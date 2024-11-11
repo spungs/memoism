@@ -1,7 +1,9 @@
-# Compiled class file
+# Java/Spring Boot 관련
 *.class
-
-# Log file
+target/
+.mvn/
+.idea/
+.settings/
 *.log
 
 # BlueJ files
@@ -22,3 +24,26 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# IDE 관련 설정 파일
+.classpath
+.project
+.vscode/
+
+# React Native/Node.js 관련
+node_modules/
+*.log
+.expo/
+.env
+
+# React Native 빌드 파일
+android/app/build/
+ios/Pods/
+ios/build/
+
+# 공통
+.DS_Store
+Thumbs.db
+
+# 테스트 관련
+test-output/
