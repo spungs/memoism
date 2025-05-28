@@ -1,0 +1,20 @@
+{
+  "login": "ログイン",
+  "signup": "サインアップ",
+  "email": "Eメール",
+  "username": "ユーザー名",
+  "password": "パスワード",
+  "saveId": "IDを保存",
+  "loginFailed": "ログインに失敗しました",
+  "signupFailed": "サインアップに失敗しました",
+  "errorOccurred": "不明なエラーが発生しました。",
+  "fillAllFields": "すべてのフィールドに入力してください。",
+  "invalidEmail": "無効なメール形式です。",
+  "invalidUsername": "ユーザー名は3〜20文字で、文字、数字、アンダースコアのみ使用できます。",
+  "invalidPassword": "パスワードは8文字以上である必要があります。",
+  "networkError": "ネットワークエラーが発生しました。もう一度お試しください。",
+  "diaryList": "日記一覧",
+  "logout": "ログアウト",
+  "newDiary": "新しい日記",
+  "loading": "読み込み中..."
+} 

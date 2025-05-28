@@ -1,0 +1,20 @@
+{
+  "login": "로그인",
+  "signup": "회원가입",
+  "email": "이메일",
+  "username": "사용자명",
+  "password": "비밀번호",
+  "saveId": "아이디 저장",
+  "loginFailed": "로그인 실패",
+  "signupFailed": "회원가입 실패",
+  "errorOccurred": "알 수 없는 오류가 발생했습니다.",
+  "fillAllFields": "모든 필드를 입력해주세요.",
+  "invalidEmail": "올바른 이메일 형식이 아닙니다.",
+  "invalidUsername": "사용자명은 3-20자의 영문, 숫자, _만 사용 가능합니다.",
+  "invalidPassword": "비밀번호는 8자 이상이어야 합니다.",
+  "networkError": "네트워크 오류가 발생했습니다. 다시 시도해주세요.",
+  "diaryList": "일기 목록",
+  "logout": "로그아웃",
+  "newDiary": "새 일기",
+  "loading": "로딩중..."
+} 
