@@ -234,11 +234,11 @@ pkill -f uvicorn
 | `cd apps/backend && PYTHONPATH=. python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload &` | 백엔드 시작 |
 | `cd apps/mobile && npx expo start` | Expo 시작 |
 | `cd apps/mobile && npx expo start --ios` | iOS 시뮬레이터에서 앱 실행 |
-| `cd apps/mobile && npx expo start --android` | Android 에뮬레이터에서 앱 실행 |
+| `cd apps/mobile && npx expo run:android` | Android 에뮬레이터에서 앱 실행 |
 | `lsof -ti:8000 \| xargs kill -9` | 포트 8000 정리 |
 | `npx expo start --clear` | 캐시 정리 후 Expo 시작 |
 | `curl -v http://localhost:8000/` | 접속 확인 |
-| ifconfig | grep -E "inet.*broadcast" | awk '{print $2}' | 현재 ip 확인
+| ifconfig | grep -E "inet.*broadcast" | awk '{print $2}' | 현재 ip 확인, config.ts에서 ip 확인하기
 
 ---
 

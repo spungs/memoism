@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: memoism-backend
+Version: 0.1.0
+Requires-Dist: fastapi[all]
+Requires-Dist: uvicorn
+Requires-Dist: sqlmodel
+Requires-Dist: python-jose[cryptography]
+Requires-Dist: passlib[bcrypt]
+Requires-Dist: python-multipart
+Requires-Dist: psycopg2-binary
+Dynamic: requires-dist
