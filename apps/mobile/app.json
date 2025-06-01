@@ -25,14 +25,23 @@
       "package": "com.mobile.app",
       "permissions": [
         "INTERNET",
-        "ACCESS_NETWORK_STATE",
-        "DETECT_SCREEN_CAPTURE"
+        "ACCESS_NETWORK_STATE"
       ],
       "usesCleartextTraffic": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": []
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false
+          }
+        }
+      ]
+    ]
   }
 }

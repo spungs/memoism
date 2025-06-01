@@ -238,6 +238,7 @@ pkill -f uvicorn
 | `lsof -ti:8000 \| xargs kill -9` | 포트 8000 정리 |
 | `npx expo start --clear` | 캐시 정리 후 Expo 시작 |
 | `curl -v http://localhost:8000/` | 접속 확인 |
+| ifconfig | grep -E "inet.*broadcast" | awk '{print $2}' | 현재 ip 확인
 
 ---
 
