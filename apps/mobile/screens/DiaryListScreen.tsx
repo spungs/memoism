@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Button, FlatList, SafeAreaView, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RootStackParamList } from '../utils/navigationRef';
 import { useDiaries, useUpdateDiary } from '../api/diaryApi';
 import { useDiaryStore } from '../store/diaryStore';
@@ -12,7 +13,7 @@ export default function DiaryListScreen({ navigation }: Props) {
   const { data: diaries, isLoading, error } = useDiaries();
   const updateDiaryMutation = useUpdateDiary();
   const setDiaries = useDiaryStore((state) => state.setDiaries);
-  const setToken = useAuthStore((state) => state.setToken);
+  const { logout, user } = useAuthStore();
 
   React.useEffect(() => {
     if (diaries) {
@@ -21,13 +22,40 @@ export default function DiaryListScreen({ navigation }: Props) {
   }, [diaries, setDiaries]);
 
   const handleLogout = async () => {
-    try {
-      setToken(null);
-      setDiaries([]);
-      // Navigation will automatically switch to AuthLogin when token is cleared
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
+    Alert.alert(
+      '로그아웃',
+      '정말 로그아웃하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        { 
+          text: '로그아웃', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // 현재 사용자의 아이디 저장 설정을 확인
+              const savedId = await AsyncStorage.getItem('savedId');
+              const currentUserEmail = user?.email;
+              
+              // 현재 로그인한 사용자의 이메일이 저장되어 있는지 확인
+              const shouldKeepSavedId = savedId === currentUserEmail;
+              
+              // 아이디 저장이 되어있지 않거나 다른 사용자라면 저장된 아이디 제거
+              if (!shouldKeepSavedId) {
+                await AsyncStorage.removeItem('savedId');
+              }
+              // shouldKeepSavedId가 true라면 savedId는 그대로 유지
+              
+              setDiaries([]);
+              logout(); // This clears both token and user from the auth store
+              // Navigation will automatically switch to AuthLogin when token is cleared
+            } catch (error) {
+              console.error('Failed to clear storage:', error);
+              logout(); // Still logout even if storage clearing fails
+            }
+          }
+        }
+      ]
+    );
   };
 
   const toggleShareStatus = async (diaryId: string, currentStatus: boolean) => {

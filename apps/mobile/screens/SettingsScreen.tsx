@@ -7,6 +7,7 @@ import { useAuthStore } from '../store/authStore';
 import { useNotifications, useMarkNotificationAsRead } from '../api/followApi';
 import { useUpdateProfile, useCurrentUser } from '../api/authApi';
 import { useTranslation } from 'react-i18next';
+import { API_URL } from '../api/config';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -71,7 +72,19 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await AsyncStorage.removeItem('savedId');
+              // 현재 사용자의 아이디 저장 설정을 확인
+              const savedId = await AsyncStorage.getItem('savedId');
+              const currentUserEmail = displayUser?.email;
+              
+              // 현재 로그인한 사용자의 이메일이 저장되어 있는지 확인
+              const shouldKeepSavedId = savedId === currentUserEmail;
+              
+              // 아이디 저장이 되어있지 않거나 다른 사용자라면 저장된 아이디 제거
+              if (!shouldKeepSavedId) {
+                await AsyncStorage.removeItem('savedId');
+              }
+              // shouldKeepSavedId가 true라면 savedId는 그대로 유지
+              
               await AsyncStorage.removeItem('pushNotifications');
               logout(); // This clears both token and user from the auth store
               // Navigation will automatically switch to AuthLogin when token is cleared
@@ -103,6 +116,28 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
 
     try {
       await updateProfileMutation.mutateAsync({ username: newUsername.trim() });
+      
+      // 업데이트 후 최신 사용자 정보를 다시 가져오기
+      try {
+        const userResponse = await fetch(`${API_URL}/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${useAuthStore.getState().token}`,
+          },
+        });
+        
+        if (userResponse.ok) {
+          const updatedUserData = await userResponse.json();
+          setUser({
+            id: updatedUserData.id,
+            email: updatedUserData.email,
+            username: updatedUserData.username,
+          });
+        }
+      } catch (fetchError) {
+        console.error('Failed to fetch updated user info:', fetchError);
+        // 사용자 정보 가져오기가 실패해도 Alert는 표시
+      }
+      
       setShowUsernameModal(false);
       setNewUsername('');
       Alert.alert('성공', '닉네임이 변경되었습니다.');
