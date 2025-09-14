@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Memoism is a **mobile‐first diary application** that pairs every user with a virtual AI character. The character helps users search, recall, and reflect on past diary entries through natural conversation. Memoism targets a global audience and must deliver a consistent user experience on both **iOS and Android** using a single React Native code‑base.
+Memoism is a **mobile‐first diary application** that pairs every user with a virtual AI character. The character helps users search, recall, and reflect on past diary entries through natural conversation. Memoism targets a global audience and must deliver a consistent user experience on both **iOS and Android** using a single React Native code‑base.
 
 ---
 
@@ -10,13 +10,13 @@ Memoism is a **mobile‐first diary application** that pairs every user with a v
 
 | ID     | Title           | As a …         | I want …                                                        | So that …                           |
 | ------ | --------------- | -------------- | --------------------------------------------------------------- | ----------------------------------- |
-|  US‑01 | Write Diary     | user           | to write daily diary entries with rich‑text (markdown) & images | I can record my memories            |
-|  US‑02 | Fast Search     | paid user      | the AI character to answer questions about my past entries      | I retrieve memories instantly       |
-|  US‑03 | 30‑day Trial    | new user       | free access to the AI character for 30 days                     | I can evaluate the feature          |
-|  US‑04 | Character Sleep | non‑subscriber | the character to appear asleep                                  | monetisation is visually reinforced |
-|  US‑05 | Shop – Coins    | user           | to buy app‑coins (1 coin = ₩100) via IAP                        | I can purchase outfits              |
-|  US‑06 | Outfit Change   | user           | to dress my character or revert its age                         | personalisation & revenue           |
-|  US‑07 | Diary Share     | user           | to share a diary publicly with comments & reactions             | social engagement                   |
+| US‑01 | Write Diary     | user           | to write daily diary entries with rich‑text (markdown) & images | I can record my memories            |
+| US‑02 | Fast Search     | paid user      | the AI character to answer questions about my past entries      | I retrieve memories instantly       |
+| US‑03 | 30‑day Trial    | new user       | free access to the AI character for 30 days                     | I can evaluate the feature          |
+| US‑04 | Character Sleep | non‑subscriber | the character to appear asleep                                  | monetisation is visually reinforced |
+| US‑05 | Shop – Coins    | user           | to buy app‑coins (1 coin = ₩100) via IAP                        | I can purchase outfits              |
+| US‑06 | Outfit Change   | user           | to dress my character or revert its age                         | personalisation & revenue           |
+| US‑07 | Diary Share     | user           | to share a diary publicly with comments & reactions             | social engagement                   |
 
 ---
 
@@ -86,8 +86,8 @@ Memoism is a **mobile‐first diary application** that pairs every user with a v
 
 * **Repo**: mono‑repo (Expo + Python) – Nx workspace
 * **CI**: GitHub Actions →
-    – lint / test → build Android APK & iOS sim build → upload to TestFlight & Internal Testing
-    – backend deploy to Railway
+  – lint / test → build Android APK & iOS sim build → upload to TestFlight & Internal Testing
+  – backend deploy to Railway
 * **CD**: EAS Submit for stores; Railway auto deploy on `main`.
 
 ---
@@ -244,8 +244,8 @@ Memoism은 **모바일 우선 일기 애플리케이션**으로, 사용자마다
 
 * **리포지터리**: 모노레포(Expo + Python) – Nx
 * **CI**: GitHub Actions
-    – 린트·테스트 → Android APK & iOS 시뮬 빌드 → TestFlight·Internal Testing 업로드
-    – 백엔드 Railway 배포
+  – 린트·테스트 → Android APK & iOS 시뮬 빌드 → TestFlight·Internal Testing 업로드
+  – 백엔드 Railway 배포
 * **CD**: EAS Submit(스토어 배포), `main` 브랜치→Railway 자동 배포
 
 ---
@@ -313,106 +313,3 @@ memoism/
 *최종 업데이트: 2025‑05‑18*
 
 ---
-
-## 10. 개발 진행 상황 (2025-05-24)
-
-### ✅ 완료된 기능
-
-#### 인증 시스템
-- JWT 기반 로그인/회원가입 구현
-- 강화된 에러 핸들링 (타임아웃, 서버 상태별 오류 메시지)
-- 클라이언트 사이드 유효성 검사 (이메일, 사용자명, 비밀번호)
-- 한국어 오류 메시지
-
-#### 일기 시스템
-- 일기 CRUD 기능 완성
-- 공개/비공개 설정 기능
-- 일기 공유 해제 기능
-
-#### 팔로우 시스템
-- 사용자 팔로우/언팔로우 기능
-- 팔로워/팔로잉 목록 조회
-- 알림 시스템 (팔로우, 일기 공유)
-
-#### Instagram 스타일 공유 피드
-- **스토리 섹션**: 상단 가로 스크롤 팔로잉 사용자 표시
-- **필터링 기능**: 스토리 클릭으로 해당 사용자 일기만 필터링
-- **포스트 카드**: 사용자 정보, 일기 내용, 좋아요/댓글 수
-- **좋아요 시스템**: ❤️/🤍 토글, 실시간 카운트
-- **댓글 시스템**: 댓글 작성, 수정, 삭제 (본인 댓글만)
-- **Pull-to-refresh**: 새로고침 기능
-
-#### 사용자 프로필 시스템
-- **닉네임 설정**: 설정 메뉴에서 닉네임 변경 가능
-- **실시간 사용자 정보**: `/auth/me` 엔드포인트로 최신 정보 동기화
-- **닉네임 중복 검사**: 백엔드에서 유니크 검증
-
-#### 네트워크 및 배포
-- 모바일 에뮬레이터에서 접근 가능한 네트워크 설정
-- Android HTTP 통신 허용 설정
-- iOS/Android 크로스 플랫폼 테스트 완료
-
-### 🔄 현재 진행 중인 작업
-
-#### 사용자 정보 동기화 문제 해결
-- **이슈**: 로그인 시 사용자 정보가 `authStore`에 제대로 저장되지 않음
-- **해결 방법**: 
-  - 백엔드 `/auth/me` 엔드포인트 추가 ✅
-  - 로그인 성공 후 사용자 정보 자동 가져오기 ✅
-  - 설정 화면에서 `useCurrentUser` 훅 사용 ✅
-- **상태**: 코드상으로 완료, 테스트 필요
-
-### ❌ 해결 필요한 문제
-
-#### Android 에뮬레이터 에러
-- **에러 1**: `DETECT_SCREEN_CAPTURE` 권한 거부
-- **에러 2**: `"main" has not been registered` Invariant Violation
-- **시도한 해결책**:
-  - AndroidManifest.xml에서 해당 권한 제거
-  - Expo 캐시 완전 정리
-  - 의존성 재설치
-- **상태**: 여전히 미해결
-
-#### 포트 충돌 문제
-- 백엔드 서버 포트 8000 Address already in use
-- 기존 프로세스 정리 필요
-
-### 📝 다음 작업 계획
-
-1. **Android 에뮬레이터 문제 해결**
-   - 권한 설정 재검토
-   - Expo/React Native 버전 호환성 확인
-   - 새로운 Android 에뮬레이터 생성 시도
-
-2. **추가 기능 구현**
-   - AI 캐릭터 채팅 시스템
-   - 구독 및 결제 시스템
-   - 코인 상점 시스템
-
-3. **테스트 및 품질 개선**
-   - 유닛 테스트 작성
-   - E2E 테스트 구현
-   - 성능 최적화
-
-### 🏗️ 아키텍처 현황
-
-#### 백엔드 (FastAPI)
-- JWT 인증 시스템
-- SQLModel + PostgreSQL
-- 다이어리, 팔로우, 댓글, 좋아요 API 완성
-- CORS 설정 완료
-
-#### 프론트엔드 (React Native + Expo)
-- Zustand 상태 관리
-- React Query 데이터 캐싱
-- TypeScript 타입 안정성
-- Instagram 스타일 UI/UX
-
-#### 배포 환경
-- 백엔드: http://192.168.219.112:8000
-- 모바일: Expo Development Build
-- 네트워크: 모든 인터페이스(0.0.0.0) 바인딩
-
----
-
-*개발 진행상황 업데이트: 2025‑05‑24*
