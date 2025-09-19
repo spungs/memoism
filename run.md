@@ -25,11 +25,11 @@ lsof -ti:8000 | xargs kill -9
 ```bash
 # 백엔드 디렉터리로 이동 후 서버 시작 (localhost 사용)
 cd apps/backend
-PYTHONPATH=. python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+PYTHONPATH=. /Users/sonkyoungho/esc/Memoism/.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 
 # 또는 백그라운드 실행
 cd apps/backend
-PYTHONPATH=. python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload &
+PYTHONPATH=. /Users/sonkyoungho/esc/Memoism/.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload &
 ```
 
 ### 3. 백엔드 서버 확인
@@ -107,7 +107,8 @@ emulator -avd Pixel_7_API_34  # AVD 이름에 맞게 변경
 
 ### 3. 원라이너 (프로젝트 루트에서)
 ```bash
-cd apps/mobile && npx expo start --android
+# package.json에 정의된 스크립트 사용
+npm run android --prefix apps/mobile
 ```
 
 ### ⚠️ Android 문제 해결 (현재 이슈)
@@ -229,17 +230,17 @@ pkill -f uvicorn
 
 ## ⚡ 빠른 참조
 
-| 명령어 | 설명 |
-|--------|------|
-| `cd apps/backend && PYTHONPATH=. python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload &` | 백엔드 시작 |
-| `cd apps/mobile && npx expo start` | Expo 시작 |
-| `cd apps/mobile && npx expo start --ios` | iOS 시뮬레이터에서 앱 실행 |
-| `cd apps/mobile && npx expo run:android` | Android 에뮬레이터에서 앱 실행 |
-| `lsof -ti:8000 \| xargs kill -9` | 포트 8000 정리 |
-| `npx expo start --clear` | 캐시 정리 후 Expo 시작 |
-| `curl -v http://localhost:8000/` | 접속 확인 |
-| ifconfig | grep -E "inet.*broadcast" | awk '{print $2}' | 현재 ip 확인, config.ts에서 ip 확인하기
+| 명령어                                                                                                                   | 설명 |
+|------------------------------------------------------------------------------------------------------------------------|------|
+| `PYTHONPATH=. /Users/sonkyoungho/esc/Memoism/.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload`| 백엔드 시작 |
+| `npx expo start`                                                                                                       | Expo 시작 |
+| `npx expo start --ios`                                                                                                 | iOS 시뮬레이터에서 앱 실행 |
+| `npm run android`                                                                                                      | Android 에뮬레이터에서 앱 실행 |
+| `lsof -ti:8000 \| xargs kill -9`                                                                                       | 포트 8000 정리 |
+| `npx expo start --clear`                                                                                               | 캐시 정리 후 Expo 시작 |
+| `curl -v http://localhost:8000/`                                                                                       | 접속 확인 |
+| ifconfig                                                                                                               | grep -E "inet.*broadcast" | awk '{print $2}' | 현재 ip 확인, config.ts에서 ip 확인하기
 
 ---
 
-*업데이트: 2025-05-24* 
+*업데이트: 2025-09-19* 

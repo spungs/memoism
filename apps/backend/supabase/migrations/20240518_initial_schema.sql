@@ -102,25 +102,25 @@ create policy "Users can delete their own diaries"
     using (auth.uid() = user_id);
 
 -- Comments policies
-create policy "Anyone can view comments on public diaries"
-    on public.diary_comments for select
-    using (
-        exists (
-            select 1 from public.diaries
-            where diaries.id = diary_comments.diary_id
-            and (diaries.is_public = true or diaries.user_id = auth.uid())
-        )
-    );
-
-create policy "Users can create comments on public diaries"
-    on public.diary_comments for insert
-    with check (
-        exists (
-            select 1 from public.diaries
-            where diaries.id = diary_comments.diary_id
-            and diaries.is_public = true
-        )
-    );
+-- create policy "Anyone can view comments on public diaries"
+--     on public.diary_comments for select
+--     using (
+--         exists (
+--             select 1 from public.diaries
+--             where diaries.id = diary_comments.diary_id
+--             and (diaries.is_public = true or diaries.user_id = auth.uid())
+--         )
+--     );
+-- 
+-- create policy "Users can create comments on public diaries"
+--     on public.diary_comments for insert
+--     with check (
+--         exists (
+--             select 1 from public.diaries
+--             where diaries.id = diary_comments.diary_id
+--             and diaries.is_public = true
+--         )
+--     );
 
 -- Reactions policies
 create policy "Anyone can view reactions on public diaries"

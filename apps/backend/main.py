@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from auth.router import router as auth_router
 from diary.router import router as diary_router
-from follow.router import router as follow_router
 from database import create_db_and_tables
 
 app = FastAPI(title="Memoism API")
@@ -19,7 +18,6 @@ app.add_middleware(
 # 라우터 등록
 app.include_router(auth_router)
 app.include_router(diary_router)
-app.include_router(follow_router)
 
 @app.on_event("startup")
 async def on_startup():
@@ -27,4 +25,4 @@ async def on_startup():
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to Memoism API"} 
+    return {"message": "Welcome to Memoism API"}

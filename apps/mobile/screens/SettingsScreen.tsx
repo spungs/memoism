@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Switch, Alert, FlatList, TextInput, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Switch, Alert, Modal, TextInput } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RootStackParamList } from '../utils/navigationRef';
 import { useAuthStore } from '../store/authStore';
-import { useNotifications, useMarkNotificationAsRead } from '../api/followApi';
 import { useUpdateProfile, useCurrentUser } from '../api/authApi';
 import { useTranslation } from 'react-i18next';
 import { API_URL } from '../api/config';
@@ -15,12 +14,9 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { t } = useTranslation();
   const { logout, user, setUser } = useAuthStore();
   const [pushNotifications, setPushNotifications] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [newUsername, setNewUsername] = useState('');
-  const { data: notifications, isLoading: notificationsLoading } = useNotifications();
   const { data: currentUserData, isLoading: userLoading } = useCurrentUser();
-  const markAsReadMutation = useMarkNotificationAsRead();
   const updateProfileMutation = useUpdateProfile();
 
   // 현재 사용자 정보를 authStore에 업데이트
@@ -98,16 +94,6 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  const handleNotificationPress = async (notification: any) => {
-    if (!notification.is_read) {
-      try {
-        await markAsReadMutation.mutateAsync(notification.id);
-      } catch (error) {
-        console.error('Failed to mark notification as read:', error);
-      }
-    }
-  };
-
   const handleUsernameUpdate = async () => {
     if (!newUsername.trim()) {
       Alert.alert('오류', '닉네임을 입력해주세요.');
@@ -146,22 +132,6 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const renderNotificationItem = ({ item }: { item: any }) => (
-    <TouchableOpacity 
-      style={[styles.notificationItem, !item.is_read && styles.unreadNotification]}
-      onPress={() => handleNotificationPress(item)}
-    >
-      <View style={styles.notificationHeader}>
-        <Text style={styles.notificationTitle}>{item.title}</Text>
-        <Text style={styles.notificationTime}>
-          {new Date(item.created_at).toLocaleDateString('ko-KR')}
-        </Text>
-      </View>
-      <Text style={styles.notificationMessage}>{item.message}</Text>
-      {!item.is_read && <View style={styles.unreadDot} />}
-    </TouchableOpacity>
-  );
-
   // 현재 사용자 정보 (서버에서 가져온 최신 정보 우선)
   const displayUser = currentUserData || user;
 
@@ -190,41 +160,6 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               value={pushNotifications}
             />
           </View>
-
-          <TouchableOpacity 
-            style={styles.settingItem} 
-            onPress={() => setShowNotifications(!showNotifications)}
-          >
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>
-                알림 내역 ({notifications?.filter(n => !n.is_read).length || 0})
-              </Text>
-              <Text style={styles.settingDescription}>
-                팔로우 및 일기 공유 알림을 확인합니다.
-              </Text>
-            </View>
-            <Text style={styles.expandIcon}>
-              {showNotifications ? '▼' : '▶'}
-            </Text>
-          </TouchableOpacity>
-
-          {showNotifications && (
-            <View style={styles.notificationList}>
-              {notificationsLoading ? (
-                <Text style={styles.loadingText}>로딩 중...</Text>
-              ) : notifications && notifications.length > 0 ? (
-                <FlatList
-                  data={notifications}
-                  renderItem={renderNotificationItem}
-                  keyExtractor={(item) => item.id}
-                  style={styles.notificationFlatList}
-                  showsVerticalScrollIndicator={false}
-                />
-              ) : (
-                <Text style={styles.emptyNotificationText}>알림이 없습니다.</Text>
-              )}
-            </View>
-          )}
         </View>
 
         <View style={styles.section}>
@@ -365,59 +300,9 @@ const styles = StyleSheet.create({
   logoutText: {
     color: '#ff3b30',
   },
-  notificationItem: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  notificationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  notificationTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  notificationTime: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 8,
-  },
-  notificationMessage: {
-    fontSize: 14,
-    color: '#666',
-  },
-  unreadNotification: {
-    backgroundColor: '#f0f0f0',
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#ff3b30',
-    marginLeft: 8,
-  },
   expandIcon: {
     fontSize: 16,
     color: '#666',
-  },
-  notificationList: {
-    marginTop: 16,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  emptyNotificationText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  notificationFlatList: {
-    padding: 16,
   },
   modalOverlay: {
     flex: 1,
@@ -475,4 +360,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SettingsScreen; 
+export default SettingsScreen;

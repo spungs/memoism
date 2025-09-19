@@ -4,7 +4,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import type { RootStackParamList } from '../utils/navigationRef';
-import { useDiaries, useUpdateDiary } from '../api/diaryApi';
+import { useDiaries } from '../api/diaryApi';
 import { useDiaryStore } from '../store/diaryStore';
 import { useAuthStore } from '../store/authStore';
 import { Diary } from '../api/diaryApi'; // Diary 타입을 가져옵니다.
@@ -12,7 +12,7 @@ import { Diary } from '../api/diaryApi'; // Diary 타입을 가져옵니다.
 type Props = NativeStackScreenProps<RootStackParamList, 'DiaryList'>;
 
 // 각 다이어리 항목을 렌더링하는 컴포넌트
-const DiaryItem = ({ diary, navigation, onToggleShare }: { diary: Diary, navigation: Props['navigation'], onToggleShare: (id: string, status: boolean) => void }) => (
+const DiaryItem = ({ diary, navigation }: { diary: Diary, navigation: Props['navigation'] }) => (
   <View style={styles.diaryCard}>
     <View style={styles.diaryHeader}>
       <Text style={styles.diaryDateLabel}>
@@ -24,16 +24,6 @@ const DiaryItem = ({ diary, navigation, onToggleShare }: { diary: Diary, navigat
           style={styles.editButton}
         >
           <Ionicons name="pencil" size={16} color="#007AFF" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => onToggleShare(diary.id, diary.is_public || false)}
-          style={[styles.shareToggleButton, diary.is_public && styles.sharedButton]}
-        >
-          <Ionicons 
-            name={diary.is_public ? "eye" : "eye-off"} 
-            size={16} 
-            color={diary.is_public ? "#34C759" : "#8E8E93"} 
-          />
         </TouchableOpacity>
       </View>
     </View>
@@ -52,20 +42,12 @@ const DiaryItem = ({ diary, navigation, onToggleShare }: { diary: Diary, navigat
         ))}
       </ScrollView>
     )}
-    
-    {diary.is_public && (
-      <View style={styles.publicIndicator}>
-        <Ionicons name="globe-outline" size={14} color="#34C759" />
-        <Text style={styles.publicText}>공유됨</Text>
-      </View>
-    )}
   </View>
 );
 
 
 export default function DiaryListScreen({ navigation }: Props) {
   const { data: diaries, isLoading, error } = useDiaries();
-  const updateDiaryMutation = useUpdateDiary();
   const setDiaries = useDiaryStore((state) => state.setDiaries);
   const { logout, user } = useAuthStore();
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -100,31 +82,6 @@ export default function DiaryListScreen({ navigation }: Props) {
             } catch (error) {
               console.error('Failed to clear storage:', error);
               logout();
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const toggleShareStatus = async (diaryId: string, currentStatus: boolean) => {
-    const action = currentStatus ? '공유 해제' : '공유';
-    Alert.alert(
-      `일기 ${action}`,
-      `정말 이 일기를 ${action}하시겠습니까?`,
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: action,
-          onPress: async () => {
-            try {
-              await updateDiaryMutation.mutateAsync({
-                id: diaryId,
-                is_public: !currentStatus
-              });
-              Alert.alert('성공', `일기가 ${action}되었습니다.`);
-            } catch (error) {
-              Alert.alert('오류', `일기 ${action} 중 오류가 발생했습니다.`);
             }
           }
         }
@@ -275,15 +232,6 @@ export default function DiaryListScreen({ navigation }: Props) {
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.navItem}
-              onPress={() => navigation.navigate('ShareFeed')}
-            >
-              <View style={styles.navIconWrapper}>
-                <Ionicons name="people-outline" size={24} color="#8E8E93" />
-              </View>
-            </TouchableOpacity>
-
             <TouchableOpacity style={styles.navItem}>
               <View style={styles.navIconWrapper}>
                 <Ionicons name="search-outline" size={24} color="#8E8E93" />
@@ -315,7 +263,6 @@ export default function DiaryListScreen({ navigation }: Props) {
                 <DiaryItem 
                   diary={item} 
                   navigation={navigation} 
-                  onToggleShare={toggleShareStatus} 
                 />
               )}
               ListHeaderComponent={
@@ -585,14 +532,6 @@ const styles = StyleSheet.create({
   },
   editButton: {
     padding: 8,
-    marginRight: 8,
-  },
-  shareToggleButton: {
-    padding: 8,
-  },
-  sharedButton: {
-    backgroundColor: '#E8F5E8',
-    borderRadius: 4,
   },
   diaryContent: {
     fontSize: 16,
@@ -608,21 +547,6 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 8,
     marginRight: 8,
-  },
-  publicIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E8F5E8',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-  },
-  publicText: {
-    fontSize: 12,
-    color: '#34C759',
-    marginLeft: 4,
-    fontWeight: '500',
   },
   emptyDiarySection: {
     flex: 1,
