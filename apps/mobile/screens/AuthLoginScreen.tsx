@@ -1,49 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, SafeAreaView } from 'react-native';
 import Checkbox from 'expo-checkbox';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useLogin, useCurrentUser } from '../api/authApi';
+import { useLogin } from '../api/authApi';
 import { useAuthStore } from '../store/authStore';
 import { API_URL } from '../api/config';
-import type { LoginData, AuthResponse } from '../api/authApi';
 
 export default function AuthLoginScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [saveId, setSaveId] = useState(false);
-  // const [autoLogin, setAutoLogin] = useState(false);
   const login = useLogin();
   const { setToken, setUser } = useAuthStore();
 
-  // 앱 시작 시 저장된 값 불러오기
   useEffect(() => {
     (async () => {
       const savedId = await AsyncStorage.getItem('savedId');
-      // const savedAutoLogin = await AsyncStorage.getItem('autoLogin');
-      // const savedToken = await AsyncStorage.getItem('autoLoginToken');
-      // const savedTimestamp = await AsyncStorage.getItem('autoLoginTimestamp');
       if (savedId) {
         setEmail(savedId);
         setSaveId(true);
       }
-      // if (savedAutoLogin === 'true' && savedToken && savedTimestamp) {
-      //   const now = Date.now();
-      //   const diff = now - parseInt(savedTimestamp, 10);
-      //   if (diff < 1000) {
-      //     setAutoLogin(true);
-      //     setToken(savedToken);
-      //     navigation.replace('MainTabs');
-      //   } else {
-      //     await AsyncStorage.removeItem('autoLoginToken');
-      //     await AsyncStorage.removeItem('autoLoginTimestamp');
-      //     await AsyncStorage.removeItem('autoLogin');
-      //     setToken(null);
-      //   }
-      // }
     })();
   }, []);
 
-  // 체크박스 상태 변경 시 즉시 저장/삭제
   const handleSaveIdChange = async (value: boolean) => {
     setSaveId(value);
     if (value) {
@@ -53,19 +32,7 @@ export default function AuthLoginScreen({ navigation }: any) {
     }
   };
 
-  // const handleAutoLoginChange = async (value: boolean) => {
-  //   setAutoLogin(value);
-  //   if (value) {
-  //     await AsyncStorage.setItem('autoLogin', 'true');
-  //   } else {
-  //     await AsyncStorage.removeItem('autoLogin');
-  //     await AsyncStorage.removeItem('autoLoginToken');
-  //     await AsyncStorage.removeItem('autoLoginTimestamp');
-  //   }
-  // };
-
   const handleLogin = async () => {
-    // 기본 유효성 검사
     if (!email.trim()) {
       Alert.alert('입력 오류', '이메일을 입력해주세요.');
       return;
@@ -79,7 +46,6 @@ export default function AuthLoginScreen({ navigation }: any) {
       const response = await login.mutateAsync({ email: email.trim(), password });
       setToken(response.access_token);
       
-      // 사용자 정보 가져오기
       try {
         const userResponse = await fetch(`${API_URL}/auth/me`, {
           method: 'GET',
@@ -101,7 +67,6 @@ export default function AuthLoginScreen({ navigation }: any) {
         console.error('Failed to fetch user info:', userError);
       }
       
-      // 아이디 저장 체크박스가 체크되어 있으면 항상 현재 이메일로 저장
       if (saveId) {
         await AsyncStorage.setItem('savedId', email.trim());
       } else {
@@ -120,103 +85,123 @@ export default function AuthLoginScreen({ navigation }: any) {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>로그인</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="이메일"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        editable={!login.isPending}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="비밀번호"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        editable={!login.isPending}
-      />
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-        <TouchableOpacity
-          style={{ flexDirection: 'row', alignItems: 'center', marginRight: 20 }}
-          onPress={() => handleSaveIdChange(!saveId)}
-          activeOpacity={0.7}
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.title}>로그인</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="이메일"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          editable={!login.isPending}
+          placeholderTextColor="#8E8E93"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="비밀번호"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          editable={!login.isPending}
+          placeholderTextColor="#8E8E93"
+        />
+        <View style={styles.checkboxContainer}>
+          <TouchableOpacity
+            style={styles.checkboxLabel}
+            onPress={() => handleSaveIdChange(!saveId)}
+            activeOpacity={0.7}
+          >
+            <Checkbox value={saveId} onValueChange={handleSaveIdChange} style={styles.checkbox} />
+            <Text style={styles.label}>아이디 저장</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity 
+          style={[styles.button, login.isPending && styles.buttonDisabled]} 
+          onPress={handleLogin}
+          disabled={login.isPending}
         >
-          <Checkbox value={saveId} onValueChange={handleSaveIdChange} style={{ marginRight: 4 }} />
-          <Text>아이디 저장</Text>
+          {login.isPending ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.buttonText}>로그인</Text>
+          )}
         </TouchableOpacity>
-        {/*
-        <TouchableOpacity
-          style={{ flexDirection: 'row', alignItems: 'center' }}
-          onPress={() => handleAutoLoginChange(!autoLogin)}
-          activeOpacity={0.7}
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('AuthSignup')}
+          disabled={login.isPending}
         >
-          <Checkbox value={autoLogin} onValueChange={handleAutoLoginChange} style={{ marginRight: 4 }} />
-          <Text>자동로그인</Text>
+          <Text style={[styles.link, login.isPending && styles.linkDisabled]}>계정이 없으신가요? 회원가입</Text>
         </TouchableOpacity>
-        */}
       </View>
-      <TouchableOpacity 
-        style={[styles.button, login.isPending && styles.buttonDisabled]} 
-        onPress={handleLogin}
-        disabled={login.isPending}
-      >
-        {login.isPending ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <Text style={styles.buttonText}>로그인</Text>
-        )}
-      </TouchableOpacity>
-      <TouchableOpacity 
-        onPress={() => navigation.navigate('AuthSignup')}
-        disabled={login.isPending}
-      >
-        <Text style={[styles.link, login.isPending && styles.linkDisabled]}>회원가입</Text>
-      </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F2F2F7',
     justifyContent: 'center',
-    padding: 20,
+  },
+  content: {
+    paddingHorizontal: 24,
   },
   title: {
-    fontSize: 24,
+    fontSize: 34,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 40,
     textAlign: 'center',
+    color: '#000',
   },
   input: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    fontSize: 17,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 10,
-    marginBottom: 10,
-    borderRadius: 5,
+    borderColor: '#E5E5EA',
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  checkboxLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkbox: {
+    marginRight: 8,
+  },
+  label: {
+    fontSize: 15,
+    color: '#000',
   },
   button: {
     backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 5,
-    marginBottom: 10,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 16,
   },
   buttonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#A9A9A9',
   },
   buttonText: {
     color: 'white',
-    textAlign: 'center',
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '600',
   },
   link: {
     color: '#007AFF',
     textAlign: 'center',
+    fontSize: 15,
   },
   linkDisabled: {
-    color: '#ccc',
+    color: '#A9A9A9',
   },
-}); 
+});

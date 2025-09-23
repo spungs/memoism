@@ -4,31 +4,33 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import type { RootStackParamList } from '../utils/navigationRef';
-import { useDiaries } from '../api/diaryApi';
+import { useDiaries, useDeleteDiary } from '../api/diaryApi';
 import { useDiaryStore } from '../store/diaryStore';
 import { useAuthStore } from '../store/authStore';
 import { Diary } from '../api/diaryApi'; // Diary 타입을 가져옵니다.
+import { parseApiDate, isSameLocalDay } from '../utils/date';
+import CalendarModal from '../components/CalendarModal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DiaryList'>;
 
 // 각 다이어리 항목을 렌더링하는 컴포넌트
-const DiaryItem = ({ diary, navigation }: { diary: Diary, navigation: Props['navigation'] }) => (
-  <View style={styles.diaryCard}>
+const DiaryItem = ({ diary, navigation, onDelete }: { diary: Diary, navigation: Props['navigation'], onDelete: (id: string) => void }) => (
+  <TouchableOpacity onPress={() => navigation.navigate('DiaryDetail', { id: diary.id })} style={styles.diaryCard}>
     <View style={styles.diaryHeader}>
       <Text style={styles.diaryDateLabel}>
-        {new Date(diary.created_at).toLocaleString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: true })}
+        {(() => {
+          const d = parseApiDate(diary.created_at);
+          return isNaN(d.getTime())
+            ? '-'
+            : d.toLocaleString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: true });
+        })()}
       </Text>
-      <View style={styles.diaryActions}>
-        <TouchableOpacity 
-          onPress={() => navigation.navigate('DiaryEdit', { id: diary.id })}
-          style={styles.editButton}
-        >
-          <Ionicons name="pencil" size={16} color="#007AFF" />
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity onPress={() => onDelete(diary.id)} style={styles.deleteButton}>
+        <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+      </TouchableOpacity>
     </View>
     
-    <Text style={styles.diaryContent}>{diary.content}</Text>
+    <Text style={styles.diaryContent} numberOfLines={3}>{diary.content}</Text>
     
     {diary.images && diary.images.length > 0 && (
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imagesContainer}>
@@ -42,7 +44,7 @@ const DiaryItem = ({ diary, navigation }: { diary: Diary, navigation: Props['nav
         ))}
       </ScrollView>
     )}
-  </View>
+  </TouchableOpacity>
 );
 
 
@@ -51,12 +53,36 @@ export default function DiaryListScreen({ navigation }: Props) {
   const setDiaries = useDiaryStore((state) => state.setDiaries);
   const { logout, user } = useAuthStore();
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [calendarVisible, setCalendarVisible] = useState(false);
+  const deleteDiary = useDeleteDiary();
 
   React.useEffect(() => {
     if (diaries) {
       setDiaries(diaries);
     }
   }, [diaries, setDiaries]);
+
+  const handleDelete = (id: string) => {
+    Alert.alert(
+      '일기 삭제',
+      '정말 이 일기를 삭제하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteDiary.mutateAsync(id);
+              Alert.alert('삭제 완료', '일기가 삭제되었습니다.');
+            } catch (e) {
+              Alert.alert('오류', '삭제에 실패했습니다.');
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const handleLogout = async () => {
     Alert.alert(
@@ -92,8 +118,10 @@ export default function DiaryListScreen({ navigation }: Props) {
   // 선택된 날짜의 일기 목록 필터링
   const getDiariesForSelectedDate = () => {
     if (!diaries) return [];
-    const todayString = selectedDate.toDateString();
-    return diaries.filter(diary => new Date(diary.created_at).toDateString() === todayString);
+    return diaries.filter((diary) => {
+      const d = parseApiDate(diary.created_at);
+      return !isNaN(d.getTime()) && isSameLocalDay(d, selectedDate);
+    });
   };
 
   const changeDate = (direction: 'prev' | 'next') => {
@@ -104,6 +132,10 @@ export default function DiaryListScreen({ navigation }: Props) {
       newDate.setDate(newDate.getDate() + 1);
     }
     setSelectedDate(newDate);
+  };
+
+  const resetToToday = () => {
+    setSelectedDate(new Date());
   };
 
   const formatDate = (date: Date) => ({
@@ -125,177 +157,69 @@ export default function DiaryListScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.mainFrame}>
-        {/* 상단 영역 */}
-        <View style={styles.topSection}>
-          {/* 헤더 */}
-          <View style={styles.headerFrame}>
-            <View style={styles.headerLeft}>
-              <View style={styles.iconWrapper}>
-                <Ionicons name="document-text-outline" size={24} color="#007AFF" />
-              </View>
-            </View>
-
-            <View style={styles.headerCenter}>
-              <Text style={styles.headerTitle}>새 항목</Text>
-            </View>
-
-            <TouchableOpacity 
-              style={styles.addButton}
-              onPress={() => navigation.navigate('DiaryEdit', {})}
-            >
-              <View style={styles.addButtonWrapper}>
-                <Text style={styles.addButtonText}>+</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          {/* 날짜 선택기 */}
-          <View style={styles.dateFrame}>
-            <TouchableOpacity onPress={() => changeDate('prev')}>
-              <Ionicons name="chevron-back" size={24} color="#007AFF" />
-            </TouchableOpacity>
-            
-            <View style={styles.dateContainer}>
-              <View style={styles.dateSection}>
-                <View style={styles.dateBox}>
-                  <Text style={styles.dateText}>{dateInfo.year}</Text>
-                </View>
-              </View>
-
-              <View style={styles.dateSection}>
-                <View style={styles.dateBox}>
-                  <Text style={styles.dateText}>{dateInfo.month}</Text>
-                </View>
-              </View>
-
-              <View style={styles.dateSection}>
-                <View style={styles.dateBox}>
-                  <Text style={styles.dateText}>{dateInfo.day}</Text>
-                </View>
-              </View>
-            </View>
-
-            <TouchableOpacity onPress={() => changeDate('next')}>
-              <Ionicons name="chevron-forward" size={24} color="#007AFF" />
-            </TouchableOpacity>
-          </View>
-
-          {/* 사용자 정보 */}
-          <View style={styles.userFrame}>
-            <View style={styles.userInfo}>
-              <View style={styles.userContent}>
-                <View style={styles.userAvatar}>
-                  <Text style={styles.avatarText}>
-                    {user?.username?.charAt(0).toUpperCase() || 'U'}
-                  </Text>
-                </View>
-
-                <View style={styles.userDetails}>
-                  <View style={styles.userNameContainer}>
-                    <Text style={styles.userName}>{user?.username || '사용자'}</Text>
-                  </View>
-                  <View style={styles.userTimeContainer}>
-                    <Text style={styles.userTime}>
-                      {selectedDate.toLocaleDateString('ko-KR', { 
-                        month: 'long', 
-                        day: 'numeric' 
-                      })}, {selectedDate.toLocaleDateString('ko-KR', { weekday: 'long' })}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* 장식 구분선 */}
-          <View style={styles.decorFrame1}>
-            <View style={styles.decorInner}>
-              <View style={styles.decorElement} />
-            </View>
-          </View>
-
-          <View style={styles.decorFrame2}>
-            <View style={styles.decorInner}>
-              <View style={styles.decorElement} />
-            </View>
-          </View>
-        </View>
-
-        {/* 하단 영역 */}
-        <View style={styles.bottomSection}>
-          {/* 네비게이션 바 */}
-          <View style={styles.navFrame}>
-            <TouchableOpacity style={styles.navItem}>
-              <View style={[styles.navIconWrapper, styles.activeNavItem]}>
-                <Ionicons name="home" size={24} color="#007AFF" />
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.navItem}>
-              <View style={styles.navIconWrapper}>
-                <Ionicons name="search-outline" size={24} color="#8E8E93" />
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.navItem}
-              onPress={() => navigation.navigate('Settings')}
-            >
-              <View style={styles.navIconWrapper}>
-                <Ionicons name="settings-outline" size={24} color="#8E8E93" />
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.navItem} onPress={handleLogout}>
-              <View style={styles.navIconWrapper}>
-                <Ionicons name="log-out-outline" size={24} color="#8E8E93" />
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          {/* AI 캐릭터와 일기 목록 표시 영역 */}
-          <View style={styles.contentFrame}>
-            <FlatList
-              data={diariesForDate}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <DiaryItem 
-                  diary={item} 
-                  navigation={navigation} 
-                />
-              )}
-              ListHeaderComponent={
-                <View style={styles.aiCharacterSection}>
-                  <View style={styles.aiCharacter}>
-                    <Ionicons name="sparkles" size={32} color="#FFD700" />
-                  </View>
-                  <Text style={styles.aiGreeting}>
-                    {diariesForDate.length > 0
-                      ? `${dateInfo.month}월 ${dateInfo.day}일의 일기 ${diariesForDate.length}개를 찾았어요!` 
-                      : `${dateInfo.month}월 ${dateInfo.day}일에는 아직 일기가 없네요.`
-                    }
-                  </Text>
-                </View>
-              }
-              ListEmptyComponent={
-                <View style={styles.emptyDiarySection}>
-                  <TouchableOpacity 
-                    style={styles.createDiaryPrompt}
-                    onPress={() => navigation.navigate('DiaryEdit', {})}
-                  >
-                    <Ionicons name="add-circle-outline" size={48} color="#007AFF" />
-                    <Text style={styles.createDiaryText}>이날의 일기를 작성해보세요</Text>
-                  </TouchableOpacity>
-                </View>
-              }
-              ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
-              style={styles.diaryDisplaySection}
-              contentContainerStyle={{ paddingBottom: 16 }}
-            />
-          </View>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>일기</Text>
+        <View style={styles.headerIcons}>
+          <TouchableOpacity onPress={() => Alert.alert('알림', '샵 기능은 곧 준비될 예정입니다!')} style={styles.iconButton}>
+            <Ionicons name="grid-outline" size={24} color="#007AFF" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.iconButton}>
+            <Ionicons name="settings-outline" size={24} color="#007AFF" />
+          </TouchableOpacity>
         </View>
       </View>
+
+      <View style={styles.dateSelector}>
+        <TouchableOpacity onPress={() => changeDate('prev')}>
+          <Ionicons name="chevron-back" size={24} color="#007AFF" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setCalendarVisible(true)}>
+          <Text style={styles.dateText}>{`${dateInfo.year}년 ${dateInfo.month}월 ${dateInfo.day}일`}</Text>
+        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity onPress={resetToToday} style={{ marginRight: 8 }}>
+            <Ionicons name="refresh" size={22} color="#007AFF" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => changeDate('next')}>
+            <Ionicons name="chevron-forward" size={24} color="#007AFF" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <FlatList
+        data={diariesForDate}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <DiaryItem 
+            diary={item} 
+            navigation={navigation} 
+            onDelete={handleDelete}
+          />
+        )}
+        ListEmptyComponent={
+          <View style={styles.emptyDiarySection}>
+            <Ionicons name="journal-outline" size={48} color="#ccc" />
+            <Text style={styles.emptyDiaryText}>이날의 일기가 없습니다.</Text>
+          </View>
+        }
+        ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+        style={styles.diaryList}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      />
+
+      <TouchableOpacity 
+        style={styles.addButton}
+        onPress={() => navigation.navigate('DiaryEdit', {})}
+      >
+        <Ionicons name="add" size={32} color="white" />
+      </TouchableOpacity>
+
+      <CalendarModal
+        visible={calendarVisible}
+        initialDate={selectedDate}
+        onClose={() => setCalendarVisible(false)}
+        onSelect={(d) => setSelectedDate(d)}
+      />
     </SafeAreaView>
   );
 }
@@ -303,207 +227,43 @@ export default function DiaryListScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F2F2F7',
   },
-  mainFrame: {
-    flex: 1,
-  },
-  topSection: {
-    backgroundColor: '#fff',
-    paddingBottom: 16,
-  },
-  headerFrame: {
+  header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  iconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerCenter: {
-    flex: 2,
-    alignItems: 'center',
+    paddingVertical: 12,
+    backgroundColor: '#F2F2F7',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 34,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#000',
   },
-  addButton: {
-    flex: 1,
-    alignItems: 'flex-end',
-  },
-  addButtonWrapper: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  dateFrame: {
+  headerIcons: {
     flexDirection: 'row',
+  },
+  iconButton: {
+    marginLeft: 16,
+  },
+  dateSelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  dateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 24,
-  },
-  dateSection: {
-    marginHorizontal: 8,
-  },
-  dateBox: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingVertical: 8,
+    backgroundColor: '#F2F2F7',
   },
   dateText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '600',
     color: '#007AFF',
   },
-  userFrame: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  userContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  userAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  userDetails: {
-    marginLeft: 12,
-  },
-  userNameContainer: {
-    marginBottom: 2,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  userTimeContainer: {
-    marginTop: 2,
-  },
-  userTime: {
-    fontSize: 12,
-    color: '#666',
-  },
-  decorFrame1: {
-    height: 1,
-    backgroundColor: '#E3F2FD',
-    marginHorizontal: 16,
-    marginVertical: 4,
-  },
-  decorInner: {
-    flex: 1,
-  },
-  decorElement: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#E3F2FD',
-  },
-  decorFrame2: {
-    height: 1,
-    backgroundColor: '#E3F2FD',
-    marginHorizontal: 16,
-    marginVertical: 4,
-  },
-  bottomSection: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  navFrame: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  navItem: {
-    padding: 8,
-  },
-  navIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  activeNavItem: {
-    backgroundColor: '#E3F2FD',
-  },
-  contentFrame: {
+  diaryList: {
     flex: 1,
     paddingHorizontal: 16,
-  },
-  aiCharacterSection: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 16,
-    marginTop: 16,
-  },
-  aiCharacter: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#FFF8DC',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  aiGreeting: {
-    fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  diaryDisplaySection: {
-    flex: 1,
   },
   diaryCard: {
     backgroundColor: '#fff',
@@ -512,39 +272,35 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
     elevation: 2,
   },
   diaryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   diaryDateLabel: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    color: '#8E8E93',
     fontWeight: '500',
   },
-  diaryActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  editButton: {
-    padding: 8,
+  deleteButton: {
+    padding: 4,
   },
   diaryContent: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#333',
-    marginBottom: 16,
-  },
-  imagesContainer: {
+    fontSize: 17,
+    lineHeight: 22,
+    color: '#000',
     marginBottom: 12,
   },
+  imagesContainer: {
+    marginTop: 8,
+  },
   diaryImage: {
-    width: 120,
-    height: 120,
+    width: 100,
+    height: 100,
     borderRadius: 8,
     marginRight: 8,
   },
@@ -552,22 +308,28 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 80,
   },
-  createDiaryPrompt: {
+  emptyDiaryText: {
+    fontSize: 17,
+    color: '#8E8E93',
+    marginTop: 16,
+  },
+  addButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#E3F2FD',
-    borderStyle: 'dashed',
-  },
-  createDiaryText: {
-    fontSize: 16,
-    color: '#007AFF',
-    marginTop: 12,
-    fontWeight: '500',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   loadingContainer: {
     flex: 1,

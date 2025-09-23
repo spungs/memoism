@@ -7,7 +7,7 @@ interface UserInfo {
   username: string;
 }
 
-interface Diary {
+export interface Diary {
   id: string;
   user_id: string;
   content: string;
@@ -20,17 +20,18 @@ interface Diary {
 // 일기 목록 조회
 export const useDiaries = () => {
   const token = useAuthStore((state) => state.token);
-  return useQuery<Diary[]>({
+  return useQuery<Diary[]>({ 
     queryKey: ['diaries', token],
     queryFn: async () => {
-      const url = `${API_URL}/diaries`; // Explicitly define URL
+      const currentToken = useAuthStore.getState().token;
+      const url = `${API_URL}/diaries`;
       console.log('[FORCE REFRESH] Fetching diaries from URL:', url);
       
       try {
-        const response = await fetch(url, { // Use the variable
+        const response = await fetch(url, {
           headers: {
             'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
           },
         });
         
@@ -52,15 +53,17 @@ export const useDiaries = () => {
       }
     },
     enabled: !!token, // 토큰이 있을 때만 쿼리 실행
+    refetchOnMount: true,
+    refetchOnReconnect: true,
   });
 };
 
 // 일기 상세 조회
 export const useDiary = (id: string) => {
-  const token = useAuthStore((state) => state.token);
-  return useQuery<Diary>({
+  return useQuery<Diary>({ 
     queryKey: ['diary', id],
     queryFn: async () => {
+      const token = useAuthStore.getState().token;
       const response = await fetch(`${API_URL}/diaries/${id}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -73,21 +76,25 @@ export const useDiary = (id: string) => {
 // 일기 작성
 export const useCreateDiary = () => {
   const queryClient = useQueryClient();
-  const token = useAuthStore((state) => state.token);
   return useMutation({
-    mutationFn: async ({ content, images }: { content: string; images?: string[] }) => {
+    mutationFn: async ({ content, images, location }: { content: string; images?: string[], location?: any }) => {
+      const token = useAuthStore.getState().token;
       const response = await fetch(`${API_URL}/diaries`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ content, images }),
+        body: JSON.stringify({ content, images, location }),
       });
       if (!response.ok) throw new Error('Failed to create diary');
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (newDiary) => {
+      const currentToken = useAuthStore.getState().token;
+      queryClient.setQueryData<Diary[]>(['diaries', currentToken], (old) =>
+        old ? [newDiary as Diary, ...old] : [newDiary as Diary]
+      );
       queryClient.invalidateQueries({ queryKey: ['diaries'] });
     },
   });
@@ -96,12 +103,13 @@ export const useCreateDiary = () => {
 // 일기 수정
 export const useUpdateDiary = () => {
   const queryClient = useQueryClient();
-  const token = useAuthStore((state) => state.token);
   return useMutation({
-    mutationFn: async ({ id, content, images }: { id: string; content?: string; images?: string[] }) => {
-      const updateData: { content?: string; images?: string[] } = {};
+    mutationFn: async ({ id, content, images, location }: { id: string; content?: string; images?: string[], location?: any }) => {
+      const token = useAuthStore.getState().token;
+      const updateData: { content?: string; images?: string[]; location?: any } = {};
       if (content !== undefined) updateData.content = content;
       if (images !== undefined) updateData.images = images;
+      if (location !== undefined) updateData.location = location;
       
       const response = await fetch(`${API_URL}/diaries/${id}`, {
         method: 'PUT',
@@ -127,9 +135,9 @@ export const useUpdateDiary = () => {
 // 일기 삭제
 export const useDeleteDiary = () => {
   const queryClient = useQueryClient();
-  const token = useAuthStore((state) => state.token);
   return useMutation({
     mutationFn: async (id: string) => {
+      const token = useAuthStore.getState().token;
       const response = await fetch(`${API_URL}/diaries/${id}`, {
         method: 'DELETE',
         headers: {

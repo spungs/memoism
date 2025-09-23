@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, SafeAreaView } from 'react-native';
 import { useSignup } from '../api/authApi';
 
 export default function AuthSignupScreen({ navigation }: any) {
@@ -9,7 +9,6 @@ export default function AuthSignupScreen({ navigation }: any) {
   const signup = useSignup();
 
   const handleSignup = async () => {
-    // 기본 유효성 검사
     if (!email.trim()) {
       Alert.alert('입력 오류', '이메일을 입력해주세요.');
       return;
@@ -46,92 +45,106 @@ export default function AuthSignupScreen({ navigation }: any) {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>회원가입</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="이메일"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        editable={!signup.isPending}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="사용자명 (3-20자, 영문/숫자/_ 가능)"
-        value={username}
-        onChangeText={setUsername}
-        autoCapitalize="none"
-        editable={!signup.isPending}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="비밀번호 (8자 이상)"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        editable={!signup.isPending}
-      />
-      <TouchableOpacity 
-        style={[styles.button, signup.isPending && styles.buttonDisabled]} 
-        onPress={handleSignup}
-        disabled={signup.isPending}
-      >
-        {signup.isPending ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <Text style={styles.buttonText}>회원가입</Text>
-        )}
-      </TouchableOpacity>
-      <TouchableOpacity 
-        onPress={() => navigation.navigate('AuthLogin')}
-        disabled={signup.isPending}
-      >
-        <Text style={[styles.link, signup.isPending && styles.linkDisabled]}>로그인</Text>
-      </TouchableOpacity>
-    </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.title}>회원가입</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="이메일"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          editable={!signup.isPending}
+          placeholderTextColor="#8E8E93"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="사용자명 (3-20자, 영문/숫자/_ 가능)"
+          value={username}
+          onChangeText={setUsername}
+          autoCapitalize="none"
+          editable={!signup.isPending}
+          placeholderTextColor="#8E8E93"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="비밀번호 (8자 이상)"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          editable={!signup.isPending}
+          placeholderTextColor="#8E8E93"
+        />
+        <TouchableOpacity 
+          style={[styles.button, signup.isPending && styles.buttonDisabled]} 
+          onPress={handleSignup}
+          disabled={signup.isPending}
+        >
+          {signup.isPending ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.buttonText}>회원가입</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('AuthLogin')}
+          disabled={signup.isPending}
+        >
+          <Text style={[styles.link, signup.isPending && styles.linkDisabled]}>이미 계정이 있으신가요? 로그인</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F2F2F7',
     justifyContent: 'center',
-    padding: 20,
+  },
+  content: {
+    paddingHorizontal: 24,
   },
   title: {
-    fontSize: 24,
+    fontSize: 34,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 40,
     textAlign: 'center',
+    color: '#000',
   },
   input: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    fontSize: 17,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 10,
-    marginBottom: 10,
-    borderRadius: 5,
+    borderColor: '#E5E5EA',
   },
   button: {
     backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 5,
-    marginBottom: 10,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 16,
   },
   buttonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#A9A9A9',
   },
   buttonText: {
     color: 'white',
-    textAlign: 'center',
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '600',
   },
   link: {
     color: '#007AFF',
     textAlign: 'center',
+    fontSize: 15,
   },
   linkDisabled: {
-    color: '#ccc',
+    color: '#A9A9A9',
   },
-}); 
+});

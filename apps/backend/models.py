@@ -4,6 +4,8 @@ from uuid import UUID, uuid4
 import json
 
 from sqlmodel import Field, SQLModel
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column
 
 class Profile(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
@@ -21,9 +23,11 @@ class Diary(SQLModel, table=True):
     user_id: UUID = Field(foreign_key="profile.id")
     content: str
     images: Optional[str] = None  # JSON string storing array of image URLs
+    location: Optional[dict] = Field(default=None, sa_column=Column(JSONB, nullable=True))
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     is_public: bool = Field(default=False)
+
     
 
 class StoreItem(SQLModel, table=True):

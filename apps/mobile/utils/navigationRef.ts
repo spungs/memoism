@@ -11,6 +11,7 @@ export type RootStackParamList = {
   DiaryEdit: { id?: string };
   
   Settings: undefined;
+  Map: { locations: any[] };
 };
 
 // 전역 네비게이션 ref 생성

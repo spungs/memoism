@@ -2,7 +2,6 @@ import React from 'react';
 import { 
   View, 
   Text, 
-  Button, 
   Alert, 
   SafeAreaView, 
   TouchableOpacity, 
@@ -15,11 +14,11 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../utils/navigationRef';
 import { useDiary, useDeleteDiary } from '../api/diaryApi';
 import { Ionicons } from '@expo/vector-icons';
+import { parseApiDate } from '../utils/date';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DiaryDetail'>;
 
 const { width } = Dimensions.get('window');
-const imageSize = (width - 48) / 2; // 2개씩 한 줄에 배치
 
 export default function DiaryDetailScreen({ navigation, route }: Props) {
   const { id } = route.params;
@@ -51,86 +50,113 @@ export default function DiaryDetailScreen({ navigation, route }: Props) {
 
   if (isLoading) return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.loadingText}>로딩 중...</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>일기</Text>
+        <View style={{ width: 24 }} />
+      </View>
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>로딩 중...</Text>
+      </View>
     </SafeAreaView>
   );
   
   if (error || !diary) return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.errorText}>일기를 불러오지 못했습니다.</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>오류</Text>
+        <View style={{ width: 24 }} />
+      </View>
+      <View style={styles.loadingContainer}>
+        <Text style={styles.errorText}>일기를 불러오지 못했습니다.</Text>
+      </View>
     </SafeAreaView>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 헤더 */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>일기 상세</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('DiaryEdit', { id })} style={styles.editButton}>
-          <Ionicons name="create-outline" size={24} color="#007AFF" />
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>
+          {(() => {
+            const d = parseApiDate(diary.created_at);
+            return isNaN(d.getTime())
+              ? '일기'
+              : d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+          })()}
+        </Text>
+        <View style={{ flexDirection: 'row' }}>
+          <TouchableOpacity onPress={() => navigation.navigate('DiaryEdit', { id })} style={{ marginRight: 16 }}>
+            <Ionicons name="create-outline" size={24} color="#007AFF" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleDelete}>
+            <Ionicons name="trash-outline" size={24} color="#FF3B30" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* 일기 내용 */}
         <Text style={styles.diaryContent}>{diary.content}</Text>
+
+        {diary.location && diary.location.images && diary.location.images.length > 0 && (
+          <TouchableOpacity 
+            style={styles.locationContainer}
+            onPress={() => {
+              const valid = diary.location.images.filter(
+                (loc: any) =>
+                  loc &&
+                  typeof loc.latitude === 'number' &&
+                  typeof loc.longitude === 'number' &&
+                  isFinite(loc.latitude) &&
+                  isFinite(loc.longitude) &&
+                  Math.abs(loc.latitude) > 1e-6 &&
+                  Math.abs(loc.longitude) > 1e-6
+              );
+              if (valid.length === 0) {
+                Alert.alert('위치 정보 없음', '선택한 사진에 유효한 위치 정보가 없습니다.');
+                return;
+              }
+              navigation.navigate('Map', { locations: valid });
+            }} // MapScreen으로 이동
+          >
+            <Ionicons name="location-outline" size={20} color="#555" />
+            <Text style={styles.locationText}>
+              이 일기에는 위치 정보가 있는 사진이 {
+                diary.location.images.filter(
+                  (loc: any) =>
+                    loc &&
+                    typeof loc.latitude === 'number' &&
+                    typeof loc.longitude === 'number' &&
+                    isFinite(loc.latitude) &&
+                    isFinite(loc.longitude) &&
+                    Math.abs(loc.latitude) > 1e-6 &&
+                    Math.abs(loc.longitude) > 1e-6
+                ).length
+              }장 포함되어 있습니다.
+            </Text>
+            <Ionicons name="chevron-forward" size={20} color="#555" style={{ marginLeft: 'auto' }} />
+          </TouchableOpacity>
+        )}
         
-        {/* 이미지 표시 */}
         {diary.images && diary.images.length > 0 && (
-          <View style={styles.imageSection}>
-            <Text style={styles.imageSectionTitle}>첨부된 사진 ({diary.images.length}장)</Text>
-            <View style={styles.imageGrid}>
-              {diary.images.map((imageUri, index) => (
-                <Image 
-                  key={index}
-                  source={{ uri: imageUri }} 
-                  style={styles.image}
-                  resizeMode="cover"
-                />
-              ))}
-            </View>
+          <View style={styles.imageGrid}>
+            {diary.images.map((imageUri, index) => (
+              <Image 
+                key={index}
+                source={{ uri: imageUri }} 
+                style={styles.image}
+                resizeMode="cover"
+              />
+            ))}
           </View>
         )}
-
-        {/* 일기 정보 */}
-        <View style={styles.infoSection}>
-          <Text style={styles.dateText}>
-            작성일: {new Date(diary.created_at).toLocaleDateString('ko-KR', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              weekday: 'long'
-            })}
-          </Text>
-          {diary.is_public && (
-            <View style={styles.publicBadge}>
-              <Ionicons name="globe-outline" size={16} color="#007AFF" />
-              <Text style={styles.publicText}>공개됨</Text>
-            </View>
-          )}
-        </View>
-
-        {/* 액션 버튼들 */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity 
-            style={styles.editButtonLarge}
-            onPress={() => navigation.navigate('DiaryEdit', { id })}
-          >
-            <Ionicons name="create-outline" size={20} color="#fff" />
-            <Text style={styles.editButtonText}>수정</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.deleteButton}
-            onPress={handleDelete}
-          >
-            <Ionicons name="trash-outline" size={20} color="#fff" />
-            <Text style={styles.deleteButtonText}>삭제</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -148,114 +174,58 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderColor: '#eee',
-  },
-  backButton: {
-    padding: 8,
+    borderColor: '#E5E5EA',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  editButton: {
-    padding: 8,
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000',
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: 20,
   },
   diaryContent: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#333',
+    fontSize: 17,
+    lineHeight: 25,
+    color: '#000',
     marginBottom: 24,
   },
-  imageSection: {
-    marginBottom: 24,
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#f2f2f2',
+    borderRadius: 8,
+    marginBottom: 16,
   },
-  imageSectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
+  locationText: {
+    marginLeft: 8,
+    fontSize: 15,
+    color: '#555',
   },
   imageGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
   image: {
-    width: imageSize,
-    height: imageSize,
+    width: (width - 56) / 2,
+    height: (width - 56) / 2,
     borderRadius: 8,
     marginBottom: 8,
-  },
-  infoSection: {
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 24,
-  },
-  dateText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  publicBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  publicText: {
-    fontSize: 14,
-    color: '#007AFF',
-    marginLeft: 4,
-    fontWeight: '600',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 32,
-  },
-  editButtonLarge: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    borderRadius: 8,
     marginRight: 8,
   },
-  editButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  deleteButton: {
+  loadingContainer: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF3B30',
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  deleteButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    marginLeft: 8,
+    alignItems: 'center',
   },
   loadingText: {
-    textAlign: 'center',
-    marginTop: 50,
     fontSize: 16,
     color: '#666',
   },
   errorText: {
-    textAlign: 'center',
-    marginTop: 50,
     fontSize: 16,
     color: '#ff0000',
   },

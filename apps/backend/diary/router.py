@@ -33,6 +33,8 @@ async def create_diary(
         user_id=current_user.id,
         content=diary.content,
         images=images_json,
+        is_public=diary.is_public,
+        location=diary.location,
     )
     session.add(db_diary)
     session.commit()
@@ -48,7 +50,9 @@ async def create_diary(
         images=images_list,
         created_at=db_diary.created_at,
         updated_at=db_diary.updated_at,
-        user=user_info
+        is_public=db_diary.is_public,
+        user=user_info,
+        location=db_diary.location
     )
 
 @router.get("/", include_in_schema=False)
@@ -84,7 +88,9 @@ async def get_diaries(
             images=images_list,
             created_at=diary.created_at,
             updated_at=diary.updated_at,
-            user={"id": str(user.id), "username": user.username}
+            is_public=diary.is_public,
+            user={"id": str(user.id), "username": user.username},
+            location=diary.location
         )
         diary_responses.append(diary_response)
     
@@ -119,7 +125,9 @@ async def get_diary(
         images=images_list,
         created_at=diary.created_at,
         updated_at=diary.updated_at,
-        user={"id": str(user.id), "username": user.username}
+        is_public=diary.is_public,
+        user={"id": str(user.id), "username": user.username},
+        location=diary.location
     )
 
 @router.put("/{diary_id}", response_model=DiaryResponse)
@@ -169,7 +177,9 @@ async def update_diary(
         images=images_list,
         created_at=diary.created_at,
         updated_at=diary.updated_at,
-        user=user_info
+        is_public=diary.is_public,
+        user=user_info,
+        location=diary.location
     )
 
 @router.delete("/{diary_id}", status_code=status.HTTP_204_NO_CONTENT)

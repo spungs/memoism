@@ -158,10 +158,11 @@ export const useSignup = () => {
 };
 
 export const useUpdateProfile = () => {
-  const { token, setUser } = useAuthStore();
+  const { setUser } = useAuthStore();
 
   return useMutation({
     mutationFn: async (data: UpdateProfileData): Promise<UserResponse> => {
+      const token = useAuthStore.getState().token;
       try {
         if (!token) {
           throw new Error('로그인이 필요합니다.');
@@ -219,9 +220,10 @@ export const useCurrentUser = () => {
   const { token } = useAuthStore();
   
   return useQuery({
-    queryKey: ['currentUser'],
+    queryKey: ['currentUser', token], // queryKey에 token을 넣어 토큰 변경 시 재조회
     queryFn: async (): Promise<UserResponse> => {
-      if (!token) {
+      const currentToken = useAuthStore.getState().token;
+      if (!currentToken) {
         throw new Error('로그인이 필요합니다.');
       }
 
@@ -229,7 +231,7 @@ export const useCurrentUser = () => {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${currentToken}`,
         },
       });
 

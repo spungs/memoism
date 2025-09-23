@@ -11,8 +11,11 @@ import DiaryListScreen from './screens/DiaryListScreen';
 import DiaryDetailScreen from './screens/DiaryDetailScreen';
 import DiaryEditScreen from './screens/DiaryEditScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import MapScreen from './screens/MapScreen'; // MapScreen import 추가
 import { navigationRef, type RootStackParamList } from './utils/navigationRef';
 import './i18n'; // i18n 초기화
+
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 // 확장된 RootStackParamList - MainTabs 추가
 type ExtendedRootStackParamList = RootStackParamList & {
@@ -56,17 +59,6 @@ function MainTabs() {
           ),
         }}
       />
-      <Tab.Screen
-        name="SettingsTab"
-        component={SettingsScreen}
-        options={{
-          headerShown: false,
-          title: '설정',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 20 }}>⚙️</Text>
-          ),
-        }}
-      />
     </Tab.Navigator>
   );
 }
@@ -102,18 +94,30 @@ function Navigation() {
             name="DiaryDetail"
             component={DiaryDetailScreen}
             options={{
-              title: '일기 상세',
-              headerStyle: { backgroundColor: '#fff' },
-              headerTintColor: '#333',
+              headerShown: false, // 이 화면은 자체 헤더를 사용합니다.
             }}
           />
           <Stack.Screen
             name="DiaryEdit"
             component={DiaryEditScreen}
             options={{
-              title: '일기 작성',
-              headerStyle: { backgroundColor: '#fff' },
-              headerTintColor: '#333',
+              headerShown: false, // 이 화면은 자체 헤더를 사용합니다.
+            }}
+          />
+          <Stack.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="Map"
+            component={MapScreen}
+            options={{
+              headerShown: true,
+              title: '사진 위치',
+              headerBackTitleVisible: false,
             }}
           />
         </>
@@ -124,10 +128,12 @@ function Navigation() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <NavigationContainer ref={navigationRef}>
-        <Navigation />
-      </NavigationContainer>
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <NavigationContainer ref={navigationRef}>
+          <Navigation />
+        </NavigationContainer>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }

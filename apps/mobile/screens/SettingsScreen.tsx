@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Switch, Alert, Modal, TextInput } from 'react-native';
+import { Ionicons } from '@expo/vector-icons'; // 아이콘 사용을 위해 추가
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RootStackParamList } from '../utils/navigationRef';
@@ -138,7 +139,11 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color="#007AFF" />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>설정</Text>
+        <View style={{ width: 24 }} />{/* 오른쪽 공간 확보 */}
       </View>
       
       <View style={styles.content}>
@@ -248,16 +253,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   header: {
-    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+  },
+  backButton: {
+    // 뒤로가기 버튼 스타일
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    textAlign: 'center',
   },
   content: {
     flex: 1,
