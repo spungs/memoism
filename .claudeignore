@@ -1,0 +1,76 @@
+# Claude Code Ignore File
+# Claude Code가 분석하지 않을 파일/디렉토리 지정
+
+# Dependencies
+node_modules/
+apps/mobile/node_modules/
+apps/backend/.venv/
+apps/backend/__pycache__/
+*.pyc
+*.pyo
+
+# Build outputs
+apps/mobile/dist/
+apps/mobile/.expo/
+apps/mobile/android/build/
+apps/mobile/android/app/build/
+apps/mobile/ios/build/
+apps/mobile/ios/Pods/
+*.app
+*.ipa
+*.apk
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files (보안상 무시)
+.env
+.env.local
+.env.*.local
+
+# Lock files (용량이 크고 자주 변경됨)
+package-lock.json
+yarn.lock
+apps/mobile/package-lock.json
+
+# Git
+.git/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# SQLite (로컬 개발용 DB 파일)
+*.db
+*.sqlite
+*.sqlite3
+
+# 이미지/미디어 (용량이 큼)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.mp4
+*.mov
+
+# 폰트 파일
+*.ttf
+*.otf
+*.woff
+*.woff2
