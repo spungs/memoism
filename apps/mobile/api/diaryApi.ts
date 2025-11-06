@@ -14,6 +14,7 @@ export interface Diary {
   images?: string[];
   created_at: string;
   updated_at: string;
+  is_public: boolean;
   user?: UserInfo;
 }
 

@@ -48,6 +48,7 @@ async def create_diary(
         images=images_list,
         created_at=db_diary.created_at,
         updated_at=db_diary.updated_at,
+        is_public=db_diary.is_public,
         user=user_info
     )
 
@@ -84,6 +85,7 @@ async def get_diaries(
             images=images_list,
             created_at=diary.created_at,
             updated_at=diary.updated_at,
+            is_public=diary.is_public,
             user={"id": str(user.id), "username": user.username}
         )
         diary_responses.append(diary_response)
@@ -119,6 +121,7 @@ async def get_diary(
         images=images_list,
         created_at=diary.created_at,
         updated_at=diary.updated_at,
+        is_public=diary.is_public,
         user={"id": str(user.id), "username": user.username}
     )
 
@@ -169,6 +172,7 @@ async def update_diary(
         images=images_list,
         created_at=diary.created_at,
         updated_at=diary.updated_at,
+        is_public=diary.is_public,
         user=user_info
     )
 

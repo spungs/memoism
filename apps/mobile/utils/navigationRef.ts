@@ -9,8 +9,6 @@ export type RootStackParamList = {
   DiaryList: undefined;
   DiaryDetail: { id: string };
   DiaryEdit: { id?: string };
-  ShareFeed: undefined;
-  ShareSelect: undefined;
   Settings: undefined;
 };
 

@@ -23,6 +23,7 @@ class Diary(SQLModel, table=True):
     images: Optional[str] = None  # JSON string storing array of image URLs
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    is_public: bool = Field(default=False)
 
 class StoreItem(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)

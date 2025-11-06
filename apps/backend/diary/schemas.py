@@ -28,6 +28,7 @@ class DiaryResponse(BaseModel):
     images: Optional[List[str]] = None
     created_at: datetime
     updated_at: datetime
+    is_public: bool = False
     user: Optional[UserInfo] = None
 
     class Config:
