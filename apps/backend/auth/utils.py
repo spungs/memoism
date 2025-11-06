@@ -17,14 +17,12 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    # 개발 단계 - 암호화 비활성화
-    return plain_password == hashed_password
-    # return pwd_context.verify(plain_password, hashed_password)
+    """Verify a plain password against a hashed password using bcrypt."""
+    return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
-    # 개발 단계 - 암호화 비활성화 (평문 저장)
-    return password
-    # return pwd_context.hash(password)
+    """Hash a password using bcrypt."""
+    return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
@@ -45,4 +43,4 @@ def verify_token(token: str) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
-        ) 
+        )
