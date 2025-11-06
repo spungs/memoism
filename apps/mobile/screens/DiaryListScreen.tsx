@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Button, FlatList, SafeAreaView, TouchableOpacity, StyleSheet, Alert, Image, RefreshControl, ActivityIndicator } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../utils/navigationRef';
-import { useDiaries, useUpdateDiary } from '../api/diaryApi';
+import { useDiaries } from '../api/diaryApi';
 import { useDiaryStore } from '../store/diaryStore';
 import { useAuthStore } from '../store/authStore';
 
@@ -10,7 +10,6 @@ type Props = NativeStackScreenProps<RootStackParamList, 'DiaryList'>;
 
 export default function DiaryListScreen({ navigation }: Props) {
   const { data: diaries, isLoading, error, refetch } = useDiaries();
-  const updateDiaryMutation = useUpdateDiary();
   const setDiaries = useDiaryStore((state) => state.setDiaries);
   const setToken = useAuthStore((state) => state.setToken);
   const [refreshing, setRefreshing] = React.useState(false);
@@ -38,31 +37,6 @@ export default function DiaryListScreen({ navigation }: Props) {
     } catch (error) {
       console.error('Logout error:', error);
     }
-  };
-
-  const toggleShareStatus = async (diaryId: string, currentStatus: boolean) => {
-    const action = currentStatus ? '공유 해제' : '공유';
-    Alert.alert(
-      `일기 ${action}`,
-      `정말 이 일기를 ${action}하시겠습니까?`,
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: action,
-          onPress: async () => {
-            try {
-              await updateDiaryMutation.mutateAsync({
-                id: diaryId,
-                is_public: !currentStatus
-              });
-              Alert.alert('성공', `일기가 ${action}되었습니다.`);
-            } catch (error) {
-              Alert.alert('오류', `일기 ${action} 중 오류가 발생했습니다.`);
-            }
-          }
-        }
-      ]
-    );
   };
 
   if (isLoading && !refreshing) return (
@@ -144,19 +118,7 @@ export default function DiaryListScreen({ navigation }: Props) {
                   <Text style={styles.diaryDate}>
                     {new Date(item.created_at).toLocaleDateString('ko-KR')}
                   </Text>
-                  {item.is_public && (
-                    <Text style={styles.sharedLabel}>공유됨</Text>
-                  )}
                 </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.shareButton, item.is_public && styles.unshareButton]}
-                onPress={() => toggleShareStatus(item.id, item.is_public || false)}
-              >
-                <Text style={[styles.shareButtonText, item.is_public && styles.unshareButtonText]}>
-                  {item.is_public ? '공유 해제' : '공유하기'}
-                </Text>
               </TouchableOpacity>
             </View>
           )}
@@ -251,33 +213,6 @@ const styles = StyleSheet.create({
   diaryDate: {
     fontSize: 12,
     color: '#999',
-  },
-  sharedLabel: {
-    fontSize: 12,
-    color: '#007AFF',
-    fontWeight: '600',
-    backgroundColor: '#E3F2FD',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  shareButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    alignSelf: 'flex-end',
-  },
-  shareButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  unshareButton: {
-    backgroundColor: '#FF3B30',
-  },
-  unshareButtonText: {
-    color: '#fff',
   },
   centerContainer: {
     flex: 1,

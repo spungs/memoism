@@ -10,8 +10,6 @@ import AuthSignupScreen from './screens/AuthSignupScreen';
 import DiaryListScreen from './screens/DiaryListScreen';
 import DiaryDetailScreen from './screens/DiaryDetailScreen';
 import DiaryEditScreen from './screens/DiaryEditScreen';
-import ShareFeedScreen from './screens/ShareFeedScreen';
-import ShareSelectScreen from './screens/ShareSelectScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { navigationRef, type RootStackParamList } from './utils/navigationRef';
 import './i18n'; // i18n 초기화
@@ -47,8 +45,8 @@ function MainTabs() {
         },
       }}
     >
-      <Tab.Screen 
-        name="DiaryListTab" 
+      <Tab.Screen
+        name="DiaryListTab"
         component={DiaryListScreen}
         options={{
           headerShown: false,
@@ -58,19 +56,8 @@ function MainTabs() {
           ),
         }}
       />
-      <Tab.Screen 
-        name="ShareFeedTab" 
-        component={ShareFeedScreen}
-        options={{
-          headerShown: false,
-          title: '공유공간',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 20 }}>📝</Text>
-          ),
-        }}
-      />
-      <Tab.Screen 
-        name="SettingsTab" 
+      <Tab.Screen
+        name="SettingsTab"
         component={SettingsScreen}
         options={{
           headerShown: false,
@@ -120,23 +107,13 @@ function Navigation() {
               headerTintColor: '#333',
             }}
           />
-          <Stack.Screen 
-            name="DiaryEdit" 
+          <Stack.Screen
+            name="DiaryEdit"
             component={DiaryEditScreen}
-            options={{ 
+            options={{
               title: '일기 작성',
               headerStyle: { backgroundColor: '#fff' },
               headerTintColor: '#333',
-            }}
-          />
-          <Stack.Screen 
-            name="ShareSelect" 
-            component={ShareSelectScreen}
-            options={{ 
-              title: '일기 공유',
-              headerStyle: { backgroundColor: '#fff' },
-              headerTintColor: '#333',
-              presentation: 'modal',
             }}
           />
         </>

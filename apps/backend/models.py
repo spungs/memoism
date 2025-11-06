@@ -23,21 +23,6 @@ class Diary(SQLModel, table=True):
     images: Optional[str] = None  # JSON string storing array of image URLs
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    is_public: bool = Field(default=False)
-
-class DiaryComment(SQLModel, table=True):
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    diary_id: UUID = Field(foreign_key="diary.id")
-    user_id: UUID = Field(foreign_key="profile.id")
-    content: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
-class DiaryReaction(SQLModel, table=True):
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    diary_id: UUID = Field(foreign_key="diary.id")
-    user_id: UUID = Field(foreign_key="profile.id")
-    reaction_type: str = Field(...)  # '❤️', '👍', '😢'
-    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class StoreItem(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
@@ -53,20 +38,4 @@ class UserItem(SQLModel, table=True):
     user_id: UUID = Field(foreign_key="profile.id")
     item_id: UUID = Field(foreign_key="storeitem.id")
     purchased_at: datetime = Field(default_factory=datetime.utcnow)
-    is_equipped: bool = Field(default=False)
-
-class Follow(SQLModel, table=True):
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    follower_id: UUID = Field(foreign_key="profile.id")  # 팔로우하는 사람
-    following_id: UUID = Field(foreign_key="profile.id")  # 팔로우 받는 사람
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
-class Notification(SQLModel, table=True):
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    user_id: UUID = Field(foreign_key="profile.id")  # 알림을 받을 사용자
-    type: str  # "follow", "diary_shared", "comment", "reaction"
-    title: str
-    message: str
-    data: Optional[str] = None  # JSON 형태의 추가 데이터
-    is_read: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow) 
+    is_equipped: bool = Field(default=False) 
