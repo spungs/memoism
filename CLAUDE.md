@@ -195,7 +195,7 @@ git push -u origin claude/setup-claude-config-011CUqcBorYpU8jMkGTrzWQp
 ## ⚠️ 알려진 이슈 & 주의사항
 
 ### 보안
-- [ ] **비밀번호 평문 저장**: `apps/backend/auth/utils.py` bcrypt로 전환 필요
+- [x] **비밀번호 평문 저장**: ~~`apps/backend/auth/utils.py`~~ **✅ 완료** - bcrypt 해싱으로 전환 (참고: `PASSWORD_HASHING_MIGRATION.md`)
 - [x] **DB URL 하드코딩**: ~~`apps/backend/database.py:6`~~ **✅ 완료** - 환경변수로 변경됨 (`.env` 파일 사용)
 - [x] **JWT Secret 하드코딩**: ~~`apps/backend/auth/utils.py`~~ **✅ 완료** - 환경변수로 변경됨
 - [x] **CORS 와일드카드**: ~~`apps/backend/main.py:13`~~ **✅ 완료** - 환경변수로 변경됨 (프로덕션에서 특정 도메인 설정 가능)
@@ -408,6 +408,6 @@ Claude Code와 작업할 때:
 
 ---
 
-**마지막 업데이트**: 2025-11-05
+**마지막 업데이트**: 2025-11-06
 **작성자**: Claude Code Setup
-**버전**: 1.1.0 (환경변수 마이그레이션 & 프론트엔드 분석 완료)
+**버전**: 1.2.0 (MVP 전환 & 보안 강화 완료)
