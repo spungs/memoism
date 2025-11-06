@@ -187,3 +187,6 @@ apps/backend/memoism_backend.egg-info/
 # Custom environment files
 config.local.js
 config.local.ts
+
+# Test account backups (contains plaintext passwords)
+TEST_ACCOUNTS_BACKUP.md
