@@ -134,15 +134,28 @@ export const API_URL = Platform.select({
 
 ### 1. 로컬 개발 시작
 ```bash
-# 백엔드 실행
+# 백엔드 환경변수 설정 (최초 1회)
 cd apps/backend
+cp .env.example .env
+# .env 파일을 열어서 DATABASE_URL과 SECRET_KEY 수정
+
+# 백엔드 의존성 설치 및 실행
 pip install -e .
 uvicorn main:app --reload
 
-# 프론트엔드 실행
+# 프론트엔드 실행 (별도 터미널)
 cd apps/mobile
 npm install
 npx expo start
+```
+
+**환경변수 설정** (`apps/backend/.env`):
+```bash
+DATABASE_URL=postgresql://username@localhost:5432/memoism
+SECRET_KEY=your-random-secret-key-here-change-in-production
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+CORS_ORIGINS=*  # 개발용. 프로덕션: https://yourdomain.com
 ```
 
 ### 2. Git 작업
@@ -183,8 +196,9 @@ git push -u origin claude/setup-claude-config-011CUqcBorYpU8jMkGTrzWQp
 
 ### 보안
 - [ ] **비밀번호 평문 저장**: `apps/backend/auth/utils.py` bcrypt로 전환 필요
-- [ ] **DB URL 하드코딩**: `apps/backend/database.py:6` 환경변수로 변경
-- [ ] **CORS 와일드카드**: `apps/backend/main.py:13` 프로덕션에서 제한 필요
+- [x] **DB URL 하드코딩**: ~~`apps/backend/database.py:6`~~ **✅ 완료** - 환경변수로 변경됨 (`.env` 파일 사용)
+- [x] **JWT Secret 하드코딩**: ~~`apps/backend/auth/utils.py`~~ **✅ 완료** - 환경변수로 변경됨
+- [x] **CORS 와일드카드**: ~~`apps/backend/main.py:13`~~ **✅ 완료** - 환경변수로 변경됨 (프로덕션에서 특정 도메인 설정 가능)
 
 ### 플랫폼별 설정
 ```json
@@ -357,19 +371,28 @@ colors: {
 ## 🚀 다음 작업 제안
 
 ### 높은 우선순위
-1. **비밀번호 해싱 구현** (`apps/backend/auth/utils.py`)
-2. **환경변수 설정** (`.env` 파일로 DB URL, JWT Secret 분리)
-3. **AI 캐릭터 채팅 기능** (백엔드 엔드포인트 + 프론트 UI)
+1. **비밀번호 해싱 구현** (`apps/backend/auth/utils.py`) - bcrypt로 전환
+2. ~~**환경변수 설정**~~ **✅ 완료** (`.env` 파일로 DB URL, JWT Secret 분리됨)
+3. **프론트엔드 Critical 이슈 수정** (상세: `FRONTEND_ISSUES_REPORT.md`)
+   - DiaryEditScreen: 저장 버튼 중복 제출 방지
+   - ShareSelectScreen: 일괄 공유 진행률 표시
+   - ShareSelectScreen: 에러 처리 개선
+4. **AI 캐릭터 채팅 기능** (백엔드 엔드포인트 + 프론트 UI)
 
 ### 중간 우선순위
-4. **구독 시스템 구현** (30일 무료 체험)
-5. **코인샵 UI** (아이템 구매 플로우)
-6. **E2E 테스트** (Detox 설정)
+5. **프론트엔드 High/Medium 이슈 수정** (총 13개)
+   - 입력 검증 (이메일, 비밀번호, 사용자명)
+   - 미저장 변경사항 경고
+   - Pull-to-Refresh 추가
+6. **구독 시스템 구현** (30일 무료 체험)
+7. **코인샵 UI** (아이템 구매 플로우)
+8. **E2E 테스트** (Detox 설정)
 
 ### 낮은 우선순위
-7. **Sentry 연동** (크래시 리포팅)
-8. **앱 성능 최적화** (콜드 스타트 ≤ 2.5초)
-9. **딥링크 구현** (일기 공유 URL)
+9. **프론트엔드 UX 개선** (이미지 뷰어, Toast 알림 등)
+10. **Sentry 연동** (크래시 리포팅)
+11. **앱 성능 최적화** (콜드 스타트 ≤ 2.5초)
+12. **딥링크 구현** (일기 공유 URL)
 
 ---
 
@@ -387,4 +410,4 @@ Claude Code와 작업할 때:
 
 **마지막 업데이트**: 2025-11-05
 **작성자**: Claude Code Setup
-**버전**: 1.0.0
+**버전**: 1.1.0 (환경변수 마이그레이션 & 프론트엔드 분석 완료)
