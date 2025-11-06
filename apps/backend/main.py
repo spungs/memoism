@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from auth.router import router as auth_router
@@ -5,12 +7,18 @@ from diary.router import router as diary_router
 from follow.router import router as follow_router
 from database import create_db_and_tables
 
+# Load environment variables
+load_dotenv()
+
 app = FastAPI(title="Memoism API")
 
-# CORS 설정
+# CORS 설정 - 환경변수에서 가져오기
+cors_origins = os.getenv("CORS_ORIGINS", "*")
+origins_list = [origin.strip() for origin in cors_origins.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 개발 환경에서만 사용. 프로덕션에서는 실제 도메인으로 변경
+    allow_origins=origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

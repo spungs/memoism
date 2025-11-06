@@ -1,9 +1,14 @@
+import os
+from dotenv import load_dotenv
 from sqlmodel import Session, SQLModel, create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy import event
 
-# 데이터베이스 URL은 환경 변수에서 가져와야 합니다
-DATABASE_URL = "postgresql://sonkyoungho@localhost:5432/memoism"
+# Load environment variables from .env file
+load_dotenv()
+
+# Get DATABASE_URL from environment variable
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://localhost:5432/memoism")
 
 engine = create_engine(DATABASE_URL, echo=True)
 

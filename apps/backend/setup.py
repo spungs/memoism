@@ -12,5 +12,6 @@ setup(
         "passlib[bcrypt]",
         "python-multipart",
         "psycopg2-binary",
+        "python-dotenv",
     ],
 ) 
