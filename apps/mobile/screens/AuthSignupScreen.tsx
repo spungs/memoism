@@ -2,6 +2,20 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { useSignup } from '../api/authApi';
 
+const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+const validateUsername = (username: string): boolean => {
+  const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+  return usernameRegex.test(username);
+};
+
+const validatePassword = (password: string): boolean => {
+  return password.length >= 8;
+};
+
 export default function AuthSignupScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -14,12 +28,24 @@ export default function AuthSignupScreen({ navigation }: any) {
       Alert.alert('입력 오류', '이메일을 입력해주세요.');
       return;
     }
+    if (!validateEmail(email.trim())) {
+      Alert.alert('입력 오류', '올바른 이메일 형식을 입력해주세요.');
+      return;
+    }
     if (!username.trim()) {
       Alert.alert('입력 오류', '사용자명을 입력해주세요.');
       return;
     }
+    if (!validateUsername(username.trim())) {
+      Alert.alert('입력 오류', '사용자명은 3-20자의 영문, 숫자, 밑줄(_)만 사용 가능합니다.');
+      return;
+    }
     if (!password.trim()) {
       Alert.alert('입력 오류', '비밀번호를 입력해주세요.');
+      return;
+    }
+    if (!validatePassword(password)) {
+      Alert.alert('입력 오류', '비밀번호는 8자 이상이어야 합니다.');
       return;
     }
 

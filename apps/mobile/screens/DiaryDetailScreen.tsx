@@ -1,15 +1,16 @@
 import React from 'react';
-import { 
-  View, 
-  Text, 
-  Button, 
-  Alert, 
-  SafeAreaView, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  Button,
+  Alert,
+  SafeAreaView,
+  TouchableOpacity,
   ScrollView,
   Image,
   StyleSheet,
-  Dimensions
+  Dimensions,
+  ActivityIndicator
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../utils/navigationRef';
@@ -51,7 +52,10 @@ export default function DiaryDetailScreen({ navigation, route }: Props) {
 
   if (isLoading) return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.loadingText}>로딩 중...</Text>
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>로딩 중...</Text>
+      </View>
     </SafeAreaView>
   );
   
@@ -247,9 +251,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   loadingText: {
     textAlign: 'center',
-    marginTop: 50,
+    marginTop: 16,
     fontSize: 16,
     color: '#666',
   },

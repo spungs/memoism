@@ -7,6 +7,11 @@ import { useAuthStore } from '../store/authStore';
 import { API_URL } from '../api/config';
 import type { LoginData, AuthResponse } from '../api/authApi';
 
+const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
 export default function AuthLoginScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -70,6 +75,10 @@ export default function AuthLoginScreen({ navigation }: any) {
       Alert.alert('입력 오류', '이메일을 입력해주세요.');
       return;
     }
+    if (!validateEmail(email.trim())) {
+      Alert.alert('입력 오류', '올바른 이메일 형식을 입력해주세요.');
+      return;
+    }
     if (!password.trim()) {
       Alert.alert('입력 오류', '비밀번호를 입력해주세요.');
       return;
@@ -78,7 +87,7 @@ export default function AuthLoginScreen({ navigation }: any) {
     try {
       const response = await login.mutateAsync({ email: email.trim(), password });
       setToken(response.access_token);
-      
+
       // 사용자 정보 가져오기
       try {
         const userResponse = await fetch(`${API_URL}/auth/me`, {
@@ -88,27 +97,30 @@ export default function AuthLoginScreen({ navigation }: any) {
             Authorization: `Bearer ${response.access_token}`,
           },
         });
-        
-        if (userResponse.ok) {
-          const userData = await userResponse.json();
-          setUser({
-            id: userData.id,
-            email: userData.email,
-            username: userData.username,
-          });
+
+        if (!userResponse.ok) {
+          throw new Error('Failed to fetch user info');
         }
+
+        const userData = await userResponse.json();
+        setUser({
+          id: userData.id,
+          email: userData.email,
+          username: userData.username,
+        });
       } catch (userError) {
         console.error('Failed to fetch user info:', userError);
+        Alert.alert('경고', '사용자 정보를 불러오는데 실패했습니다.');
       }
-      
+
       // 아이디 저장 체크박스가 체크되어 있으면 항상 현재 이메일로 저장
       if (saveId) {
         await AsyncStorage.setItem('savedId', email.trim());
       } else {
         await AsyncStorage.removeItem('savedId');
       }
-      
-      navigation.navigate('MainTabs');
+
+      navigation.replace('MainTabs');
     } catch (error) {
       console.error('Login error:', error);
       if (error instanceof Error) {

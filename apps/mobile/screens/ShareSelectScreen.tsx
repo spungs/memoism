@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, StyleSheet, SafeAreaView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../utils/navigationRef';
 import { useDiaries, useUpdateDiary } from '../api/diaryApi';
@@ -12,10 +12,12 @@ const ShareSelectScreen: React.FC<Props> = ({ navigation }) => {
   const { data: diaries, isLoading, error } = useDiaries(false); // private diaries
   const updateDiaryMutation = useUpdateDiary();
   const [selectedDiaries, setSelectedDiaries] = useState<string[]>([]);
+  const [isSharing, setIsSharing] = useState(false);
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
 
   const toggleDiarySelection = (diaryId: string) => {
-    setSelectedDiaries(prev => 
-      prev.includes(diaryId) 
+    setSelectedDiaries(prev =>
+      prev.includes(diaryId)
         ? prev.filter(id => id !== diaryId)
         : [...prev, diaryId]
     );
@@ -27,18 +29,42 @@ const ShareSelectScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
+    setIsSharing(true);
+    setProgress({ current: 0, total: selectedDiaries.length });
+
     try {
-      for (const diaryId of selectedDiaries) {
-        await updateDiaryMutation.mutateAsync({
-          id: diaryId,
-          is_public: true
-        });
+      const results = await Promise.allSettled(
+        selectedDiaries.map(async (diaryId, index) => {
+          const result = await updateDiaryMutation.mutateAsync({
+            id: diaryId,
+            is_public: true
+          });
+          setProgress(prev => ({ ...prev, current: index + 1 }));
+          return result;
+        })
+      );
+
+      const succeeded = results.filter(r => r.status === 'fulfilled').length;
+      const failed = results.filter(r => r.status === 'rejected').length;
+
+      if (failed === 0) {
+        Alert.alert('성공', `${succeeded}개의 일기가 공유되었습니다.`, [
+          { text: '확인', onPress: () => navigation.goBack() }
+        ]);
+      } else {
+        Alert.alert(
+          '일부 실패',
+          `성공: ${succeeded}개\n실패: ${failed}개`,
+          [
+            { text: '확인', onPress: () => navigation.goBack() }
+          ]
+        );
       }
-      Alert.alert('성공', `${selectedDiaries.length}개의 일기가 공유되었습니다.`, [
-        { text: '확인', onPress: () => navigation.goBack() }
-      ]);
     } catch (error) {
       Alert.alert('오류', '일기 공유 중 오류가 발생했습니다.');
+    } finally {
+      setIsSharing(false);
+      setProgress({ current: 0, total: 0 });
     }
   };
 
@@ -91,18 +117,32 @@ const ShareSelectScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.cancelButton}>취소</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} disabled={isSharing}>
+          <Text style={[styles.cancelButton, isSharing && styles.disabledText]}>취소</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>공유할 일기 선택</Text>
-        <TouchableOpacity 
-          onPress={handleShare} 
-          disabled={selectedDiaries.length === 0}
-          style={[styles.shareButton, selectedDiaries.length === 0 && styles.disabledButton]}
+        <Text style={styles.headerTitle}>
+          {isSharing
+            ? `공유 중... (${progress.current}/${progress.total})`
+            : '공유할 일기 선택'}
+        </Text>
+        <TouchableOpacity
+          onPress={handleShare}
+          disabled={selectedDiaries.length === 0 || isSharing}
+          style={[
+            styles.shareButton,
+            (selectedDiaries.length === 0 || isSharing) && styles.disabledButton
+          ]}
         >
-          <Text style={[styles.shareButtonText, selectedDiaries.length === 0 && styles.disabledText]}>
-            공유 ({selectedDiaries.length})
-          </Text>
+          {isSharing ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={[
+              styles.shareButtonText,
+              selectedDiaries.length === 0 && styles.disabledText
+            ]}>
+              공유 ({selectedDiaries.length})
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
       

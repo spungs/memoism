@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  Button, 
-  Alert, 
-  SafeAreaView, 
-  TouchableOpacity, 
-  StyleSheet, 
-  ScrollView, 
+import {
+  View,
+  Text,
+  TextInput,
+  Button,
+  Alert,
+  SafeAreaView,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
   Image,
-  Dimensions
+  Dimensions,
+  ActivityIndicator,
+  Linking
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../utils/navigationRef';
@@ -26,9 +28,10 @@ const imageSize = (width - 60) / 3; // 3개씩 한 줄에 배치
 export default function DiaryEditScreen({ navigation, route }: Props) {
   const diaryId = route.params?.id;
   const isEdit = !!diaryId;
-  const { data: diary } = useDiary(diaryId || '');
+  const { data: diary } = useDiary(diaryId || '', { enabled: !!diaryId });
   const [content, setContent] = useState(diary?.content || '');
   const [images, setImages] = useState<string[]>(diary?.images || []);
+  const [hasChanges, setHasChanges] = useState(false);
   const createDiary = useCreateDiary();
   const updateDiary = useUpdateDiary();
 
@@ -39,6 +42,17 @@ export default function DiaryEditScreen({ navigation, route }: Props) {
     }
   }, [diary, isEdit]);
 
+  // Track changes for unsaved warning
+  React.useEffect(() => {
+    if (isEdit && diary) {
+      const contentChanged = content !== diary.content;
+      const imagesChanged = JSON.stringify(images) !== JSON.stringify(diary.images || []);
+      setHasChanges(contentChanged || imagesChanged);
+    } else {
+      setHasChanges(content.trim().length > 0 || images.length > 0);
+    }
+  }, [content, images, diary, isEdit]);
+
   const pickImage = async () => {
     if (images.length >= 10) {
       Alert.alert('알림', '최대 10장까지만 첨부할 수 있습니다.');
@@ -47,7 +61,17 @@ export default function DiaryEditScreen({ navigation, route }: Props) {
 
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('권한 필요', '사진을 선택하기 위해 갤러리 접근 권한이 필요합니다.');
+      Alert.alert(
+        '권한 필요',
+        '사진을 선택하기 위해 갤러리 접근 권한이 필요합니다.',
+        [
+          { text: '취소', style: 'cancel' },
+          {
+            text: '설정으로 이동',
+            onPress: () => Linking.openSettings()
+          }
+        ]
+      );
       return;
     }
 
@@ -68,6 +92,25 @@ export default function DiaryEditScreen({ navigation, route }: Props) {
   const removeImage = (index: number) => {
     const newImages = images.filter((_, i) => i !== index);
     setImages(newImages);
+  };
+
+  const handleGoBack = () => {
+    if (hasChanges) {
+      Alert.alert(
+        '저장하지 않은 변경사항',
+        '작성 중인 내용이 있습니다. 저장하지 않고 나가시겠습니까?',
+        [
+          { text: '취소', style: 'cancel' },
+          {
+            text: '나가기',
+            style: 'destructive',
+            onPress: () => navigation.goBack()
+          }
+        ]
+      );
+    } else {
+      navigation.goBack();
+    }
   };
 
   const handleSave = async () => {
@@ -101,12 +144,23 @@ export default function DiaryEditScreen({ navigation, route }: Props) {
     <SafeAreaView style={styles.container}>
       {/* 헤더 */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{isEdit ? '일기 수정' : '새 일기 작성'}</Text>
-        <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
-          <Text style={styles.saveButtonText}>저장</Text>
+        <TouchableOpacity
+          onPress={handleSave}
+          style={[
+            styles.saveButton,
+            (createDiary.isPending || updateDiary.isPending) && styles.saveButtonDisabled
+          ]}
+          disabled={createDiary.isPending || updateDiary.isPending}
+        >
+          {createDiary.isPending || updateDiary.isPending ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.saveButtonText}>저장</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -184,6 +238,9 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: '#fff',
     fontWeight: '600',
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
   },
   content: {
     flex: 1,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Switch, Alert, FlatList, TextInput, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Switch, Alert, FlatList, TextInput, Modal, ActivityIndicator } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RootStackParamList } from '../utils/navigationRef';
@@ -66,13 +66,15 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       '정말 로그아웃하시겠습니까?',
       [
         { text: '취소', style: 'cancel' },
-        { 
-          text: '로그아웃', 
+        {
+          text: '로그아웃',
           style: 'destructive',
           onPress: async () => {
             try {
-              await AsyncStorage.removeItem('savedId');
-              await AsyncStorage.removeItem('pushNotifications');
+              await Promise.all([
+                AsyncStorage.removeItem('savedId'),
+                AsyncStorage.removeItem('pushNotifications')
+              ]);
               logout(); // This clears both token and user from the auth store
               // Navigation will automatically switch to AuthLogin when token is cleared
             } catch (error) {
@@ -255,14 +257,16 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               >
                 <Text style={styles.cancelButtonText}>취소</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.saveButton]}
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton, updateProfileMutation.isPending && styles.saveButtonDisabled]}
                 onPress={handleUsernameUpdate}
                 disabled={updateProfileMutation.isPending}
               >
-                <Text style={styles.saveButtonText}>
-                  {updateProfileMutation.isPending ? '저장 중...' : '저장'}
-                </Text>
+                {updateProfileMutation.isPending ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.saveButtonText}>저장</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -427,6 +431,9 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     backgroundColor: '#007AFF',
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
   },
   cancelButtonText: {
     color: '#666',

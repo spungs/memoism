@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Button, FlatList, SafeAreaView, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
+import { View, Text, Button, FlatList, SafeAreaView, TouchableOpacity, StyleSheet, Alert, Image, RefreshControl, ActivityIndicator } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../utils/navigationRef';
 import { useDiaries, useUpdateDiary } from '../api/diaryApi';
@@ -9,16 +9,26 @@ import { useAuthStore } from '../store/authStore';
 type Props = NativeStackScreenProps<RootStackParamList, 'DiaryList'>;
 
 export default function DiaryListScreen({ navigation }: Props) {
-  const { data: diaries, isLoading, error } = useDiaries();
+  const { data: diaries, isLoading, error, refetch } = useDiaries();
   const updateDiaryMutation = useUpdateDiary();
   const setDiaries = useDiaryStore((state) => state.setDiaries);
   const setToken = useAuthStore((state) => state.setToken);
+  const [refreshing, setRefreshing] = React.useState(false);
 
   React.useEffect(() => {
     if (diaries) {
       setDiaries(diaries);
     }
   }, [diaries, setDiaries]);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   const handleLogout = async () => {
     try {
@@ -55,15 +65,26 @@ export default function DiaryListScreen({ navigation }: Props) {
     );
   };
 
-  if (isLoading) return (
+  if (isLoading && !refreshing) return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.loadingText}>로딩 중...</Text>
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>로딩 중...</Text>
+      </View>
     </SafeAreaView>
   );
-  
+
   if (error) return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.errorText}>오류: {error.message}</Text>
+      <View style={styles.centerContainer}>
+        <Text style={styles.errorText}>오류: {error.message}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => refetch()}
+        >
+          <Text style={styles.retryButtonText}>다시 시도</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 
@@ -90,6 +111,9 @@ export default function DiaryListScreen({ navigation }: Props) {
           data={diaries}
           keyExtractor={item => item.id}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
           renderItem={({ item }) => (
             <View style={styles.diaryItem}>
               <TouchableOpacity 
@@ -255,17 +279,34 @@ const styles = StyleSheet.create({
   unshareButtonText: {
     color: '#fff',
   },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
   loadingText: {
     textAlign: 'center',
-    marginTop: 50,
+    marginTop: 16,
     fontSize: 16,
     color: '#666',
   },
   errorText: {
     textAlign: 'center',
-    marginTop: 50,
     fontSize: 16,
     color: '#ff0000',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
   },
   emptyContainer: {
     alignItems: 'center',
