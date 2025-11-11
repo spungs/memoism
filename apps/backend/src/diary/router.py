@@ -64,6 +64,7 @@ def create_diary(
     # Create new diary
     new_diary = Diary(
         user_id=user_id,
+        title=diary_data.title,
         content=diary_data.content,
     )
 

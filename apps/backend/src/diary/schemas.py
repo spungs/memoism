@@ -2,6 +2,7 @@
 Diary request/response schemas.
 """
 from datetime import datetime
+from typing import Optional
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
@@ -9,6 +10,7 @@ from pydantic import BaseModel, ConfigDict
 class CreateDiaryRequest(BaseModel):
     """Request schema for creating a diary entry."""
 
+    title: Optional[str] = None
     content: str
 
 
@@ -19,5 +21,6 @@ class DiaryResponse(BaseModel):
 
     id: UUID
     user_id: UUID
+    title: Optional[str]
     content: str
     created_at: datetime

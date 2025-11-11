@@ -45,3 +45,41 @@ class TestDiary:
         assert data["content"] == diary_data["content"]
         assert data["user_id"] == user_id
         assert "created_at" in data
+
+    def test_create_diary_with_title(self, client: TestClient, create_and_login_user):
+        """
+        Test 2.2: User should be able to create a diary entry with a title.
+
+        Given: An authenticated user
+        When: POST /diary is called with title and content
+        Then:
+          - Response status is 201 Created
+          - Response contains diary with title and content
+          - Title is optional, but when provided, it's stored correctly
+        """
+        # Arrange
+        auth_data = create_and_login_user()
+        access_token = auth_data["access_token"]
+        user_id = auth_data["user_id"]
+
+        diary_data = {
+            "title": "공원에서의 하루",
+            "content": "오늘은 날씨가 참 좋았다. 공원을 산책하며 많은 생각을 했다."
+        }
+
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+
+        # Act
+        response = client.post("/diary", json=diary_data, headers=headers)
+
+        # Assert
+        assert response.status_code == 201
+
+        data = response.json()
+        assert "id" in data
+        assert data["title"] == diary_data["title"]
+        assert data["content"] == diary_data["content"]
+        assert data["user_id"] == user_id
+        assert "created_at" in data
