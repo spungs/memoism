@@ -281,3 +281,40 @@ class TestAuthentication:
         assert "detail" in error_data, "Response should contain error detail"
         assert "incorrect" in error_data["detail"].lower(), \
             f"Error message should indicate incorrect credentials, got: {error_data['detail']}"
+
+    def test_login_invalid_password(self, client: TestClient):
+        """
+        Test 1.8: Login should fail with incorrect password.
+
+        Given: A registered user with valid email
+        When: POST /auth/login is called with wrong password
+        Then:
+          - Response status is 401 Unauthorized
+          - Error message indicates incorrect credentials
+        """
+        # Arrange - Create a user first
+        signup_data = {
+            "email": "passwordtest@example.com",
+            "username": "passwordtest",
+            "password": "CorrectPassword123!"
+        }
+        signup_response = client.post("/auth/signup", json=signup_data)
+        assert signup_response.status_code == 201
+
+        # Prepare login data with wrong password
+        login_data = {
+            "email": signup_data["email"],
+            "password": "WrongPassword456!"  # Incorrect password
+        }
+
+        # Act
+        response = client.post("/auth/login", json=login_data)
+
+        # Assert
+        assert response.status_code == 401, \
+            f"Expected 401 Unauthorized, got {response.status_code}"
+
+        error_data = response.json()
+        assert "detail" in error_data, "Response should contain error detail"
+        assert "incorrect" in error_data["detail"].lower(), \
+            f"Error message should indicate incorrect credentials, got: {error_data['detail']}"
