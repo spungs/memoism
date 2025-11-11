@@ -37,15 +37,15 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a JWT access token."""
-    to_encode = data.copy()
+    token_payload = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(minutes=JWT_EXPIRATION_MINUTES)
 
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    return encoded_jwt
+    token_payload.update({"exp": expire})
+    access_token = jwt.encode(token_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return access_token
 
 
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -67,20 +67,20 @@ def signup(
         HTTPException: If email or username already exists
     """
     # Check if email already exists
-    existing_user = session.exec(
+    user_with_email = session.exec(
         select(User).where(User.email == signup_data.email)
     ).first()
-    if existing_user:
+    if user_with_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered",
         )
 
     # Check if username already exists
-    existing_username = session.exec(
+    user_with_username = session.exec(
         select(User).where(User.username == signup_data.username)
     ).first()
-    if existing_username:
+    if user_with_username:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already taken",
