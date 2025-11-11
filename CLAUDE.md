@@ -4,6 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **IMPORTANT: Always follow the instructions in [plan.md](plan.md). When I say "go", find the next unmarked test in plan.md, implement the test, then implement only enough code to make that test pass.**
 
+**IMPORTANT: Always respond in Korean (한국어). All explanations, summaries, and communications with the user should be in Korean.**
+
 ---
 
 # 🎯 DEVELOPMENT METHODOLOGY
