@@ -1,14 +1,23 @@
 """
 Authentication router.
 """
+from datetime import datetime, timedelta
+from typing import Optional
+import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
+from jose import jwt
 from src.database import get_session
 from src.models import User
-from src.auth.schemas import SignupRequest, UserResponse
+from src.auth.schemas import SignupRequest, UserResponse, LoginRequest, LoginResponse
 import bcrypt
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# JWT Configuration
+JWT_SECRET = os.getenv("JWT_SECRET", "your-super-secret-jwt-key-change-this-in-production")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+JWT_EXPIRATION_MINUTES = int(os.getenv("JWT_EXPIRATION_MINUTES", "30"))
 
 
 def hash_password(password: str) -> str:
@@ -17,6 +26,26 @@ def hash_password(password: str) -> str:
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password_bytes, salt)
     return hashed.decode('utf-8')
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a password against its hash using bcrypt."""
+    password_bytes = plain_password.encode('utf-8')
+    hashed_bytes = hashed_password.encode('utf-8')
+    return bcrypt.checkpw(password_bytes, hashed_bytes)
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """Create a JWT access token."""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=JWT_EXPIRATION_MINUTES)
+
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return encoded_jwt
 
 
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -69,3 +98,42 @@ def signup(
     session.refresh(new_user)
 
     return new_user
+
+
+@router.post("/login", response_model=LoginResponse, status_code=status.HTTP_200_OK)
+def login(
+    login_data: LoginRequest,
+    session: Session = Depends(get_session),
+):
+    """
+    Authenticate a user and return JWT token.
+
+    Args:
+        login_data: User login credentials
+        session: Database session
+
+    Returns:
+        LoginResponse: JWT access token
+
+    Raises:
+        HTTPException: If credentials are invalid
+    """
+    # Find user by email
+    user = session.exec(
+        select(User).where(User.email == login_data.email)
+    ).first()
+
+    # Check if user exists and password is correct
+    if not user or not verify_password(login_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Create access token
+    access_token = create_access_token(
+        data={"sub": str(user.id), "email": user.email}
+    )
+
+    return LoginResponse(access_token=access_token, token_type="bearer")

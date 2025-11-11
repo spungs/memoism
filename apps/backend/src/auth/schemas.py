@@ -21,3 +21,17 @@ class UserResponse(BaseModel):
     id: UUID
     email: str
     username: str
+
+
+class LoginRequest(BaseModel):
+    """Request schema for user login."""
+
+    email: EmailStr
+    password: str
+
+
+class LoginResponse(BaseModel):
+    """Response schema for login with JWT token."""
+
+    access_token: str
+    token_type: str

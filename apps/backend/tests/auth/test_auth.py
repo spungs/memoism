@@ -207,3 +207,49 @@ class TestAuthentication:
         second_hash_bytes = second_hash.encode('utf-8')
         assert bcrypt.checkpw(password_bytes, second_hash_bytes), \
             "Second hash should also verify the original password"
+
+    def test_login_success(self, client: TestClient):
+        """
+        Test 1.6: User login should succeed with valid credentials and return JWT token.
+
+        Given: A registered user with valid credentials
+        When: POST /auth/login is called with correct email and password
+        Then:
+          - Response status is 200 OK
+          - Response contains access_token
+          - Response contains token_type as "bearer"
+          - Token is a valid JWT format (3 parts separated by dots)
+        """
+        # Arrange - Create a user first
+        signup_data = {
+            "email": "loginuser@example.com",
+            "username": "loginuser",
+            "password": "LoginPass123!"
+        }
+        signup_response = client.post("/auth/signup", json=signup_data)
+        assert signup_response.status_code == 201
+
+        # Prepare login data
+        login_data = {
+            "email": signup_data["email"],
+            "password": signup_data["password"]
+        }
+
+        # Act
+        response = client.post("/auth/login", json=login_data)
+
+        # Assert
+        assert response.status_code == 200, \
+            f"Expected 200 OK, got {response.status_code}: {response.json()}"
+
+        data = response.json()
+        assert "access_token" in data, "Response should contain access_token"
+        assert "token_type" in data, "Response should contain token_type"
+        assert data["token_type"] == "bearer", \
+            f"Token type should be 'bearer', got '{data['token_type']}'"
+
+        # JWT tokens have 3 parts separated by dots: header.payload.signature
+        token = data["access_token"]
+        token_parts = token.split(".")
+        assert len(token_parts) == 3, \
+            f"JWT token should have 3 parts, got {len(token_parts)} parts"
