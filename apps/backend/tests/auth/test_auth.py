@@ -208,7 +208,7 @@ class TestAuthentication:
         assert bcrypt.checkpw(password_bytes, second_hash_bytes), \
             "Second hash should also verify the original password"
 
-    def test_login_success(self, client: TestClient):
+    def test_login_success(self, client: TestClient, create_user):
         """
         Test 1.6: User login should succeed with valid credentials and return JWT token.
 
@@ -220,13 +220,12 @@ class TestAuthentication:
           - Response contains token_type as "bearer"
           - Token is a valid JWT format (3 parts separated by dots)
         """
-        # Arrange - Create a user first
-        signup_data = {
-            "email": "loginuser@example.com",
-            "username": "loginuser",
-            "password": "LoginPass123!"
-        }
-        signup_response = client.post("/auth/signup", json=signup_data)
+        # Arrange - Create a user using fixture
+        signup_response, signup_data = create_user(
+            email="loginuser@example.com",
+            username="loginuser",
+            password="LoginPass123!"
+        )
         assert signup_response.status_code == 201
 
         # Prepare login data
@@ -282,7 +281,7 @@ class TestAuthentication:
         assert "incorrect" in error_data["detail"].lower(), \
             f"Error message should indicate incorrect credentials, got: {error_data['detail']}"
 
-    def test_login_invalid_password(self, client: TestClient):
+    def test_login_invalid_password(self, client: TestClient, create_user):
         """
         Test 1.8: Login should fail with incorrect password.
 
@@ -292,13 +291,12 @@ class TestAuthentication:
           - Response status is 401 Unauthorized
           - Error message indicates incorrect credentials
         """
-        # Arrange - Create a user first
-        signup_data = {
-            "email": "passwordtest@example.com",
-            "username": "passwordtest",
-            "password": "CorrectPassword123!"
-        }
-        signup_response = client.post("/auth/signup", json=signup_data)
+        # Arrange - Create a user using fixture
+        signup_response, signup_data = create_user(
+            email="passwordtest@example.com",
+            username="passwordtest",
+            password="CorrectPassword123!"
+        )
         assert signup_response.status_code == 201
 
         # Prepare login data with wrong password
@@ -319,7 +317,7 @@ class TestAuthentication:
         assert "incorrect" in error_data["detail"].lower(), \
             f"Error message should indicate incorrect credentials, got: {error_data['detail']}"
 
-    def test_token_validation(self, client: TestClient):
+    def test_token_validation(self, create_and_login_user, jwt_settings):
         """
         Test 1.9: JWT token should be valid and contain correct user information.
 
@@ -333,44 +331,32 @@ class TestAuthentication:
           - User id in token matches the created user
         """
         from jose import jwt
-        import os
 
-        # Arrange - Create user and login
-        signup_data = {
-            "email": "tokentest@example.com",
-            "username": "tokentest",
-            "password": "TokenPass123!"
-        }
-        signup_response = client.post("/auth/signup", json=signup_data)
-        assert signup_response.status_code == 201
-        user_id = signup_response.json()["id"]
-
-        login_data = {
-            "email": signup_data["email"],
-            "password": signup_data["password"]
-        }
-        login_response = client.post("/auth/login", json=login_data)
-        assert login_response.status_code == 200
-
-        token = login_response.json()["access_token"]
+        # Arrange - Create user and login using fixture
+        user_data = create_and_login_user(
+            email="tokentest@example.com",
+            username="tokentest",
+            password="TokenPass123!"
+        )
 
         # Act - Decode the token
-        JWT_SECRET = os.getenv("JWT_SECRET", "your-super-secret-jwt-key-change-this-in-production")
-        JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(
+            user_data["access_token"],
+            jwt_settings["secret"],
+            algorithms=[jwt_settings["algorithm"]]
+        )
 
         # Assert
         assert "sub" in payload, "Token should contain 'sub' (user id)"
         assert "email" in payload, "Token should contain 'email'"
         assert "exp" in payload, "Token should contain 'exp' (expiration)"
 
-        assert payload["sub"] == user_id, \
-            f"Token user id should match created user id: expected {user_id}, got {payload['sub']}"
-        assert payload["email"] == signup_data["email"], \
-            f"Token email should match user email: expected {signup_data['email']}, got {payload['email']}"
+        assert payload["sub"] == user_data["user_id"], \
+            f"Token user id should match created user id: expected {user_data['user_id']}, got {payload['sub']}"
+        assert payload["email"] == user_data["email"], \
+            f"Token email should match user email: expected {user_data['email']}, got {payload['email']}"
 
-    def test_token_expiration(self):
+    def test_token_expiration(self, jwt_settings):
         """
         Test 1.10: Expired JWT token should fail validation.
 
@@ -382,7 +368,6 @@ class TestAuthentication:
         from jose import jwt, ExpiredSignatureError
         from datetime import timedelta
         from src.auth.router import create_access_token
-        import os
         import pytest
 
         # Arrange - Create an expired token (expired 1 minute ago)
@@ -391,16 +376,17 @@ class TestAuthentication:
             expires_delta=timedelta(minutes=-1)  # Expired 1 minute ago
         )
 
-        JWT_SECRET = os.getenv("JWT_SECRET", "your-super-secret-jwt-key-change-this-in-production")
-        JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-
         # Act & Assert - Decoding should raise ExpiredSignatureError
         with pytest.raises(ExpiredSignatureError) as exc_info:
-            jwt.decode(expired_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            jwt.decode(
+                expired_token,
+                jwt_settings["secret"],
+                algorithms=[jwt_settings["algorithm"]]
+            )
 
         assert "Signature has expired" in str(exc_info.value)
 
-    def test_invalid_token(self):
+    def test_invalid_token(self, jwt_settings):
         """
         Test 1.11: Invalid JWT token format should fail validation.
 
@@ -411,11 +397,7 @@ class TestAuthentication:
           - Different types of invalid tokens should all fail
         """
         from jose import jwt, JWTError
-        import os
         import pytest
-
-        JWT_SECRET = os.getenv("JWT_SECRET", "your-super-secret-jwt-key-change-this-in-production")
-        JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
         # Test cases: various invalid token formats
         invalid_tokens = [
@@ -429,7 +411,11 @@ class TestAuthentication:
         for invalid_token in invalid_tokens:
             # Act & Assert - Decoding should raise JWTError
             with pytest.raises(JWTError) as exc_info:
-                jwt.decode(invalid_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+                jwt.decode(
+                    invalid_token,
+                    jwt_settings["secret"],
+                    algorithms=[jwt_settings["algorithm"]]
+                )
 
             # All JWT errors should be caught
             assert exc_info.type in (JWTError,) or issubclass(exc_info.type, JWTError), \
