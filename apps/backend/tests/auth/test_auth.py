@@ -165,3 +165,45 @@ class TestAuthentication:
         hashed_bytes = user.hashed_password.encode('utf-8')
         assert bcrypt.checkpw(password_bytes, hashed_bytes), \
             "Hashed password should be verifiable with bcrypt.checkpw"
+
+    def test_password_hashing_roundtrip(self):
+        """
+        Test 1.5: Password hashing and verification should work end-to-end.
+
+        Given: A plain text password
+        When: The password is hashed and then verified
+        Then:
+          - Correct password verification should return True
+          - Incorrect password verification should return False
+          - Multiple hashes of the same password should be different (due to salt)
+        """
+        import bcrypt
+        from src.auth.router import hash_password
+
+        # Arrange
+        plain_password = "TestPassword123!"
+        wrong_password = "WrongPassword456!"
+
+        # Act
+        hashed_password = hash_password(plain_password)
+
+        # Assert - Correct password should verify successfully
+        password_bytes = plain_password.encode('utf-8')
+        hashed_bytes = hashed_password.encode('utf-8')
+        assert bcrypt.checkpw(password_bytes, hashed_bytes), \
+            "Correct password should verify against its hash"
+
+        # Assert - Incorrect password should fail verification
+        wrong_bytes = wrong_password.encode('utf-8')
+        assert not bcrypt.checkpw(wrong_bytes, hashed_bytes), \
+            "Incorrect password should not verify against the hash"
+
+        # Assert - Multiple hashes should be different (bcrypt generates unique salt)
+        second_hash = hash_password(plain_password)
+        assert hashed_password != second_hash, \
+            "Multiple hashes of the same password should be different due to unique salts"
+
+        # Assert - But both hashes should verify the same password
+        second_hash_bytes = second_hash.encode('utf-8')
+        assert bcrypt.checkpw(password_bytes, second_hash_bytes), \
+            "Second hash should also verify the original password"
