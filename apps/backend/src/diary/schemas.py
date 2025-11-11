@@ -2,7 +2,7 @@
 Diary request/response schemas.
 """
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
@@ -12,6 +12,7 @@ class CreateDiaryRequest(BaseModel):
 
     title: Optional[str] = None
     content: str
+    images: Optional[List[str]] = None
 
 
 class DiaryResponse(BaseModel):
@@ -23,4 +24,5 @@ class DiaryResponse(BaseModel):
     user_id: UUID
     title: Optional[str]
     content: str
+    images: Optional[List[str]]
     created_at: datetime

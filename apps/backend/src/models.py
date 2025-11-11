@@ -4,9 +4,10 @@ Database models.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID, uuid4
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, Column
+from sqlalchemy import JSON
 
 
 class User(SQLModel, table=True):
@@ -30,4 +31,5 @@ class Diary(SQLModel, table=True):
     user_id: UUID = Field(foreign_key="users.id", index=True)
     title: Optional[str] = None
     content: str
+    images: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=datetime.utcnow)
