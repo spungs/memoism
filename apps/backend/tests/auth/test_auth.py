@@ -369,3 +369,33 @@ class TestAuthentication:
             f"Token user id should match created user id: expected {user_id}, got {payload['sub']}"
         assert payload["email"] == signup_data["email"], \
             f"Token email should match user email: expected {signup_data['email']}, got {payload['email']}"
+
+    def test_token_expiration(self):
+        """
+        Test 1.10: Expired JWT token should fail validation.
+
+        Given: A JWT token with past expiration time
+        When: The token is decoded
+        Then:
+          - jose.exceptions.ExpiredSignatureError should be raised
+        """
+        from jose import jwt, ExpiredSignatureError
+        from datetime import timedelta
+        from src.auth.router import create_access_token
+        import os
+        import pytest
+
+        # Arrange - Create an expired token (expired 1 minute ago)
+        expired_token = create_access_token(
+            data={"sub": "test-user-id", "email": "test@example.com"},
+            expires_delta=timedelta(minutes=-1)  # Expired 1 minute ago
+        )
+
+        JWT_SECRET = os.getenv("JWT_SECRET", "your-super-secret-jwt-key-change-this-in-production")
+        JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+
+        # Act & Assert - Decoding should raise ExpiredSignatureError
+        with pytest.raises(ExpiredSignatureError) as exc_info:
+            jwt.decode(expired_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+
+        assert "Signature has expired" in str(exc_info.value)
