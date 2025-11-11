@@ -12,12 +12,12 @@
 
 ## Phase 0: 프로젝트 준비
 
-- [ ] 0.1 plan.md 생성
-- [ ] 0.2 기존 Backend 코드 백업 (apps/backend → apps/backend-legacy)
-- [ ] 0.3 기존 Mobile 코드 백업 (apps/mobile → apps/mobile-legacy)
-- [ ] 0.4 Backend 테스트 환경 설정 (pytest, pytest-asyncio, pytest-cov, httpx, faker)
+- [x] 0.1 plan.md 생성
+- [x] 0.2 기존 Backend 코드 백업 (apps/backend → apps/backend-legacy)
+- [x] 0.3 기존 Mobile 코드 백업 (apps/mobile → apps/mobile-legacy)
+- [x] 0.4 Backend 테스트 환경 설정 (pytest, pytest-asyncio, pytest-cov, httpx, faker)
 - [ ] 0.5 Mobile 테스트 환경 설정 (Jest, React Testing Library)
-- [ ] 0.6 .env.example 파일 생성
+- [x] 0.6 .env.example 파일 생성
 
 ---
 
@@ -25,7 +25,7 @@
 
 ### 테스트 작성 및 구현 (Red → Green)
 
-- [ ] 1.1 test_signup_success: 사용자 회원가입 성공
+- [x] 1.1 test_signup_success: 사용자 회원가입 성공
 - [ ] 1.2 test_signup_duplicate_email: 중복 이메일 검증
 - [ ] 1.3 test_signup_invalid_email: 잘못된 이메일 형식 검증
 - [ ] 1.4 test_password_hashing: bcrypt 비밀번호 암호화 검증
