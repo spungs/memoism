@@ -178,7 +178,7 @@ class TestAuthentication:
           - Multiple hashes of the same password should be different (due to salt)
         """
         import bcrypt
-        from src.auth.router import hash_password
+        from src.auth.utils import hash_password
 
         # Arrange
         plain_password = "TestPassword123!"
@@ -367,7 +367,7 @@ class TestAuthentication:
         """
         from jose import jwt, ExpiredSignatureError
         from datetime import timedelta
-        from src.auth.router import create_access_token
+        from src.auth.utils import create_access_token
         import pytest
 
         # Arrange - Create an expired token (expired 1 minute ago)

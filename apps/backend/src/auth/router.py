@@ -1,51 +1,14 @@
 """
 Authentication router.
 """
-from datetime import datetime, timedelta
-from typing import Optional
-import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
-from jose import jwt
 from src.database import get_session
 from src.models import User
 from src.auth.schemas import SignupRequest, UserResponse, LoginRequest, LoginResponse
-import bcrypt
+from src.auth.utils import hash_password, verify_password, create_access_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-# JWT Configuration
-JWT_SECRET = os.getenv("JWT_SECRET", "your-super-secret-jwt-key-change-this-in-production")
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-JWT_EXPIRATION_MINUTES = int(os.getenv("JWT_EXPIRATION_MINUTES", "30"))
-
-
-def hash_password(password: str) -> str:
-    """Hash a password using bcrypt."""
-    password_bytes = password.encode('utf-8')
-    salt = bcrypt.gensalt()
-    hashed = bcrypt.hashpw(password_bytes, salt)
-    return hashed.decode('utf-8')
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash using bcrypt."""
-    password_bytes = plain_password.encode('utf-8')
-    hashed_bytes = hashed_password.encode('utf-8')
-    return bcrypt.checkpw(password_bytes, hashed_bytes)
-
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """Create a JWT access token."""
-    token_payload = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=JWT_EXPIRATION_MINUTES)
-
-    token_payload.update({"exp": expire})
-    access_token = jwt.encode(token_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    return access_token
 
 
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
