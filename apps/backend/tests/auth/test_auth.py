@@ -77,3 +77,42 @@ class TestAuthentication:
         assert "detail" in error_data
         assert "email" in error_data["detail"].lower()
         assert "already" in error_data["detail"].lower()
+
+    def test_signup_invalid_email(self, client: TestClient):
+        """
+        Test 1.3: User signup should fail with invalid email format.
+
+        Given: Invalid email formats (missing @, missing domain, etc.)
+        When: POST /auth/signup is called
+        Then:
+          - Response status is 422 Unprocessable Entity
+          - Error message indicates email validation failure
+        """
+        # Arrange: Various invalid email formats
+        invalid_emails = [
+            "notanemail",           # Missing @ and domain
+            "missing@domain",       # Missing TLD
+            "@nodomain.com",        # Missing local part
+            "spaces in@email.com",  # Spaces in email
+            "double@@example.com",  # Double @
+        ]
+
+        for invalid_email in invalid_emails:
+            # Act
+            signup_data = {
+                "email": invalid_email,
+                "username": "testuser",
+                "password": "SecurePass123!"
+            }
+            response = client.post("/auth/signup", json=signup_data)
+
+            # Assert
+            assert response.status_code == 422, \
+                f"Expected 422 for invalid email '{invalid_email}', got {response.status_code}"
+
+            error_data = response.json()
+            assert "detail" in error_data
+            # Pydantic validation errors have a specific structure
+            assert isinstance(error_data["detail"], list)
+            assert any("email" in str(err).lower() for err in error_data["detail"]), \
+                f"Expected email validation error for '{invalid_email}', got {error_data}"

@@ -26,8 +26,8 @@
 ### 테스트 작성 및 구현 (Red → Green)
 
 - [x] 1.1 test_signup_success: 사용자 회원가입 성공
-- [ ] 1.2 test_signup_duplicate_email: 중복 이메일 검증
-- [ ] 1.3 test_signup_invalid_email: 잘못된 이메일 형식 검증
+- [x] 1.2 test_signup_duplicate_email: 중복 이메일 검증
+- [x] 1.3 test_signup_invalid_email: 잘못된 이메일 형식 검증
 - [ ] 1.4 test_password_hashing: bcrypt 비밀번호 암호화 검증
 - [ ] 1.5 test_password_hashing_roundtrip: 암호화/검증 전체 사이클
 - [ ] 1.6 test_login_success: 로그인 성공 및 JWT 토큰 발급
@@ -177,11 +177,11 @@
 
 ## 진행 상황
 
-- **현재 단계**: Phase 0 - 프로젝트 준비
-- **다음 테스트**: 0.1 plan.md 생성
-- **완료된 테스트**: 0개 / 총 100+개
+- **현재 단계**: Phase 1 - Backend Authentication (Week 1)
+- **다음 테스트**: 1.4 test_password_hashing
+- **완료된 테스트**: 3개 / 총 100+개
 - **테스트 커버리지**:
-  - Backend: 0%
+  - Backend: 93.85%
   - Mobile: 0%
 
 ---
