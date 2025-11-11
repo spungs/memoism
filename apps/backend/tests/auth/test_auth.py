@@ -116,3 +116,52 @@ class TestAuthentication:
             assert isinstance(error_data["detail"], list)
             assert any("email" in str(err).lower() for err in error_data["detail"]), \
                 f"Expected email validation error for '{invalid_email}', got {error_data}"
+
+    def test_password_hashing(self, client: TestClient, session):
+        """
+        Test 1.4: Passwords should be hashed using bcrypt before storage.
+
+        Given: A user signs up with a plain text password
+        When: The user is created in the database
+        Then:
+          - The stored password is different from the plain text password
+          - The stored password is a valid bcrypt hash (starts with $2b$)
+          - The stored password can be verified using bcrypt.checkpw
+        """
+        import bcrypt
+        from sqlmodel import select
+        from src.models import User
+
+        # Arrange
+        plain_password = "MySecurePassword123!"
+        signup_data = {
+            "email": "hashtest@example.com",
+            "username": "hashuser",
+            "password": plain_password
+        }
+
+        # Act
+        response = client.post("/auth/signup", json=signup_data)
+        assert response.status_code == 201
+
+        # Query the database directly to get the hashed password
+        user = session.exec(
+            select(User).where(User.email == signup_data["email"])
+        ).first()
+
+        # Assert
+        assert user is not None, "User should exist in database"
+
+        # Password should be hashed, not stored as plain text
+        assert user.hashed_password != plain_password, \
+            "Password should be hashed, not stored as plain text"
+
+        # Bcrypt hashes start with $2a$, $2b$, or $2y$ followed by cost factor
+        assert user.hashed_password.startswith("$2b$"), \
+            f"Password should be a valid bcrypt hash, got: {user.hashed_password[:10]}"
+
+        # Verify the hashed password can be validated against the original
+        password_bytes = plain_password.encode('utf-8')
+        hashed_bytes = user.hashed_password.encode('utf-8')
+        assert bcrypt.checkpw(password_bytes, hashed_bytes), \
+            "Hashed password should be verifiable with bcrypt.checkpw"
