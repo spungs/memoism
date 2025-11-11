@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from src.auth.router import router as auth_router
+from src.diary.router import router as diary_router
 
 app = FastAPI(
     title="Memoism API",
@@ -29,6 +30,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth_router)
+app.include_router(diary_router)
 
 
 @app.get("/")
