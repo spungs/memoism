@@ -13,6 +13,7 @@ class CreateDiaryRequest(BaseModel):
     title: Optional[str] = None
     content: str
     images: Optional[List[str]] = None
+    location: Optional[dict] = None
 
 
 class DiaryResponse(BaseModel):
@@ -25,4 +26,5 @@ class DiaryResponse(BaseModel):
     title: Optional[str]
     content: str
     images: Optional[List[str]]
+    location: Optional[dict]
     created_at: datetime

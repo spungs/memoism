@@ -127,3 +127,49 @@ class TestDiary:
         assert data["images"] == diary_data["images"]
         assert len(data["images"]) == 3
         assert "created_at" in data
+
+    def test_create_diary_with_location(self, client: TestClient, create_and_login_user):
+        """
+        Test 2.4: User should be able to create a diary entry with location data.
+
+        Given: An authenticated user
+        When: POST /diary is called with content and location (JSONB)
+        Then:
+          - Response status is 201 Created
+          - Response contains diary with location object
+          - Location contains latitude, longitude, and address
+          - Location is stored as JSONB format
+        """
+        # Arrange
+        auth_data = create_and_login_user()
+        access_token = auth_data["access_token"]
+        user_id = auth_data["user_id"]
+
+        diary_data = {
+            "content": "서울 남산에서 바라본 야경이 아름다웠다.",
+            "location": {
+                "latitude": 37.5512,
+                "longitude": 126.9882,
+                "address": "서울특별시 중구 남산공원길 105"
+            }
+        }
+
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+
+        # Act
+        response = client.post("/diary", json=diary_data, headers=headers)
+
+        # Assert
+        assert response.status_code == 201
+
+        data = response.json()
+        assert "id" in data
+        assert data["content"] == diary_data["content"]
+        assert data["user_id"] == user_id
+        assert "location" in data
+        assert data["location"]["latitude"] == diary_data["location"]["latitude"]
+        assert data["location"]["longitude"] == diary_data["location"]["longitude"]
+        assert data["location"]["address"] == diary_data["location"]["address"]
+        assert "created_at" in data

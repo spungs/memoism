@@ -32,4 +32,5 @@ class Diary(SQLModel, table=True):
     title: Optional[str] = None
     content: str
     images: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
+    location: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=datetime.utcnow)

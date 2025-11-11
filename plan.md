@@ -50,10 +50,10 @@
 
 ### 테스트 작성 및 구현 (Red → Green)
 
-- [ ] 2.1 test_create_diary_basic: 기본 일기 생성
-- [ ] 2.2 test_create_diary_with_title: 제목 포함 일기 생성
-- [ ] 2.3 test_create_diary_with_images: 이미지 URL 배열 포함
-- [ ] 2.4 test_create_diary_with_location: JSONB 위치 데이터 포함
+- [x] 2.1 test_create_diary_basic: 기본 일기 생성
+- [x] 2.2 test_create_diary_with_title: 제목 포함 일기 생성
+- [x] 2.3 test_create_diary_with_images: 이미지 URL 배열 포함
+- [x] 2.4 test_create_diary_with_location: JSONB 위치 데이터 포함
 - [ ] 2.5 test_create_diary_unauthorized: 인증 없이 생성 시도 실패
 - [ ] 2.6 test_list_diaries_empty: 빈 일기 목록 조회
 - [ ] 2.7 test_list_diaries_with_data: 일기 목록 조회 (데이터 있음)
@@ -177,11 +177,11 @@
 
 ## 진행 상황
 
-- **현재 단계**: Phase 1 완료 ✅ → Phase 2 시작
-- **다음 테스트**: Phase 2.1 - test_create_diary_basic (Diary CRUD)
-- **완료된 테스트**: 11개 / 총 100+개
+- **현재 단계**: Phase 2 진행 중
+- **다음 테스트**: Phase 2.5 - test_create_diary_unauthorized (인증 없이 생성 시도 실패)
+- **완료된 테스트**: 15개 / 총 100+개
 - **테스트 커버리지**:
-  - Backend: 95.88%
+  - Backend: 94.59%
   - Mobile: 0%
 
 ---

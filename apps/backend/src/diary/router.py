@@ -67,6 +67,7 @@ def create_diary(
         title=diary_data.title,
         content=diary_data.content,
         images=diary_data.images,
+        location=diary_data.location,
     )
 
     session.add(new_diary)
