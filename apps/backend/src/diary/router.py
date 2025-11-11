@@ -1,6 +1,7 @@
 """
 Diary router.
 """
+from typing import Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Header, status
 from sqlmodel import Session
@@ -12,7 +13,7 @@ from src.auth.utils import verify_token
 router = APIRouter(prefix="/diary", tags=["diary"])
 
 
-def get_current_user_id(authorization: str = Header()) -> UUID:
+def get_current_user_id(authorization: Optional[str] = Header(default=None)) -> UUID:
     """
     Extract and verify user ID from JWT token in Authorization header.
 
@@ -25,6 +26,13 @@ def get_current_user_id(authorization: str = Header()) -> UUID:
     Raises:
         HTTPException: If token is invalid or missing
     """
+    # Check if authorization header is present
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authorization header",
+        )
+
     # Extract token from "Bearer <token>"
     if not authorization.startswith("Bearer "):
         raise HTTPException(

@@ -173,3 +173,25 @@ class TestDiary:
         assert data["location"]["longitude"] == diary_data["location"]["longitude"]
         assert data["location"]["address"] == diary_data["location"]["address"]
         assert "created_at" in data
+
+    def test_create_diary_unauthorized(self, client: TestClient):
+        """
+        Test 2.5: Creating a diary without authentication should fail.
+
+        Given: No authentication token
+        When: POST /diary is called without Authorization header
+        Then:
+          - Response status is 401 Unauthorized
+          - Error message indicates authentication is required
+        """
+        # Arrange
+        diary_data = {
+            "content": "인증 없이 작성한 일기"
+        }
+
+        # Act
+        response = client.post("/diary", json=diary_data)
+
+        # Assert
+        assert response.status_code == 401
+        assert "detail" in response.json()
