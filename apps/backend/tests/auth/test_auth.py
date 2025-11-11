@@ -253,3 +253,31 @@ class TestAuthentication:
         token_parts = token.split(".")
         assert len(token_parts) == 3, \
             f"JWT token should have 3 parts, got {len(token_parts)} parts"
+
+    def test_login_invalid_email(self, client: TestClient):
+        """
+        Test 1.7: Login should fail with non-existent email.
+
+        Given: A non-existent email address
+        When: POST /auth/login is called with the email
+        Then:
+          - Response status is 401 Unauthorized
+          - Error message indicates incorrect credentials
+        """
+        # Arrange
+        login_data = {
+            "email": "nonexistent@example.com",
+            "password": "SomePassword123!"
+        }
+
+        # Act
+        response = client.post("/auth/login", json=login_data)
+
+        # Assert
+        assert response.status_code == 401, \
+            f"Expected 401 Unauthorized, got {response.status_code}"
+
+        error_data = response.json()
+        assert "detail" in error_data, "Response should contain error detail"
+        assert "incorrect" in error_data["detail"].lower(), \
+            f"Error message should indicate incorrect credentials, got: {error_data['detail']}"
