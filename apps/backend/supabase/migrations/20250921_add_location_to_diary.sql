@@ -1,1 +1,0 @@
-ALTER TABLE diary ADD COLUMN location JSONB;

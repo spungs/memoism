@@ -183,6 +183,12 @@ apps/backend/__pycache__/
 apps/backend/*.pyc
 apps/backend/.pytest_cache/
 apps/backend/memoism_backend.egg-info/
+apps/backend/.coverage
+apps/backend/htmlcov/
+
+# Legacy backups (not tracked in git)
+apps/backend-legacy/
+apps/mobile-legacy/
 
 # Custom environment files
 config.local.js
