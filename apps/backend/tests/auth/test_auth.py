@@ -399,3 +399,38 @@ class TestAuthentication:
             jwt.decode(expired_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
 
         assert "Signature has expired" in str(exc_info.value)
+
+    def test_invalid_token(self):
+        """
+        Test 1.11: Invalid JWT token format should fail validation.
+
+        Given: Invalid JWT tokens (malformed, wrong signature, etc.)
+        When: The token is decoded
+        Then:
+          - jose.exceptions.JWTError should be raised
+          - Different types of invalid tokens should all fail
+        """
+        from jose import jwt, JWTError
+        import os
+        import pytest
+
+        JWT_SECRET = os.getenv("JWT_SECRET", "your-super-secret-jwt-key-change-this-in-production")
+        JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+
+        # Test cases: various invalid token formats
+        invalid_tokens = [
+            "not.a.token",                           # Invalid format but correct structure
+            "invalid-jwt-token",                     # Completely invalid format
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",  # Only header (1 part)
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0",  # Only 2 parts
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0.wrong_signature",  # Wrong signature
+        ]
+
+        for invalid_token in invalid_tokens:
+            # Act & Assert - Decoding should raise JWTError
+            with pytest.raises(JWTError) as exc_info:
+                jwt.decode(invalid_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+
+            # All JWT errors should be caught
+            assert exc_info.type in (JWTError,) or issubclass(exc_info.type, JWTError), \
+                f"Expected JWTError or subclass for token '{invalid_token[:20]}...', got {exc_info.type}"

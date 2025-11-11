@@ -35,7 +35,7 @@
 - [x] 1.8 test_login_invalid_password: 잘못된 비밀번호로 로그인 실패
 - [x] 1.9 test_token_validation: JWT 토큰 검증 성공
 - [x] 1.10 test_token_expiration: 만료된 토큰 검증 실패
-- [ ] 1.11 test_invalid_token: 잘못된 형식의 토큰 검증 실패
+- [x] 1.11 test_invalid_token: 잘못된 형식의 토큰 검증 실패
 
 ### 리팩토링 (Tidy First)
 
@@ -178,8 +178,8 @@
 ## 진행 상황
 
 - **현재 단계**: Phase 1 - Backend Authentication (Week 1)
-- **다음 테스트**: 1.11 test_invalid_token
-- **완료된 테스트**: 10개 / 총 100+개
+- **다음 테스트**: 1.R1 중복 코드 제거 (Refactoring)
+- **완료된 테스트**: 11개 / 총 100+개
 - **테스트 커버리지**:
   - Backend: 95.70%
   - Mobile: 0%
