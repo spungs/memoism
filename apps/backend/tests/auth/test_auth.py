@@ -318,3 +318,54 @@ class TestAuthentication:
         assert "detail" in error_data, "Response should contain error detail"
         assert "incorrect" in error_data["detail"].lower(), \
             f"Error message should indicate incorrect credentials, got: {error_data['detail']}"
+
+    def test_token_validation(self, client: TestClient):
+        """
+        Test 1.9: JWT token should be valid and contain correct user information.
+
+        Given: A user logs in successfully
+        When: The JWT token is decoded
+        Then:
+          - Token can be decoded successfully
+          - Token contains user id (sub)
+          - Token contains user email
+          - Token contains expiration time (exp)
+          - User id in token matches the created user
+        """
+        from jose import jwt
+        import os
+
+        # Arrange - Create user and login
+        signup_data = {
+            "email": "tokentest@example.com",
+            "username": "tokentest",
+            "password": "TokenPass123!"
+        }
+        signup_response = client.post("/auth/signup", json=signup_data)
+        assert signup_response.status_code == 201
+        user_id = signup_response.json()["id"]
+
+        login_data = {
+            "email": signup_data["email"],
+            "password": signup_data["password"]
+        }
+        login_response = client.post("/auth/login", json=login_data)
+        assert login_response.status_code == 200
+
+        token = login_response.json()["access_token"]
+
+        # Act - Decode the token
+        JWT_SECRET = os.getenv("JWT_SECRET", "your-super-secret-jwt-key-change-this-in-production")
+        JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+
+        # Assert
+        assert "sub" in payload, "Token should contain 'sub' (user id)"
+        assert "email" in payload, "Token should contain 'email'"
+        assert "exp" in payload, "Token should contain 'exp' (expiration)"
+
+        assert payload["sub"] == user_id, \
+            f"Token user id should match created user id: expected {user_id}, got {payload['sub']}"
+        assert payload["email"] == signup_data["email"], \
+            f"Token email should match user email: expected {signup_data['email']}, got {payload['email']}"
