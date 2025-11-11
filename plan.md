@@ -55,7 +55,7 @@
 - [x] 2.3 test_create_diary_with_images: 이미지 URL 배열 포함
 - [x] 2.4 test_create_diary_with_location: JSONB 위치 데이터 포함
 - [x] 2.5 test_create_diary_unauthorized: 인증 없이 생성 시도 실패
-- [ ] 2.6 test_list_diaries_empty: 빈 일기 목록 조회
+- [x] 2.6 test_list_diaries_empty: 빈 일기 목록 조회
 - [ ] 2.7 test_list_diaries_with_data: 일기 목록 조회 (데이터 있음)
 - [ ] 2.8 test_list_diaries_pagination: 페이지네이션 동작
 - [ ] 2.9 test_list_diaries_date_filter: 날짜 필터링
@@ -178,10 +178,10 @@
 ## 진행 상황
 
 - **현재 단계**: Phase 2 진행 중
-- **다음 테스트**: Phase 2.6 - test_list_diaries_empty (빈 일기 목록 조회)
-- **완료된 테스트**: 16개 / 총 100+개
+- **다음 테스트**: Phase 2.7 - test_list_diaries_with_data (일기 목록 조회 - 데이터 있음)
+- **완료된 테스트**: 17개 / 총 100+개
 - **테스트 커버리지**:
-  - Backend: 94.70%
+  - Backend: 94.87%
   - Mobile: 0%
 
 ---

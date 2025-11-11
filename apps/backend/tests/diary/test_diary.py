@@ -195,3 +195,30 @@ class TestDiary:
         # Assert
         assert response.status_code == 401
         assert "detail" in response.json()
+
+    def test_list_diaries_empty(self, client: TestClient, create_and_login_user):
+        """
+        Test 2.6: Listing diaries should return an empty list when user has no diaries.
+
+        Given: An authenticated user with no diary entries
+        When: GET /diary is called
+        Then:
+          - Response status is 200 OK
+          - Response contains an empty list
+        """
+        # Arrange
+        auth_data = create_and_login_user()
+        access_token = auth_data["access_token"]
+
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+
+        # Act
+        response = client.get("/diary", headers=headers)
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == 0

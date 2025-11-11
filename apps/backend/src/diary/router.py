@@ -1,10 +1,10 @@
 """
 Diary router.
 """
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Header, status
-from sqlmodel import Session
+from sqlmodel import Session, select
 from src.database import get_session
 from src.models import Diary
 from src.diary.schemas import CreateDiaryRequest, DiaryResponse
@@ -83,3 +83,25 @@ def create_diary(
     session.refresh(new_diary)
 
     return new_diary
+
+
+@router.get("", response_model=List[DiaryResponse])
+def list_diaries(
+    session: Session = Depends(get_session),
+    user_id: UUID = Depends(get_current_user_id),
+):
+    """
+    List all diary entries for the authenticated user.
+
+    Args:
+        session: Database session
+        user_id: Authenticated user ID
+
+    Returns:
+        List[DiaryResponse]: List of diary entries
+    """
+    # Query diaries for the authenticated user
+    statement = select(Diary).where(Diary.user_id == user_id)
+    diaries = session.exec(statement).all()
+
+    return diaries
