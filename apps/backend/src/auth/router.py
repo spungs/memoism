@@ -10,6 +10,11 @@ from src.auth.utils import hash_password, verify_password, create_access_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+# Error messages
+ERROR_EMAIL_ALREADY_REGISTERED = "Email already registered"
+ERROR_USERNAME_ALREADY_TAKEN = "Username already taken"
+ERROR_INCORRECT_CREDENTIALS = "Incorrect email or password"
+
 
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def signup(
@@ -36,7 +41,7 @@ def signup(
     if user_with_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered",
+            detail=ERROR_EMAIL_ALREADY_REGISTERED,
         )
 
     # Check if username already exists
@@ -46,7 +51,7 @@ def signup(
     if user_with_username:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already taken",
+            detail=ERROR_USERNAME_ALREADY_TAKEN,
         )
 
     # Create new user
@@ -90,7 +95,7 @@ def login(
     if not user or not verify_password(login_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail=ERROR_INCORRECT_CREDENTIALS,
             headers={"WWW-Authenticate": "Bearer"},
         )
 
