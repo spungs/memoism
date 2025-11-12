@@ -15,6 +15,39 @@ from src.common.errors import ERROR_DIARY_NOT_FOUND
 router = APIRouter(prefix="/diary", tags=["diary"])
 
 
+def get_diary_by_id_and_user(
+    diary_id: UUID,
+    user_id: UUID,
+    session: Session,
+) -> Diary:
+    """
+    Get a diary by ID and user ID, or raise 404 if not found.
+
+    This helper function eliminates duplicate query logic across multiple endpoints.
+
+    Args:
+        diary_id: The ID of the diary
+        user_id: The ID of the user (for authorization check)
+        session: Database session
+
+    Returns:
+        Diary: The diary object
+
+    Raises:
+        HTTPException: If diary is not found or doesn't belong to user
+    """
+    statement = select(Diary).where(Diary.id == diary_id, Diary.user_id == user_id)
+    diary = session.exec(statement).first()
+
+    if not diary:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=ERROR_DIARY_NOT_FOUND,
+        )
+
+    return diary
+
+
 @router.post("", response_model=DiaryResponse, status_code=status.HTTP_201_CREATED)
 def create_diary(
     diary_data: CreateDiaryRequest,
@@ -123,16 +156,7 @@ def get_diary_detail(
     Raises:
         HTTPException: If diary is not found
     """
-    # Query the diary by ID and user_id
-    statement = select(Diary).where(Diary.id == diary_id, Diary.user_id == user_id)
-    diary = session.exec(statement).first()
-
-    if not diary:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=ERROR_DIARY_NOT_FOUND,
-        )
-
+    diary = get_diary_by_id_and_user(diary_id, user_id, session)
     return diary
 
 
@@ -158,15 +182,7 @@ def update_diary(
     Raises:
         HTTPException: If diary is not found
     """
-    # Query the diary by ID and user_id
-    statement = select(Diary).where(Diary.id == diary_id, Diary.user_id == user_id)
-    diary = session.exec(statement).first()
-
-    if not diary:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=ERROR_DIARY_NOT_FOUND,
-        )
+    diary = get_diary_by_id_and_user(diary_id, user_id, session)
 
     # Update only provided fields (partial update)
     if diary_data.title is not None:
@@ -205,15 +221,7 @@ def delete_diary(
     Raises:
         HTTPException: If diary is not found
     """
-    # Query the diary by ID and user_id
-    statement = select(Diary).where(Diary.id == diary_id, Diary.user_id == user_id)
-    diary = session.exec(statement).first()
-
-    if not diary:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=ERROR_DIARY_NOT_FOUND,
-        )
+    diary = get_diary_by_id_and_user(diary_id, user_id, session)
 
     # Delete the diary
     session.delete(diary)
