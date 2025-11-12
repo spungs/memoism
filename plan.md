@@ -61,7 +61,7 @@
 - [x] 2.9 test_list_diaries_date_filter: 날짜 필터링
 - [x] 2.10 test_get_diary_detail: 일기 상세 조회 성공
 - [x] 2.11 test_get_diary_not_found: 존재하지 않는 일기 조회 실패
-- [ ] 2.12 test_update_diary: 일기 수정 성공
+- [x] 2.12 test_update_diary: 일기 수정 성공
 - [ ] 2.13 test_update_diary_unauthorized: 다른 사용자 일기 수정 실패
 - [ ] 2.14 test_delete_diary: 일기 삭제 성공
 - [ ] 2.15 test_delete_diary_unauthorized: 다른 사용자 일기 삭제 실패
@@ -178,10 +178,10 @@
 ## 진행 상황
 
 - **현재 단계**: Phase 2 진행 중
-- **다음 테스트**: Phase 2.12 - test_update_diary (일기 수정 성공)
-- **완료된 테스트**: 22개 / 총 100+개
+- **다음 테스트**: Phase 2.13 - test_update_diary_unauthorized (다른 사용자 일기 수정 실패)
+- **완료된 테스트**: 23개 / 총 100+개
 - **테스트 커버리지**:
-  - Backend: 95.43%
+  - Backend: 94.44%
   - Mobile: 0%
 
 ---

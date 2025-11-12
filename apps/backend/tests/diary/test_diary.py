@@ -499,3 +499,60 @@ class TestDiary:
         data = response.json()
         assert "detail" in data
         assert "not found" in data["detail"].lower()
+
+    def test_update_diary(self, client: TestClient, create_and_login_user):
+        """
+        Test 2.12: User should be able to update their own diary entry.
+
+        Given: An authenticated user with an existing diary entry
+        When: PUT /diary/{diary_id} is called with updated data
+        Then:
+          - Response status is 200 OK
+          - Response contains the updated diary data
+          - Original fields not included in the update remain unchanged
+          - Updated fields reflect the new values
+        """
+        # Arrange
+        auth_data = create_and_login_user()
+        access_token = auth_data["access_token"]
+
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+
+        # Create an initial diary entry
+        initial_diary_data = {
+            "title": "원래 제목",
+            "content": "원래 내용입니다.",
+            "images": ["https://example.com/old-image.jpg"]
+        }
+
+        create_response = client.post("/diary", json=initial_diary_data, headers=headers)
+        assert create_response.status_code == 201
+        created_diary = create_response.json()
+        diary_id = created_diary["id"]
+
+        # Prepare update data (partial update)
+        update_data = {
+            "title": "수정된 제목",
+            "content": "수정된 내용입니다. 오늘 정말 좋은 일이 있었다."
+        }
+
+        # Act
+        response = client.put(f"/diary/{diary_id}", json=update_data, headers=headers)
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify updated fields
+        assert data["id"] == diary_id
+        assert data["title"] == update_data["title"]
+        assert data["content"] == update_data["content"]
+
+        # Verify unchanged fields (images should remain)
+        assert data["images"] == initial_diary_data["images"]
+
+        # Verify metadata
+        assert "created_at" in data
+        assert "user_id" in data

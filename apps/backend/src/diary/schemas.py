@@ -16,6 +16,15 @@ class CreateDiaryRequest(BaseModel):
     location: Optional[dict] = None
 
 
+class UpdateDiaryRequest(BaseModel):
+    """Request schema for updating a diary entry (partial update)."""
+
+    title: Optional[str] = None
+    content: Optional[str] = None
+    images: Optional[List[str]] = None
+    location: Optional[dict] = None
+
+
 class DiaryResponse(BaseModel):
     """Response schema for diary operations."""
 

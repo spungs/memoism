@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header, status
 from sqlmodel import Session, select
 from src.database import get_session
 from src.models import Diary
-from src.diary.schemas import CreateDiaryRequest, DiaryResponse
+from src.diary.schemas import CreateDiaryRequest, UpdateDiaryRequest, DiaryResponse
 from src.auth.utils import verify_token
 
 router = APIRouter(prefix="/diary", tags=["diary"])
@@ -170,5 +170,54 @@ def get_diary_detail(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Diary not found",
         )
+
+    return diary
+
+
+@router.put("/{diary_id}", response_model=DiaryResponse)
+def update_diary(
+    diary_id: UUID,
+    diary_data: UpdateDiaryRequest,
+    session: Session = Depends(get_session),
+    user_id: UUID = Depends(get_current_user_id),
+):
+    """
+    Update a diary entry.
+
+    Args:
+        diary_id: The ID of the diary to update
+        diary_data: Updated diary data (partial update supported)
+        session: Database session
+        user_id: Authenticated user ID
+
+    Returns:
+        DiaryResponse: The updated diary data
+
+    Raises:
+        HTTPException: If diary is not found
+    """
+    # Query the diary by ID and user_id
+    statement = select(Diary).where(Diary.id == diary_id, Diary.user_id == user_id)
+    diary = session.exec(statement).first()
+
+    if not diary:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Diary not found",
+        )
+
+    # Update only provided fields (partial update)
+    if diary_data.title is not None:
+        diary.title = diary_data.title
+    if diary_data.content is not None:
+        diary.content = diary_data.content
+    if diary_data.images is not None:
+        diary.images = diary_data.images
+    if diary_data.location is not None:
+        diary.location = diary_data.location
+
+    session.add(diary)
+    session.commit()
+    session.refresh(diary)
 
     return diary
