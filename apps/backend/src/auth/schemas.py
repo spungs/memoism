@@ -2,15 +2,15 @@
 Authentication schemas for request/response.
 """
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class SignupRequest(BaseModel):
     """Request schema for user signup."""
 
     email: EmailStr
-    username: str
-    password: str
+    username: str = Field(min_length=3, max_length=50)
+    password: str = Field(min_length=8)
 
 
 class UserResponse(BaseModel):
