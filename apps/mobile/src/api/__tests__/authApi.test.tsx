@@ -178,4 +178,43 @@ describe('authApi', () => {
       expect(result.current.data?.user.email).toBe('user@example.com');
     });
   });
+
+  /**
+   * Test 3.8: useLogin error handling
+   *
+   * Given: API returns an error response (e.g., invalid credentials)
+   * When: useLogin mutation is called
+   * Then:
+   *   - isError should be true
+   *   - error object should contain error information
+   *   - Token and user data should not be set
+   */
+  describe('test_use_login_error', () => {
+    it('should handle login error when credentials are invalid', async () => {
+      // Arrange
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({ detail: 'Invalid email or password' }),
+      });
+
+      const loginData = {
+        email: 'wrong@example.com',
+        password: 'wrongpassword',
+      };
+
+      // Act
+      const { result } = renderHook(() => useLogin(), {
+        wrapper: createWrapper(),
+      });
+
+      result.current.mutate(loginData);
+
+      // Assert
+      await waitFor(() => expect(result.current.isError).toBe(true));
+
+      expect(result.current.error).toBeDefined();
+      expect(result.current.data).toBeUndefined();
+    });
+  });
 });
