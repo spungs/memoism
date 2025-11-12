@@ -724,3 +724,62 @@ class TestDiary:
         original_diary = verify_response.json()
         assert original_diary["title"] == diary_data["title"]
         assert original_diary["content"] == diary_data["content"]
+
+    def test_cannot_access_other_users_diary(self, client: TestClient, create_and_login_user):
+        """
+        Test 2.16: User should not be able to access another user's diary entry.
+
+        Given: Two authenticated users (User A and User B)
+        And: User A has created a diary entry
+        When: User B tries to access User A's diary entry via GET
+        Then:
+          - Response status is 404 Not Found
+          - Error message indicates diary was not found
+          - User B cannot see any information about User A's diary
+        """
+        # Arrange: Create User A and their diary
+        user_a_data = create_and_login_user()
+        user_a_token = user_a_data["access_token"]
+
+        headers_a = {
+            "Authorization": f"Bearer {user_a_token}"
+        }
+
+        # User A creates a private diary
+        diary_data = {
+            "title": "User A의 비밀 일기",
+            "content": "이것은 절대 다른 사람이 볼 수 없는 개인적인 내용입니다."
+        }
+
+        create_response = client.post("/diary", json=diary_data, headers=headers_a)
+        assert create_response.status_code == 201
+        created_diary = create_response.json()
+        diary_id = created_diary["id"]
+
+        # Arrange: Create User B with different credentials
+        user_b_data = create_and_login_user(
+            email="user_b@example.com",
+            username="user_b",
+            password="UserBPass123!"
+        )
+        user_b_token = user_b_data["access_token"]
+
+        headers_b = {
+            "Authorization": f"Bearer {user_b_token}"
+        }
+
+        # Act: User B attempts to access User A's diary
+        response = client.get(f"/diary/{diary_id}", headers=headers_b)
+
+        # Assert
+        assert response.status_code == 404
+        data = response.json()
+        assert "detail" in data
+        assert "not found" in data["detail"].lower()
+
+        # Verify User A can still access their own diary
+        verify_response = client.get(f"/diary/{diary_id}", headers=headers_a)
+        assert verify_response.status_code == 200
+        original_diary = verify_response.json()
+        assert original_diary["title"] == diary_data["title"]
+        assert original_diary["content"] == diary_data["content"]
