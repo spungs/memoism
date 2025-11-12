@@ -3,6 +3,7 @@ Diary router.
 """
 from typing import Optional, List
 from uuid import UUID
+from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Header, status
 from sqlmodel import Session, select
 from src.database import get_session
@@ -89,23 +90,52 @@ def create_diary(
 def list_diaries(
     skip: int = 0,
     limit: int = 100,
+    date: Optional[date] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     session: Session = Depends(get_session),
     user_id: UUID = Depends(get_current_user_id),
 ):
     """
-    List diary entries for the authenticated user with pagination.
+    List diary entries for the authenticated user with pagination and date filtering.
 
     Args:
         skip: Number of entries to skip (default: 0)
         limit: Maximum number of entries to return (default: 100)
+        date: Filter by specific date (YYYY-MM-DD)
+        start_date: Filter diaries created on or after this date (YYYY-MM-DD)
+        end_date: Filter diaries created on or before this date (YYYY-MM-DD)
         session: Database session
         user_id: Authenticated user ID
 
     Returns:
         List[DiaryResponse]: List of diary entries
     """
-    # Query diaries for the authenticated user with pagination
-    statement = select(Diary).where(Diary.user_id == user_id).offset(skip).limit(limit)
+    # Start with base query for the authenticated user
+    statement = select(Diary).where(Diary.user_id == user_id)
+
+    # Apply date filters
+    if date:
+        # Filter by specific date (start of day to end of day)
+        start_datetime = datetime.combine(date, datetime.min.time())
+        end_datetime = datetime.combine(date, datetime.max.time())
+        statement = statement.where(
+            Diary.created_at >= start_datetime,
+            Diary.created_at <= end_datetime
+        )
+    else:
+        # Apply start_date and end_date filters
+        if start_date:
+            start_datetime = datetime.combine(start_date, datetime.min.time())
+            statement = statement.where(Diary.created_at >= start_datetime)
+
+        if end_date:
+            end_datetime = datetime.combine(end_date, datetime.max.time())
+            statement = statement.where(Diary.created_at <= end_datetime)
+
+    # Apply pagination
+    statement = statement.offset(skip).limit(limit)
+
     diaries = session.exec(statement).all()
 
     return diaries

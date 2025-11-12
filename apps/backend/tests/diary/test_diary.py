@@ -329,3 +329,84 @@ class TestDiary:
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 0  # No items available
+
+    def test_list_diaries_date_filter(self, client: TestClient, create_and_login_user, session):
+        """
+        Test 2.9: Listing diaries should support date filtering.
+
+        Given: An authenticated user with diary entries on different dates
+        When: GET /diary is called with date filter parameters
+        Then:
+          - Response status is 200 OK
+          - Only diaries matching the date filter are returned
+          - Date filter supports both specific date and date range
+        """
+        from datetime import datetime, timedelta
+        from src.models import Diary
+
+        # Arrange
+        auth_data = create_and_login_user()
+        access_token = auth_data["access_token"]
+        user_id = auth_data["user_id"]
+
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+
+        # Create diaries with different dates (directly in DB to control created_at)
+        today = datetime.utcnow().replace(hour=12, minute=0, second=0, microsecond=0)
+        yesterday = today - timedelta(days=1)
+        two_days_ago = today - timedelta(days=2)
+        three_days_ago = today - timedelta(days=3)
+
+        # Create 4 diaries with different dates
+        diary1 = Diary(user_id=user_id, content="오늘 일기", created_at=today)
+        diary2 = Diary(user_id=user_id, content="어제 일기", created_at=yesterday)
+        diary3 = Diary(user_id=user_id, content="그저께 일기", created_at=two_days_ago)
+        diary4 = Diary(user_id=user_id, content="3일 전 일기", created_at=three_days_ago)
+
+        session.add(diary1)
+        session.add(diary2)
+        session.add(diary3)
+        session.add(diary4)
+        session.commit()
+
+        # Act & Assert: Test filtering by specific date
+        date_str = today.date().isoformat()
+        response = client.get(f"/diary?date={date_str}", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["content"] == "오늘 일기"
+
+        # Act & Assert: Test filtering by date range (start_date and end_date)
+        start_date = three_days_ago.date().isoformat()
+        end_date = yesterday.date().isoformat()
+        response = client.get(f"/diary?start_date={start_date}&end_date={end_date}", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 3
+        contents = [d["content"] for d in data]
+        assert "어제 일기" in contents
+        assert "그저께 일기" in contents
+        assert "3일 전 일기" in contents
+
+        # Act & Assert: Test with only start_date
+        start_date = yesterday.date().isoformat()
+        response = client.get(f"/diary?start_date={start_date}", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2  # Yesterday and today
+        contents = [d["content"] for d in data]
+        assert "오늘 일기" in contents
+        assert "어제 일기" in contents
+
+        # Act & Assert: Test with only end_date
+        end_date = two_days_ago.date().isoformat()
+        response = client.get(f"/diary?end_date={end_date}", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2  # 2 days ago and 3 days ago
+        contents = [d["content"] for d in data]
+        assert "그저께 일기" in contents
+        assert "3일 전 일기" in contents
