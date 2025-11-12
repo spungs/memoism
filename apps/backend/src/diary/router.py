@@ -10,6 +10,7 @@ from src.database import get_session
 from src.models import Diary
 from src.diary.schemas import CreateDiaryRequest, UpdateDiaryRequest, DiaryResponse
 from src.auth.dependencies import get_current_user_id
+from src.common.errors import ERROR_DIARY_NOT_FOUND
 
 router = APIRouter(prefix="/diary", tags=["diary"])
 
@@ -129,7 +130,7 @@ def get_diary_detail(
     if not diary:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Diary not found",
+            detail=ERROR_DIARY_NOT_FOUND,
         )
 
     return diary
@@ -164,7 +165,7 @@ def update_diary(
     if not diary:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Diary not found",
+            detail=ERROR_DIARY_NOT_FOUND,
         )
 
     # Update only provided fields (partial update)
@@ -211,7 +212,7 @@ def delete_diary(
     if not diary:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Diary not found",
+            detail=ERROR_DIARY_NOT_FOUND,
         )
 
     # Delete the diary

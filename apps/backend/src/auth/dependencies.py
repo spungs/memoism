@@ -5,6 +5,11 @@ from typing import Optional
 from uuid import UUID
 from fastapi import Header, HTTPException, status
 from src.auth.utils import verify_token
+from src.common.errors import (
+    ERROR_MISSING_AUTH_HEADER,
+    ERROR_INVALID_AUTH_HEADER_FORMAT,
+    ERROR_INVALID_OR_EXPIRED_TOKEN,
+)
 
 
 def get_current_user_id(authorization: Optional[str] = Header(default=None)) -> UUID:
@@ -26,14 +31,14 @@ def get_current_user_id(authorization: Optional[str] = Header(default=None)) -> 
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing authorization header",
+            detail=ERROR_MISSING_AUTH_HEADER,
         )
 
     # Extract token from "Bearer <token>"
     if not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format",
+            detail=ERROR_INVALID_AUTH_HEADER_FORMAT,
         )
 
     token = authorization.replace("Bearer ", "")
@@ -42,7 +47,7 @@ def get_current_user_id(authorization: Optional[str] = Header(default=None)) -> 
     if not payload or "sub" not in payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
+            detail=ERROR_INVALID_OR_EXPIRED_TOKEN,
         )
 
     return UUID(payload["sub"])

@@ -7,13 +7,13 @@ from src.database import get_session
 from src.models import User
 from src.auth.schemas import SignupRequest, UserResponse, LoginRequest, LoginResponse
 from src.auth.utils import hash_password, verify_password, create_access_token
+from src.common.errors import (
+    ERROR_EMAIL_ALREADY_REGISTERED,
+    ERROR_USERNAME_ALREADY_TAKEN,
+    ERROR_INCORRECT_CREDENTIALS,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-# Error messages
-ERROR_EMAIL_ALREADY_REGISTERED = "Email already registered"
-ERROR_USERNAME_ALREADY_TAKEN = "Username already taken"
-ERROR_INCORRECT_CREDENTIALS = "Incorrect email or password"
 
 
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
