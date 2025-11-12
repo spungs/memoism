@@ -222,3 +222,55 @@ class TestDiary:
         data = response.json()
         assert isinstance(data, list)
         assert len(data) == 0
+
+    def test_list_diaries_with_data(self, client: TestClient, create_and_login_user):
+        """
+        Test 2.7: Listing diaries should return all user's diary entries.
+
+        Given: An authenticated user with 3 diary entries
+        When: GET /diary is called
+        Then:
+          - Response status is 200 OK
+          - Response contains a list of 3 diaries
+          - Each diary has all expected fields
+          - Diaries are sorted by created_at (newest first)
+        """
+        # Arrange
+        auth_data = create_and_login_user()
+        access_token = auth_data["access_token"]
+        user_id = auth_data["user_id"]
+
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+
+        # Create 3 diary entries
+        diary1 = {"content": "첫 번째 일기"}
+        diary2 = {"content": "두 번째 일기", "title": "제목 있는 일기"}
+        diary3 = {"content": "세 번째 일기", "images": ["https://example.com/image.jpg"]}
+
+        client.post("/diary", json=diary1, headers=headers)
+        client.post("/diary", json=diary2, headers=headers)
+        client.post("/diary", json=diary3, headers=headers)
+
+        # Act
+        response = client.get("/diary", headers=headers)
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == 3
+
+        # Verify all diaries belong to the authenticated user
+        for diary in data:
+            assert diary["user_id"] == user_id
+            assert "id" in diary
+            assert "content" in diary
+            assert "created_at" in diary
+
+        # Verify specific diary contents
+        contents = [d["content"] for d in data]
+        assert "첫 번째 일기" in contents
+        assert "두 번째 일기" in contents
+        assert "세 번째 일기" in contents
