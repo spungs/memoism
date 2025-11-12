@@ -46,6 +46,42 @@
 
 ---
 
+## Phase 1.5: Backend - Social Login
+
+### User 모델 확장
+- [ ] 1.5.0 test_user_model_with_social_fields: User 모델에 social_provider, social_id 필드 추가
+
+### 카카오 로그인
+- [ ] 1.5.1 test_kakao_login_success: 카카오 토큰으로 로그인 성공 (신규 사용자)
+- [ ] 1.5.2 test_kakao_login_existing_user: 카카오 로그인 (기존 사용자 연동)
+- [ ] 1.5.3 test_kakao_invalid_token: 잘못된 카카오 토큰 검증 실패
+- [ ] 1.5.4 test_kakao_user_info_fetch: 카카오 사용자 정보 조회
+
+### 구글 로그인
+- [ ] 1.5.5 test_google_login_success: 구글 토큰으로 로그인 성공 (신규 사용자)
+- [ ] 1.5.6 test_google_login_existing_user: 구글 로그인 (기존 사용자 연동)
+- [ ] 1.5.7 test_google_invalid_token: 잘못된 구글 토큰 검증 실패
+- [ ] 1.5.8 test_google_user_info_fetch: 구글 사용자 정보 조회
+
+### 애플 로그인
+- [ ] 1.5.9 test_apple_login_success: 애플 토큰으로 로그인 성공 (신규 사용자)
+- [ ] 1.5.10 test_apple_login_existing_user: 애플 로그인 (기존 사용자 연동)
+- [ ] 1.5.11 test_apple_invalid_token: 잘못된 애플 토큰 검증 실패
+- [ ] 1.5.12 test_apple_user_info_fetch: 애플 사용자 정보 조회
+
+### 네이버 로그인
+- [ ] 1.5.13 test_naver_login_success: 네이버 토큰으로 로그인 성공 (신규 사용자)
+- [ ] 1.5.14 test_naver_login_existing_user: 네이버 로그인 (기존 사용자 연동)
+- [ ] 1.5.15 test_naver_invalid_token: 잘못된 네이버 토큰 검증 실패
+- [ ] 1.5.16 test_naver_user_info_fetch: 네이버 사용자 정보 조회
+
+### 리팩토링 (Tidy First)
+- [ ] 1.5.R1 소셜 로그인 공통 로직 추상화
+- [ ] 1.5.R2 토큰 검증 유틸리티 함수 분리
+- [ ] 1.5.R3 사용자 연동 로직 통일
+
+---
+
 ## Phase 2: Backend - Diary CRUD (Week 2)
 
 ### 테스트 작성 및 구현 (Red → Green)
@@ -95,12 +131,38 @@
 - [ ] 3.13 test_signup_form_validation: 회원가입 폼 유효성 검증
 - [ ] 3.14 test_signup_submission: 회원가입 폼 제출
 
+### 소셜 로그인 - 카카오
+- [ ] 3.15 test_kakao_login_button_renders: 카카오 로그인 버튼 렌더링
+- [ ] 3.16 test_kakao_login_sdk_init: 카카오 SDK 초기화
+- [ ] 3.17 test_kakao_login_flow: 카카오 로그인 플로우 (토큰 교환)
+- [ ] 3.18 test_kakao_login_error: 카카오 로그인 에러 처리
+
+### 소셜 로그인 - 구글
+- [ ] 3.19 test_google_login_button_renders: 구글 로그인 버튼 렌더링
+- [ ] 3.20 test_google_login_sdk_init: 구글 SDK 초기화
+- [ ] 3.21 test_google_login_flow: 구글 로그인 플로우 (토큰 교환)
+- [ ] 3.22 test_google_login_error: 구글 로그인 에러 처리
+
+### 소셜 로그인 - 애플
+- [ ] 3.23 test_apple_login_button_renders: 애플 로그인 버튼 렌더링
+- [ ] 3.24 test_apple_login_sdk_init: 애플 Sign In 초기화
+- [ ] 3.25 test_apple_login_flow: 애플 로그인 플로우 (토큰 교환)
+- [ ] 3.26 test_apple_login_error: 애플 로그인 에러 처리
+
+### 소셜 로그인 - 네이버
+- [ ] 3.27 test_naver_login_button_renders: 네이버 로그인 버튼 렌더링
+- [ ] 3.28 test_naver_login_sdk_init: 네이버 SDK 초기화
+- [ ] 3.29 test_naver_login_flow: 네이버 로그인 플로우 (토큰 교환)
+- [ ] 3.30 test_naver_login_error: 네이버 로그인 에러 처리
+
 ### 리팩토링 (Tidy First)
 
 - [ ] 3.R1 공통 폼 컴포넌트 추출
 - [ ] 3.R2 유효성 검증 로직 분리
 - [ ] 3.R3 API 클라이언트 유틸리티 정리
 - [ ] 3.R4 타입 정의 개선
+- [ ] 3.R5 소셜 로그인 버튼 컴포넌트 통일
+- [ ] 3.R6 소셜 로그인 플로우 추상화
 
 ---
 
@@ -179,10 +241,16 @@
 
 - **현재 단계**: Phase 3 진행 중 (Mobile Authentication)
 - **다음 작업**: Phase 3.10 - test_login_form_validation
-- **완료된 테스트**: 36개 / 총 100+개
+- **완료된 테스트**: 36개 / 총 133개
+  - Phase 0: 6개 ✅
+  - Phase 1: 11개 ✅
+  - Phase 1.5 (소셜 로그인 백엔드): 0/17개
+  - Phase 2: 16개 ✅
+  - Phase 3: 9/30개 (기본 인증 9개, 소셜 로그인 0/16개)
+  - Phase 4-6: 0개
 - **테스트 커버리지**:
   - Backend: 85.45%
-  - Mobile: authStore 구현 시작
+  - Mobile: authStore 및 기본 UI 구현 시작
 
 ---
 
