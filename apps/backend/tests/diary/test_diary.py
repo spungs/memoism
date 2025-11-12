@@ -556,3 +556,68 @@ class TestDiary:
         # Verify metadata
         assert "created_at" in data
         assert "user_id" in data
+
+    def test_update_diary_unauthorized(self, client: TestClient, create_and_login_user):
+        """
+        Test 2.13: User should not be able to update another user's diary entry.
+
+        Given: Two authenticated users (User A and User B)
+        And: User A has created a diary entry
+        When: User B tries to update User A's diary entry
+        Then:
+          - Response status is 404 Not Found
+          - Error message indicates diary was not found
+          - User A's diary remains unchanged
+        """
+        # Arrange: Create User A and their diary
+        user_a_data = create_and_login_user()
+        user_a_token = user_a_data["access_token"]
+
+        headers_a = {
+            "Authorization": f"Bearer {user_a_token}"
+        }
+
+        # User A creates a diary
+        diary_data = {
+            "title": "User A의 일기",
+            "content": "이것은 User A의 개인 일기입니다."
+        }
+
+        create_response = client.post("/diary", json=diary_data, headers=headers_a)
+        assert create_response.status_code == 201
+        created_diary = create_response.json()
+        diary_id = created_diary["id"]
+
+        # Arrange: Create User B with different credentials
+        user_b_data = create_and_login_user(
+            email="user_b@example.com",
+            username="user_b",
+            password="UserBPass123!"
+        )
+        user_b_token = user_b_data["access_token"]
+
+        headers_b = {
+            "Authorization": f"Bearer {user_b_token}"
+        }
+
+        # User B attempts to update User A's diary
+        malicious_update = {
+            "title": "해킹 시도",
+            "content": "다른 사용자의 일기를 수정하려는 시도"
+        }
+
+        # Act
+        response = client.put(f"/diary/{diary_id}", json=malicious_update, headers=headers_b)
+
+        # Assert
+        assert response.status_code == 404
+        data = response.json()
+        assert "detail" in data
+        assert "not found" in data["detail"].lower()
+
+        # Verify User A's diary remains unchanged
+        verify_response = client.get(f"/diary/{diary_id}", headers=headers_a)
+        assert verify_response.status_code == 200
+        original_diary = verify_response.json()
+        assert original_diary["title"] == diary_data["title"]
+        assert original_diary["content"] == diary_data["content"]
