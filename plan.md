@@ -80,7 +80,7 @@
 
 ### 테스트 작성 및 구현 (Red → Green)
 
-- [ ] 3.1 test_auth_store_initial_state: authStore 초기 상태
+- [x] 3.1 test_auth_store_initial_state: authStore 초기 상태
 - [ ] 3.2 test_auth_store_set_token: 토큰 저장
 - [ ] 3.3 test_auth_store_set_user: 사용자 정보 저장
 - [ ] 3.4 test_auth_store_clear_auth: 로그아웃 (상태 초기화)
@@ -177,12 +177,12 @@
 
 ## 진행 상황
 
-- **현재 단계**: Phase 2 완료 (모든 리팩토링 포함)
-- **다음 작업**: Phase 3 - Mobile Authentication
-- **완료된 테스트**: 27개 / 총 100+개
+- **현재 단계**: Phase 3 진행 중 (Mobile Authentication)
+- **다음 작업**: Phase 3.2 - test_auth_store_set_token
+- **완료된 테스트**: 28개 / 총 100+개
 - **테스트 커버리지**:
   - Backend: 85.45%
-  - Mobile: 0%
+  - Mobile: authStore 구현 시작
 
 ---
 
