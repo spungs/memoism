@@ -52,4 +52,33 @@ describe('authStore', () => {
       expect(result.current.isAuthenticated).toBe(true);
     });
   });
+
+  /**
+   * Test 3.3: authStore set user
+   *
+   * Given: authStore is in initial state
+   * When: setUser is called with user data
+   * Then:
+   *   - user should be set to the provided value
+   *   - user properties (id, email, username) should match
+   */
+  describe('test_auth_store_set_user', () => {
+    it('should set user data correctly', () => {
+      const { result } = renderHook(() => useAuthStore());
+      const testUser = {
+        id: '123e4567-e89b-12d3-a456-426614174000',
+        email: 'test@example.com',
+        username: 'testuser',
+      };
+
+      act(() => {
+        result.current.setUser(testUser);
+      });
+
+      expect(result.current.user).toEqual(testUser);
+      expect(result.current.user?.id).toBe(testUser.id);
+      expect(result.current.user?.email).toBe(testUser.email);
+      expect(result.current.user?.username).toBe(testUser.username);
+    });
+  });
 });
