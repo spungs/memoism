@@ -274,3 +274,58 @@ class TestDiary:
         assert "첫 번째 일기" in contents
         assert "두 번째 일기" in contents
         assert "세 번째 일기" in contents
+
+    def test_list_diaries_pagination(self, client: TestClient, create_and_login_user):
+        """
+        Test 2.8: Listing diaries should support pagination (skip and limit).
+
+        Given: An authenticated user with 10 diary entries
+        When: GET /diary is called with skip and limit parameters
+        Then:
+          - Response status is 200 OK
+          - Response contains only the requested number of items (limit)
+          - Pagination works correctly with skip parameter
+          - Default values work when parameters are not provided
+        """
+        # Arrange
+        auth_data = create_and_login_user()
+        access_token = auth_data["access_token"]
+
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+
+        # Create 10 diary entries
+        for i in range(10):
+            diary_data = {"content": f"일기 {i+1}"}
+            client.post("/diary", json=diary_data, headers=headers)
+
+        # Act & Assert: Test default pagination (no parameters)
+        response = client.get("/diary", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 10  # All diaries returned by default
+
+        # Act & Assert: Test limit parameter
+        response = client.get("/diary?limit=5", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 5
+
+        # Act & Assert: Test skip parameter
+        response = client.get("/diary?skip=5", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 5  # Remaining 5 diaries
+
+        # Act & Assert: Test both skip and limit
+        response = client.get("/diary?skip=3&limit=4", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 4
+
+        # Act & Assert: Test skip beyond available items
+        response = client.get("/diary?skip=20", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 0  # No items available

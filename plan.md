@@ -57,7 +57,7 @@
 - [x] 2.5 test_create_diary_unauthorized: 인증 없이 생성 시도 실패
 - [x] 2.6 test_list_diaries_empty: 빈 일기 목록 조회
 - [x] 2.7 test_list_diaries_with_data: 일기 목록 조회 (데이터 있음)
-- [ ] 2.8 test_list_diaries_pagination: 페이지네이션 동작
+- [x] 2.8 test_list_diaries_pagination: 페이지네이션 동작
 - [ ] 2.9 test_list_diaries_date_filter: 날짜 필터링
 - [ ] 2.10 test_get_diary_detail: 일기 상세 조회 성공
 - [ ] 2.11 test_get_diary_not_found: 존재하지 않는 일기 조회 실패
@@ -178,8 +178,8 @@
 ## 진행 상황
 
 - **현재 단계**: Phase 2 진행 중
-- **다음 테스트**: Phase 2.8 - test_list_diaries_pagination (페이지네이션 동작)
-- **완료된 테스트**: 18개 / 총 100+개
+- **다음 테스트**: Phase 2.9 - test_list_diaries_date_filter (날짜 필터링)
+- **완료된 테스트**: 19개 / 총 100+개
 - **테스트 커버리지**:
   - Backend: 94.87%
   - Mobile: 0%

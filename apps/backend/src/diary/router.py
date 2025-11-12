@@ -87,21 +87,25 @@ def create_diary(
 
 @router.get("", response_model=List[DiaryResponse])
 def list_diaries(
+    skip: int = 0,
+    limit: int = 100,
     session: Session = Depends(get_session),
     user_id: UUID = Depends(get_current_user_id),
 ):
     """
-    List all diary entries for the authenticated user.
+    List diary entries for the authenticated user with pagination.
 
     Args:
+        skip: Number of entries to skip (default: 0)
+        limit: Maximum number of entries to return (default: 100)
         session: Database session
         user_id: Authenticated user ID
 
     Returns:
         List[DiaryResponse]: List of diary entries
     """
-    # Query diaries for the authenticated user
-    statement = select(Diary).where(Diary.user_id == user_id)
+    # Query diaries for the authenticated user with pagination
+    statement = select(Diary).where(Diary.user_id == user_id).offset(skip).limit(limit)
     diaries = session.exec(statement).all()
 
     return diaries
