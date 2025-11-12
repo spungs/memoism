@@ -79,4 +79,44 @@ describe('authApi', () => {
       expect(result.current.data).toEqual(mockResponse);
     });
   });
+
+  /**
+   * Test 3.6: useSignup error handling
+   *
+   * Given: API returns an error response (e.g., duplicate email)
+   * When: useSignup mutation is called
+   * Then:
+   *   - isError should be true
+   *   - error object should contain error information
+   *   - User data should not be set
+   */
+  describe('test_use_signup_error', () => {
+    it('should handle signup error when API returns 400', async () => {
+      // Arrange
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ detail: 'Email already registered' }),
+      });
+
+      const signupData = {
+        email: 'existing@example.com',
+        username: 'testuser',
+        password: 'password123',
+      };
+
+      // Act
+      const { result } = renderHook(() => useSignup(), {
+        wrapper: createWrapper(),
+      });
+
+      result.current.mutate(signupData);
+
+      // Assert
+      await waitFor(() => expect(result.current.isError).toBe(true));
+
+      expect(result.current.error).toBeDefined();
+      expect(result.current.data).toBeUndefined();
+    });
+  });
 });
