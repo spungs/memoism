@@ -621,3 +621,47 @@ class TestDiary:
         original_diary = verify_response.json()
         assert original_diary["title"] == diary_data["title"]
         assert original_diary["content"] == diary_data["content"]
+
+    def test_delete_diary(self, client: TestClient, create_and_login_user):
+        """
+        Test 2.14: User should be able to delete their own diary entry.
+
+        Given: An authenticated user with an existing diary entry
+        When: DELETE /diary/{diary_id} is called
+        Then:
+          - Response status is 204 No Content
+          - The diary is removed from the database
+          - Subsequent GET requests return 404
+        """
+        # Arrange
+        auth_data = create_and_login_user()
+        access_token = auth_data["access_token"]
+
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+
+        # Create a diary to delete
+        diary_data = {
+            "title": "삭제할 일기",
+            "content": "이 일기는 곧 삭제될 예정입니다."
+        }
+
+        create_response = client.post("/diary", json=diary_data, headers=headers)
+        assert create_response.status_code == 201
+        created_diary = create_response.json()
+        diary_id = created_diary["id"]
+
+        # Verify diary exists before deletion
+        verify_response = client.get(f"/diary/{diary_id}", headers=headers)
+        assert verify_response.status_code == 200
+
+        # Act
+        response = client.delete(f"/diary/{diary_id}", headers=headers)
+
+        # Assert
+        assert response.status_code == 204
+
+        # Verify diary no longer exists
+        verify_deleted_response = client.get(f"/diary/{diary_id}", headers=headers)
+        assert verify_deleted_response.status_code == 404

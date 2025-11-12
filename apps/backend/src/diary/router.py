@@ -221,3 +221,40 @@ def update_diary(
     session.refresh(diary)
 
     return diary
+
+
+@router.delete("/{diary_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_diary(
+    diary_id: UUID,
+    session: Session = Depends(get_session),
+    user_id: UUID = Depends(get_current_user_id),
+):
+    """
+    Delete a diary entry.
+
+    Args:
+        diary_id: The ID of the diary to delete
+        session: Database session
+        user_id: Authenticated user ID
+
+    Returns:
+        None (204 No Content)
+
+    Raises:
+        HTTPException: If diary is not found
+    """
+    # Query the diary by ID and user_id
+    statement = select(Diary).where(Diary.id == diary_id, Diary.user_id == user_id)
+    diary = session.exec(statement).first()
+
+    if not diary:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Diary not found",
+        )
+
+    # Delete the diary
+    session.delete(diary)
+    session.commit()
+
+    return None
