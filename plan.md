@@ -64,7 +64,7 @@
 - [x] 2.12 test_update_diary: 일기 수정 성공
 - [x] 2.13 test_update_diary_unauthorized: 다른 사용자 일기 수정 실패
 - [x] 2.14 test_delete_diary: 일기 삭제 성공
-- [ ] 2.15 test_delete_diary_unauthorized: 다른 사용자 일기 삭제 실패
+- [x] 2.15 test_delete_diary_unauthorized: 다른 사용자 일기 삭제 실패
 - [ ] 2.16 test_cannot_access_other_users_diary: 권한 검증
 
 ### 리팩토링 (Tidy First)
@@ -178,10 +178,10 @@
 ## 진행 상황
 
 - **현재 단계**: Phase 2 진행 중
-- **다음 테스트**: Phase 2.15 - test_delete_diary_unauthorized (다른 사용자 일기 삭제 실패)
-- **완료된 테스트**: 25개 / 총 100+개
+- **다음 테스트**: Phase 2.16 - test_cannot_access_other_users_diary (권한 검증)
+- **완료된 테스트**: 26개 / 총 100+개
 - **테스트 커버리지**:
-  - Backend: 94.69%
+  - Backend: 95.17%
   - Mobile: 0%
 
 ---
