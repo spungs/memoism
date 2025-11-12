@@ -11,7 +11,7 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
-import { useSignup } from '../authApi';
+import { useSignup, useLogin } from '../authApi';
 
 // Mock fetch
 global.fetch = jest.fn();
@@ -117,6 +117,65 @@ describe('authApi', () => {
 
       expect(result.current.error).toBeDefined();
       expect(result.current.data).toBeUndefined();
+    });
+  });
+
+  /**
+   * Test 3.7: useLogin mutation
+   *
+   * Given: User provides valid login credentials
+   * When: useLogin mutation is called
+   * Then:
+   *   - API request is sent to /auth/login
+   *   - Response includes access_token and user data
+   *   - Success callback is triggered
+   */
+  describe('test_use_login_mutation', () => {
+    it('should successfully login a user and return token', async () => {
+      // Arrange
+      const mockResponse = {
+        access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        user: {
+          id: '123e4567-e89b-12d3-a456-426614174000',
+          email: 'user@example.com',
+          username: 'testuser',
+        },
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      });
+
+      const loginData = {
+        email: 'user@example.com',
+        password: 'password123',
+      };
+
+      // Act
+      const { result } = renderHook(() => useLogin(), {
+        wrapper: createWrapper(),
+      });
+
+      result.current.mutate(loginData);
+
+      // Assert
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/auth/login'),
+        expect.objectContaining({
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(loginData),
+        })
+      );
+
+      expect(result.current.data).toEqual(mockResponse);
+      expect(result.current.data?.access_token).toBeDefined();
+      expect(result.current.data?.user.email).toBe('user@example.com');
     });
   });
 });

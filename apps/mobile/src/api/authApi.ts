@@ -17,6 +17,16 @@ interface UserResponse {
   username: string;
 }
 
+interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+interface LoginResponse {
+  access_token: string;
+  user: UserResponse;
+}
+
 export const useSignup = () => {
   return useMutation({
     mutationFn: async (data: SignupRequest): Promise<UserResponse> => {
@@ -30,6 +40,26 @@ export const useSignup = () => {
 
       if (!response.ok) {
         throw new Error('Signup failed');
+      }
+
+      return response.json();
+    },
+  });
+};
+
+export const useLogin = () => {
+  return useMutation({
+    mutationFn: async (data: LoginRequest): Promise<LoginResponse> => {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error('Login failed');
       }
 
       return response.json();
