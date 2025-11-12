@@ -467,3 +467,35 @@ class TestDiary:
         assert data["location"]["address"] == diary_data["location"]["address"]
         assert "created_at" in data
         assert "user_id" in data
+
+    def test_get_diary_not_found(self, client: TestClient, create_and_login_user):
+        """
+        Test 2.11: Getting a non-existent diary should fail with 404.
+
+        Given: An authenticated user
+        When: GET /diary/{diary_id} is called with a non-existent diary ID
+        Then:
+          - Response status is 404 Not Found
+          - Error message indicates diary was not found
+        """
+        from uuid import uuid4
+
+        # Arrange
+        auth_data = create_and_login_user()
+        access_token = auth_data["access_token"]
+
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+
+        # Generate a random UUID that doesn't exist in the database
+        non_existent_diary_id = uuid4()
+
+        # Act
+        response = client.get(f"/diary/{non_existent_diary_id}", headers=headers)
+
+        # Assert
+        assert response.status_code == 404
+        data = response.json()
+        assert "detail" in data
+        assert "not found" in data["detail"].lower()
