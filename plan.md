@@ -16,7 +16,7 @@
 - [x] 0.2 기존 Backend 코드 백업 (apps/backend → apps/backend-legacy)
 - [x] 0.3 기존 Mobile 코드 백업 (apps/mobile → apps/mobile-legacy)
 - [x] 0.4 Backend 테스트 환경 설정 (pytest, pytest-asyncio, pytest-cov, httpx, faker)
-- [ ] 0.5 Mobile 테스트 환경 설정 (Jest, React Testing Library)
+- [x] 0.5 Mobile 테스트 환경 설정 (Jest, React Testing Library)
 - [x] 0.6 .env.example 파일 생성
 
 ---
