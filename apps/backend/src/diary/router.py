@@ -4,53 +4,14 @@ Diary router.
 from typing import Optional, List
 from uuid import UUID
 from datetime import date, datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, Header, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from src.database import get_session
 from src.models import Diary
 from src.diary.schemas import CreateDiaryRequest, UpdateDiaryRequest, DiaryResponse
-from src.auth.utils import verify_token
+from src.auth.dependencies import get_current_user_id
 
 router = APIRouter(prefix="/diary", tags=["diary"])
-
-
-def get_current_user_id(authorization: Optional[str] = Header(default=None)) -> UUID:
-    """
-    Extract and verify user ID from JWT token in Authorization header.
-
-    Args:
-        authorization: Authorization header with Bearer token
-
-    Returns:
-        User ID from token
-
-    Raises:
-        HTTPException: If token is invalid or missing
-    """
-    # Check if authorization header is present
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing authorization header",
-        )
-
-    # Extract token from "Bearer <token>"
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format",
-        )
-
-    token = authorization.replace("Bearer ", "")
-    payload = verify_token(token)
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-        )
-
-    return UUID(payload["sub"])
 
 
 @router.post("", response_model=DiaryResponse, status_code=status.HTTP_201_CREATED)
