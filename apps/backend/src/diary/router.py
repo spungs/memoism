@@ -139,3 +139,36 @@ def list_diaries(
     diaries = session.exec(statement).all()
 
     return diaries
+
+
+@router.get("/{diary_id}", response_model=DiaryResponse)
+def get_diary_detail(
+    diary_id: UUID,
+    session: Session = Depends(get_session),
+    user_id: UUID = Depends(get_current_user_id),
+):
+    """
+    Get a specific diary entry by ID.
+
+    Args:
+        diary_id: The ID of the diary to retrieve
+        session: Database session
+        user_id: Authenticated user ID
+
+    Returns:
+        DiaryResponse: The diary data
+
+    Raises:
+        HTTPException: If diary is not found
+    """
+    # Query the diary by ID and user_id
+    statement = select(Diary).where(Diary.id == diary_id, Diary.user_id == user_id)
+    diary = session.exec(statement).first()
+
+    if not diary:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Diary not found",
+        )
+
+    return diary

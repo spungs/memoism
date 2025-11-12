@@ -410,3 +410,60 @@ class TestDiary:
         contents = [d["content"] for d in data]
         assert "그저께 일기" in contents
         assert "3일 전 일기" in contents
+
+    def test_get_diary_detail(self, client: TestClient, create_and_login_user):
+        """
+        Test 2.10: User should be able to get a specific diary entry by ID.
+
+        Given: An authenticated user with diary entries
+        When: GET /diary/{diary_id} is called with a valid diary ID
+        Then:
+          - Response status is 200 OK
+          - Response contains the complete diary data
+          - All fields (id, title, content, images, location, created_at) are present
+        """
+        # Arrange
+        auth_data = create_and_login_user()
+        access_token = auth_data["access_token"]
+
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+
+        # Create a diary with all fields
+        diary_data = {
+            "title": "서울 여행",
+            "content": "오늘 서울에 다녀왔다. 날씨가 좋았고 경복궁을 구경했다.",
+            "images": [
+                "https://example.com/palace1.jpg",
+                "https://example.com/palace2.jpg"
+            ],
+            "location": {
+                "latitude": 37.5796,
+                "longitude": 126.9770,
+                "address": "서울특별시 종로구 경복궁"
+            }
+        }
+
+        create_response = client.post("/diary", json=diary_data, headers=headers)
+        assert create_response.status_code == 201
+        created_diary = create_response.json()
+        diary_id = created_diary["id"]
+
+        # Act
+        response = client.get(f"/diary/{diary_id}", headers=headers)
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify all fields are present and correct
+        assert data["id"] == diary_id
+        assert data["title"] == diary_data["title"]
+        assert data["content"] == diary_data["content"]
+        assert data["images"] == diary_data["images"]
+        assert data["location"]["latitude"] == diary_data["location"]["latitude"]
+        assert data["location"]["longitude"] == diary_data["location"]["longitude"]
+        assert data["location"]["address"] == diary_data["location"]["address"]
+        assert "created_at" in data
+        assert "user_id" in data
