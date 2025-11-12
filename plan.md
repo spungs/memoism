@@ -83,7 +83,7 @@
 - [x] 3.1 test_auth_store_initial_state: authStore 초기 상태
 - [x] 3.2 test_auth_store_set_token: 토큰 저장
 - [x] 3.3 test_auth_store_set_user: 사용자 정보 저장
-- [ ] 3.4 test_auth_store_clear_auth: 로그아웃 (상태 초기화)
+- [x] 3.4 test_auth_store_clear_auth: 로그아웃 (상태 초기화)
 - [ ] 3.5 test_use_signup_mutation: 회원가입 훅 (성공)
 - [ ] 3.6 test_use_signup_error: 회원가입 훅 (에러 처리)
 - [ ] 3.7 test_use_login_mutation: 로그인 훅 (성공)
@@ -178,8 +178,8 @@
 ## 진행 상황
 
 - **현재 단계**: Phase 3 진행 중 (Mobile Authentication)
-- **다음 작업**: Phase 3.4 - test_auth_store_clear_auth
-- **완료된 테스트**: 30개 / 총 100+개
+- **다음 작업**: Phase 3.5 - test_use_signup_mutation
+- **완료된 테스트**: 31개 / 총 100+개
 - **테스트 커버리지**:
   - Backend: 85.45%
   - Mobile: authStore 구현 시작

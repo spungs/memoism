@@ -81,4 +81,47 @@ describe('authStore', () => {
       expect(result.current.user?.username).toBe(testUser.username);
     });
   });
+
+  /**
+   * Test 3.4: authStore clear auth (logout)
+   *
+   * Given: authStore has token and user data set
+   * When: clearAuth is called (simulating logout)
+   * Then:
+   *   - token should be null
+   *   - user should be null
+   *   - isAuthenticated should be false
+   */
+  describe('test_auth_store_clear_auth', () => {
+    it('should clear all auth state on logout', () => {
+      const { result } = renderHook(() => useAuthStore());
+      const testToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token';
+      const testUser = {
+        id: '123e4567-e89b-12d3-a456-426614174000',
+        email: 'test@example.com',
+        username: 'testuser',
+      };
+
+      // Arrange: Set token and user
+      act(() => {
+        result.current.setToken(testToken);
+        result.current.setUser(testUser);
+      });
+
+      // Verify initial state is set
+      expect(result.current.token).toBe(testToken);
+      expect(result.current.user).toEqual(testUser);
+      expect(result.current.isAuthenticated).toBe(true);
+
+      // Act: Clear auth
+      act(() => {
+        result.current.clearAuth();
+      });
+
+      // Assert: All state should be reset
+      expect(result.current.token).toBeNull();
+      expect(result.current.user).toBeNull();
+      expect(result.current.isAuthenticated).toBe(false);
+    });
+  });
 });
