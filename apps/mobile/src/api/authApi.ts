@@ -2,8 +2,7 @@
  * Authentication API hooks using React Query
  */
 import { useMutation } from '@tanstack/react-query';
-
-const API_URL = 'http://localhost:8000';
+import { API_URL } from '../config/api';
 
 interface SignupRequest {
   email: string;
