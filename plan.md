@@ -229,18 +229,18 @@
 - [ ] 6.3 API_URL 환경별 설정
 - [ ] 6.4 GitHub Actions CI/CD 구축
 - [ ] 6.5 테스트 자동 실행 설정
-- [ ] 6.6 API 문서 자동 생성 (FastAPI Swagger)
-- [ ] 6.7 README.md 업데이트
+- [x] 6.6 API 문서 자동 생성 (FastAPI Swagger)
+- [x] 6.7 README.md 업데이트
 - [ ] 6.8 개발 환경 설정 가이드 작성
-- [ ] 6.9 전체 테스트 스위트 실행 및 커버리지 확인 (80%+)
+- [x] 6.9 전체 테스트 스위트 실행 및 커버리지 확인 (80%+)
 - [ ] 6.10 수동 QA 체크리스트 완료
 
 ---
 
 ## 진행 상황
 
-- **현재 단계**: Phase 5 리팩토링 진행 중 (Tidy First)
-- **다음 작업**: Phase 5.R2 - 네이밍 일관성 개선 (선택사항)
+- **현재 단계**: Phase 6 Production Ready 진행 중 📦
+- **다음 작업**: Phase 6 나머지 작업 (CI/CD, 환경 설정) 또는 Phase 7 (AI 캐릭터 채팅)
 - **완료된 테스트**: 55개 / 총 100개 (소셜 로그인 제외)
   - Phase 0: 6개 ✅
   - Phase 1: 11개 ✅
@@ -249,9 +249,11 @@
   - Phase 3: 14/14개 ✅ (기본 인증 완료, 소셜 로그인 SKIP)
   - Phase 4: 17/17개 ✅ (Diary Features 완료)
   - Phase 5: 9/9개 ✅ (통합 테스트 완료!)
+  - Phase 6: 3/10개 ✅ (6.6, 6.7, 6.9 완료)
 - **테스트 커버리지**:
   - Backend: 89.61% (36개 테스트 통과, 목표 80% 초과 ✅)
   - Mobile: 43개 테스트 통과 (authStore, Auth screens, Diary screens, Map screen with markers)
+  - **총 테스트**: 79개 (모두 통과 ✅)
 
 ---
 
