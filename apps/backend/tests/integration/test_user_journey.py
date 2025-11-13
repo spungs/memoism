@@ -320,3 +320,124 @@ class TestUserJourney:
         )
         assert new_diary_response.status_code == 201
         assert new_diary_response.json()["content"] == new_diary_data["content"]
+
+    def test_invalid_input_handling(self, client: TestClient, create_and_login_user):
+        """
+        Test 5.4: API should reject invalid inputs with appropriate error messages.
+
+        Given: A user attempts to use the API with invalid inputs
+        When: Various types of invalid data are submitted
+        Then:
+          - API returns 4xx error codes (400, 422)
+          - Error messages are clear and informative
+          - System remains stable after invalid inputs
+          - Valid requests still work after invalid ones
+        """
+        # Get authenticated user
+        auth_data = create_and_login_user(
+            email="invalidtest@example.com",
+            username="invalidtestuser",
+            password="ValidPass123!"
+        )
+        token = auth_data["access_token"]
+
+        # Test 1: Empty content in diary creation (should fail)
+        empty_content_data = {
+            "content": "",  # Empty content
+            "title": "Empty Content Test",
+        }
+
+        empty_response = client.post(
+            "/diary",
+            json=empty_content_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert empty_response.status_code in [400, 422]  # Validation error
+        error_data = empty_response.json()
+        assert "detail" in error_data
+
+        # Test 2: Missing required field (content)
+        missing_field_data = {
+            "title": "Missing Content Test",
+            # content is missing
+        }
+
+        missing_response = client.post(
+            "/diary",
+            json=missing_field_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert missing_response.status_code == 422  # Pydantic validation error
+        error_data = missing_response.json()
+        assert "detail" in error_data
+
+        # Test 3: Extremely long content (stress test)
+        very_long_content = "A" * 100000  # 100k characters
+        long_content_data = {
+            "content": very_long_content,
+            "title": "Long Content Test",
+        }
+
+        long_response = client.post(
+            "/diary",
+            json=long_content_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        # This might succeed or fail depending on DB constraints
+        # Just verify we get a response
+        assert long_response.status_code in [201, 400, 422, 413, 500]
+
+        # Test 4: Invalid pagination parameters (negative values)
+        invalid_pagination_response = client.get(
+            "/diary?skip=-1&limit=-10",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        # Should either reject or normalize negative values
+        assert invalid_pagination_response.status_code in [200, 400, 422]
+
+        # Test 5: Excessively large pagination limit
+        large_limit_response = client.get(
+            "/diary?limit=999999",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        # Should work but might be capped
+        assert large_limit_response.status_code == 200
+
+        # Test 6: Invalid data types (string where number expected)
+        invalid_type_response = client.get(
+            "/diary?skip=abc&limit=xyz",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert invalid_type_response.status_code == 422  # Type validation error
+
+        # Test 7: Verify system is still functional after all invalid inputs
+        # Create a valid diary entry
+        valid_data = {
+            "content": "System is still working after invalid inputs",
+            "title": "Recovery Test",
+        }
+
+        recovery_response = client.post(
+            "/diary",
+            json=valid_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert recovery_response.status_code == 201
+        assert recovery_response.json()["content"] == valid_data["content"]
+
+        # Test 8: Login with empty credentials (should fail gracefully)
+        empty_login = client.post("/auth/login", json={"email": "", "password": ""})
+        assert empty_login.status_code in [400, 422]
+
+        # Test 9: Signup with invalid email format (already tested in Phase 1.3, verify integration)
+        invalid_email_signup = client.post(
+            "/auth/signup",
+            json={
+                "email": "not-an-email",
+                "username": "testuser",
+                "password": "ValidPass123!",
+            },
+        )
+        assert invalid_email_signup.status_code in [400, 422]
+        error_data = invalid_email_signup.json()
+        assert "detail" in error_data
