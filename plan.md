@@ -206,7 +206,7 @@
 - [x] 5.3 test_token_expiration_flow: 토큰 만료 처리
 - [x] 5.4 test_invalid_input_handling: 잘못된 입력 처리
 - [x] 5.5 test_sql_injection_prevention: SQL Injection 방지
-- [ ] 5.6 test_xss_prevention: XSS 방지
+- [x] 5.6 test_xss_prevention: XSS 방지
 - [ ] 5.7 test_cors_policy: CORS 정책 검증
 - [ ] 5.8 test_large_diary_list_pagination: 대량 데이터 페이지네이션
 - [ ] 5.9 test_multiple_images_upload: 다중 이미지 처리
@@ -240,17 +240,17 @@
 ## 진행 상황
 
 - **현재 단계**: Phase 5 진행 중 (Integration & Polish)
-- **다음 작업**: Phase 5.6 - test_xss_prevention (XSS 방지)
-- **완료된 테스트**: 51개 / 총 100개 (소셜 로그인 제외)
+- **다음 작업**: Phase 5.7 - test_cors_policy (CORS 정책 검증)
+- **완료된 테스트**: 52개 / 총 100개 (소셜 로그인 제외)
   - Phase 0: 6개 ✅
   - Phase 1: 11개 ✅
   - Phase 1.5 (소셜 로그인 백엔드): SKIP (나중에 구현)
   - Phase 2: 16개 ✅
   - Phase 3: 14/14개 ✅ (기본 인증 완료, 소셜 로그인 SKIP)
   - Phase 4: 17/17개 ✅ (Diary Features 완료)
-  - Phase 5: 5/9개 (통합 테스트 진행 중)
+  - Phase 5: 6/9개 (통합 테스트 진행 중)
 - **테스트 커버리지**:
-  - Backend: 86.74% (32개 테스트 통과, 목표 80% 초과 ✅)
+  - Backend: 86.74% (33개 테스트 통과, 목표 80% 초과 ✅)
   - Mobile: 43개 테스트 통과 (authStore, Auth screens, Diary screens, Map screen with markers)
 
 ---
