@@ -5,11 +5,12 @@
  * Test 4.2: test_use_diaries_query_empty - 빈 목록 처리
  * Test 4.3: test_use_create_diary_mutation - 일기 생성 훅 테스트
  * Test 4.4: test_use_create_diary_with_images - 이미지 포함 일기 생성
+ * Test 4.5: test_use_update_diary_mutation - 일기 수정 훅 테스트
  */
 import React from 'react';
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useDiariesQuery, useCreateDiary } from '../diaryApi';
+import { useDiariesQuery, useCreateDiary, useUpdateDiary } from '../diaryApi';
 
 // Mock fetch
 global.fetch = jest.fn();
@@ -282,6 +283,77 @@ describe('DiaryApi', () => {
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify(diaryData),
+        })
+      );
+    });
+  });
+
+  describe('test_use_update_diary_mutation', () => {
+    it('should update a diary successfully', async () => {
+      /**
+       * Test 4.5: 일기 수정 성공
+       *
+       * Given: 인증된 사용자와 기존 일기 ID
+       * When: useUpdateDiary 훅으로 일기 수정 요청
+       * Then:
+       *   - PUT /diary/:id 요청이 전송됨
+       *   - 수정된 일기 정보가 반환됨
+       *   - Authorization 헤더가 포함됨
+       */
+
+      // Arrange
+      const diaryId = '123e4567-e89b-12d3-a456-426614174001';
+      const mockUpdatedDiary = {
+        id: diaryId,
+        title: '수정된 일기',
+        content: '내용을 수정했다.',
+        images: [],
+        location: null,
+        user_id: '123e4567-e89b-12d3-a456-426614174000',
+        created_at: '2025-01-01T00:00:00.000Z',
+        updated_at: '2025-01-01T12:00:00.000Z',
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockUpdatedDiary,
+      });
+
+      const mockToken = 'mock-jwt-token-12345';
+
+      // Act
+      const Wrapper = createWrapper();
+      const { result } = renderHook(() => useUpdateDiary(mockToken), {
+        wrapper: Wrapper,
+      });
+
+      const updateData = {
+        id: diaryId,
+        title: '수정된 일기',
+        content: '내용을 수정했다.',
+      };
+
+      result.current.mutate(updateData);
+
+      // Assert
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(result.current.data).toEqual(mockUpdatedDiary);
+      expect(result.current.data?.title).toBe('수정된 일기');
+      expect(result.current.data?.content).toBe('내용을 수정했다.');
+
+      // Verify API call
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/diary/${diaryId}`),
+        expect.objectContaining({
+          method: 'PUT',
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${mockToken}`,
+            'Content-Type': 'application/json',
+          }),
+          body: expect.any(String),
         })
       );
     });

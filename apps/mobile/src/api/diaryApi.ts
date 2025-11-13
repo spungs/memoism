@@ -23,6 +23,14 @@ interface CreateDiaryRequest {
   location?: any;
 }
 
+interface UpdateDiaryRequest {
+  id: string;
+  title?: string;
+  content?: string;
+  images?: string[];
+  location?: any;
+}
+
 export const useDiariesQuery = (token: string) => {
   return useQuery({
     queryKey: ['diaries'],
@@ -58,6 +66,28 @@ export const useCreateDiary = (token: string) => {
 
       if (!response.ok) {
         throw new Error('Failed to create diary');
+      }
+
+      return response.json();
+    },
+  });
+};
+
+export const useUpdateDiary = (token: string) => {
+  return useMutation({
+    mutationFn: async (data: UpdateDiaryRequest): Promise<DiaryResponse> => {
+      const { id, ...updateData } = data;
+      const response = await fetch(`${API_URL}/diary/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update diary');
       }
 
       return response.json();
