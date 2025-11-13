@@ -15,7 +15,7 @@ TEST_DATABASE_URL = "sqlite:///:memory:"
 def engine_fixture():
     """Create a test database engine with in-memory SQLite."""
     # Import models to register them with SQLModel.metadata
-    from src.models import User, Diary  # noqa: F401
+    from src.models import User, Diary, ChatMessage  # noqa: F401
 
     engine = create_engine(
         TEST_DATABASE_URL,

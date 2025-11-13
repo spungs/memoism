@@ -4,6 +4,7 @@ Tests for AI Character Chat feature.
 from datetime import datetime, timezone
 from uuid import uuid4
 import pytest
+from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 from src.models import User, ChatMessage
 
@@ -74,3 +75,51 @@ class TestChatMessage:
         assert len(messages) == 2
         assert messages[0].role == "user"
         assert messages[1].role == "assistant"
+
+    def test_send_chat_message(self, client: TestClient, create_and_login_user, session: Session):
+        """
+        Test 7.2: API should allow authenticated users to send chat messages.
+
+        Given: An authenticated user
+        When: POST /chat with message content
+        Then:
+          - Response status is 201 Created
+          - Message is saved to database with role="user"
+          - Response contains message id, role, content, created_at
+          - user_id is automatically set from authenticated user
+        """
+        # Arrange: Create and login user
+        auth_data = create_and_login_user(
+            email="chatapi@example.com",
+            username="chatapi",
+            password="ChatTest123!"
+        )
+        token = auth_data["access_token"]
+        user_id = auth_data["user_id"]
+
+        # Act: Send a chat message
+        message_data = {
+            "content": "오늘 기분이 좋아! 뭔가 좋은 일이 생길 것 같아."
+        }
+        response = client.post(
+            "/chat",
+            json=message_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+
+        # Assert: Response is successful
+        assert response.status_code == 201
+        response_data = response.json()
+        assert "id" in response_data
+        assert response_data["role"] == "user"
+        assert response_data["content"] == message_data["content"]
+        assert "created_at" in response_data
+
+        # Assert: Message is saved in database
+        message_id = response_data["id"]
+        statement = select(ChatMessage).where(ChatMessage.id == message_id)
+        saved_message = session.exec(statement).first()
+        assert saved_message is not None
+        assert str(saved_message.user_id) == user_id
+        assert saved_message.role == "user"
+        assert saved_message.content == message_data["content"]
