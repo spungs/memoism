@@ -36,12 +36,33 @@ export default function MapScreen({ navigation, token }: MapScreenProps) {
     );
   }
 
+  // Filter diaries with location data
+  const diariesWithLocation = diaries?.filter((diary) => diary.location) || [];
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title} testID="screen-title">지도</Text>
+        <Text style={styles.title} testID="screen-title">
+          지도
+        </Text>
         <View style={styles.mapContainer} testID="map-view">
-          <Text style={styles.placeholderText}>지도가 여기에 표시됩니다</Text>
+          {diariesWithLocation.length === 0 ? (
+            <Text style={styles.placeholderText}>
+              위치 정보가 있는 일기가 없습니다
+            </Text>
+          ) : (
+            <>
+              <Text style={styles.placeholderText}>
+                지도가 여기에 표시됩니다
+              </Text>
+              {diariesWithLocation.map((diary) => (
+                <View key={diary.id} style={styles.marker} testID="map-marker">
+                  <Text style={styles.markerText}>📍</Text>
+                  <Text style={styles.markerTitle}>{diary.title}</Text>
+                </View>
+              ))}
+            </>
+          )}
         </View>
       </View>
     </SafeAreaView>
@@ -85,5 +106,22 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: '#FF3B30',
     textAlign: 'center',
+  },
+  marker: {
+    position: 'absolute',
+    backgroundColor: '#fff',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    alignItems: 'center',
+  },
+  markerText: {
+    fontSize: 24,
+  },
+  markerTitle: {
+    fontSize: 12,
+    color: '#000',
+    marginTop: 4,
   },
 });

@@ -186,7 +186,7 @@
 - [x] 4.14 test_diary_edit_image_picker: 이미지 선택
 - [x] 4.15 test_diary_edit_submission: 편집 제출
 - [x] 4.16 test_map_screen_renders: 지도 화면 렌더링
-- [ ] 4.17 test_map_markers: 지도 마커 표시
+- [x] 4.17 test_map_markers: 지도 마커 표시
 
 ### 리팩토링 (Tidy First)
 
@@ -239,18 +239,18 @@
 
 ## 진행 상황
 
-- **현재 단계**: Phase 4 진행 중 (Mobile Diary Features)
-- **다음 작업**: Phase 4.17 - test_map_markers (지도 마커 표시)
-- **완료된 테스트**: 45개 / 총 100개 (소셜 로그인 제외)
+- **현재 단계**: Phase 4 완료 ✅, Phase 5 시작 예정 (Integration & Polish)
+- **다음 작업**: Phase 5.1 - test_full_user_journey (전체 사용자 여정 통합 테스트)
+- **완료된 테스트**: 46개 / 총 100개 (소셜 로그인 제외)
   - Phase 0: 6개 ✅
   - Phase 1: 11개 ✅
   - Phase 1.5 (소셜 로그인 백엔드): SKIP (나중에 구현)
   - Phase 2: 16개 ✅
   - Phase 3: 14/14개 ✅ (기본 인증 완료, 소셜 로그인 SKIP)
-  - Phase 4: 16/17개 (지도 기능 진행 중)
+  - Phase 4: 17/17개 ✅ (Diary Features 완료)
 - **테스트 커버리지**:
   - Backend: 85.45%
-  - Mobile: 42개 테스트 통과 (authStore, Auth screens, Diary screens, Map screen)
+  - Mobile: 43개 테스트 통과 (authStore, Auth screens, Diary screens, Map screen with markers)
 
 ---
 
