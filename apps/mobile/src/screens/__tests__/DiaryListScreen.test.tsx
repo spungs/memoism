@@ -1,6 +1,7 @@
 /**
  * Test 4.7: DiaryListScreen empty state
  * Test 4.8: DiaryListScreen with data
+ * Test 4.9: DiaryListScreen navigation
  *
  * Given: User has no diary entries
  * When: DiaryListScreen component is rendered
@@ -10,7 +11,7 @@
  *   - No diary items should be displayed
  */
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react-native';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DiaryListScreen from '../DiaryListScreen';
 
@@ -147,6 +148,65 @@ describe('DiaryListScreen', () => {
       expect(screen.getByText('오늘 날씨가 좋았다.')).toBeTruthy();
       expect(screen.getByText('두 번째 일기')).toBeTruthy();
       expect(screen.getByText('오늘은 친구를 만났다.')).toBeTruthy();
+    });
+  });
+
+  describe('test_diary_list_navigation', () => {
+    it('should navigate to diary detail when item is pressed', async () => {
+      /**
+       * Test 4.9: 일기 상세로 네비게이션
+       *
+       * Given: 일기 목록이 표시됨
+       * When: 일기 아이템을 터치
+       * Then:
+       *   - navigation.navigate가 호출됨
+       *   - 'DiaryDetail' 화면으로 이동
+       *   - 선택한 일기 ID가 파라미터로 전달됨
+       */
+
+      // Arrange
+      const mockDiaries = [
+        {
+          id: '123e4567-e89b-12d3-a456-426614174001',
+          title: '첫 번째 일기',
+          content: '오늘 날씨가 좋았다.',
+          images: [],
+          location: null,
+          user_id: '123e4567-e89b-12d3-a456-426614174000',
+          created_at: '2025-01-01T00:00:00.000Z',
+          updated_at: '2025-01-01T00:00:00.000Z',
+        },
+      ];
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockDiaries,
+      });
+
+      const mockToken = 'mock-jwt-token-12345';
+
+      // Act
+      const Wrapper = createWrapper();
+      render(
+        <Wrapper>
+          <DiaryListScreen navigation={mockNavigation} token={mockToken} />
+        </Wrapper>
+      );
+
+      // Wait for diary items to be displayed
+      await waitFor(() => {
+        const diaryItems = screen.getAllByTestId('diary-item');
+        expect(diaryItems).toHaveLength(1);
+      });
+
+      // Press the diary item
+      const diaryItem = screen.getByTestId('diary-item');
+      fireEvent.press(diaryItem);
+
+      // Assert
+      expect(mockNavigate).toHaveBeenCalledWith('DiaryDetail', {
+        diaryId: '123e4567-e89b-12d3-a456-426614174001',
+      });
     });
   });
 });

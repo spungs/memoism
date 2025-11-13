@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   FlatList,
+  TouchableOpacity,
 } from 'react-native';
 import { useDiariesQuery } from '../api/diaryApi';
 
@@ -60,15 +61,22 @@ export default function DiaryListScreen({
           data={diaries}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <View style={styles.diaryItem} testID="diary-item">
-              {item.title && (
-                <Text style={styles.diaryTitle}>{item.title}</Text>
-              )}
-              <Text style={styles.diaryContent}>{item.content}</Text>
-              <Text style={styles.diaryDate}>
-                {new Date(item.created_at).toLocaleDateString('ko-KR')}
-              </Text>
-            </View>
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate('DiaryDetail', { diaryId: item.id })
+              }
+              testID="diary-item"
+            >
+              <View style={styles.diaryItem}>
+                {item.title && (
+                  <Text style={styles.diaryTitle}>{item.title}</Text>
+                )}
+                <Text style={styles.diaryContent}>{item.content}</Text>
+                <Text style={styles.diaryDate}>
+                  {new Date(item.created_at).toLocaleDateString('ko-KR')}
+                </Text>
+              </View>
+            </TouchableOpacity>
           )}
           contentContainerStyle={styles.listContent}
         />

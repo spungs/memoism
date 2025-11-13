@@ -178,7 +178,7 @@
 - [x] 4.6 test_use_delete_diary_mutation: 일기 삭제 훅
 - [x] 4.7 test_diary_list_empty_state: 일기 목록 화면 (빈 상태)
 - [x] 4.8 test_diary_list_with_data: 일기 목록 화면 (데이터 있음)
-- [ ] 4.9 test_diary_list_navigation: 일기 상세로 네비게이션
+- [x] 4.9 test_diary_list_navigation: 일기 상세로 네비게이션
 - [ ] 4.10 test_diary_detail_renders: 일기 상세 화면 렌더링
 - [ ] 4.11 test_diary_detail_images: 이미지 표시
 - [ ] 4.12 test_diary_detail_location: 위치 정보 표시
