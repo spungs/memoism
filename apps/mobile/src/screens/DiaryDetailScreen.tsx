@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   ScrollView,
+  Image,
 } from 'react-native';
 import { useDiaryDetail } from '../api/diaryApi';
 
@@ -59,6 +60,20 @@ export default function DiaryDetailScreen({
           })}
         </Text>
         <Text style={styles.contentText}>{diary.content}</Text>
+
+        {/* Display images if available */}
+        {diary.images && diary.images.length > 0 && (
+          <View style={styles.imagesContainer}>
+            {diary.images.map((imageUrl, index) => (
+              <Image
+                key={index}
+                source={{ uri: imageUrl }}
+                style={styles.image}
+                testID="diary-image"
+              />
+            ))}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -94,6 +109,16 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: '#000',
     lineHeight: 26,
+    marginBottom: 24,
+  },
+  imagesContainer: {
+    marginTop: 8,
+  },
+  image: {
+    width: '100%',
+    height: 300,
+    borderRadius: 12,
+    marginBottom: 16,
   },
   errorText: {
     fontSize: 17,
