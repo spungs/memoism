@@ -94,3 +94,20 @@ export const useUpdateDiary = (token: string) => {
     },
   });
 };
+
+export const useDeleteDiary = (token: string) => {
+  return useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      const response = await fetch(`${API_URL}/diary/${id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete diary');
+      }
+    },
+  });
+};

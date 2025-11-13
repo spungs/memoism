@@ -6,11 +6,12 @@
  * Test 4.3: test_use_create_diary_mutation - 일기 생성 훅 테스트
  * Test 4.4: test_use_create_diary_with_images - 이미지 포함 일기 생성
  * Test 4.5: test_use_update_diary_mutation - 일기 수정 훅 테스트
+ * Test 4.6: test_use_delete_diary_mutation - 일기 삭제 훅 테스트
  */
 import React from 'react';
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useDiariesQuery, useCreateDiary, useUpdateDiary } from '../diaryApi';
+import { useDiariesQuery, useCreateDiary, useUpdateDiary, useDeleteDiary } from '../diaryApi';
 
 // Mock fetch
 global.fetch = jest.fn();
@@ -354,6 +355,56 @@ describe('DiaryApi', () => {
             'Content-Type': 'application/json',
           }),
           body: expect.any(String),
+        })
+      );
+    });
+  });
+
+  describe('test_use_delete_diary_mutation', () => {
+    it('should delete a diary successfully', async () => {
+      /**
+       * Test 4.6: 일기 삭제 성공
+       *
+       * Given: 인증된 사용자와 기존 일기 ID
+       * When: useDeleteDiary 훅으로 일기 삭제 요청
+       * Then:
+       *   - DELETE /diary/:id 요청이 전송됨
+       *   - 삭제 성공 응답이 반환됨
+       *   - Authorization 헤더가 포함됨
+       */
+
+      // Arrange
+      const diaryId = '123e4567-e89b-12d3-a456-426614174001';
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        status: 204,
+        json: async () => ({}),
+      });
+
+      const mockToken = 'mock-jwt-token-12345';
+
+      // Act
+      const Wrapper = createWrapper();
+      const { result } = renderHook(() => useDeleteDiary(mockToken), {
+        wrapper: Wrapper,
+      });
+
+      result.current.mutate(diaryId);
+
+      // Assert
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      // Verify API call
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/diary/${diaryId}`),
+        expect.objectContaining({
+          method: 'DELETE',
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${mockToken}`,
+          }),
         })
       );
     });

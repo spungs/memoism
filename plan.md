@@ -175,7 +175,7 @@
 - [x] 4.3 test_use_create_diary_mutation: 일기 생성 훅
 - [x] 4.4 test_use_create_diary_with_images: 이미지 포함 생성
 - [x] 4.5 test_use_update_diary_mutation: 일기 수정 훅
-- [ ] 4.6 test_use_delete_diary_mutation: 일기 삭제 훅
+- [x] 4.6 test_use_delete_diary_mutation: 일기 삭제 훅
 - [ ] 4.7 test_diary_list_empty_state: 일기 목록 화면 (빈 상태)
 - [ ] 4.8 test_diary_list_with_data: 일기 목록 화면 (데이터 있음)
 - [ ] 4.9 test_diary_list_navigation: 일기 상세로 네비게이션
