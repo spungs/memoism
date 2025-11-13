@@ -1,6 +1,7 @@
 /**
  * Test 4.13: DiaryEditScreen form
  * Test 4.14: DiaryEditScreen image picker
+ * Test 4.15: DiaryEditScreen submission
  *
  * Given: User navigates to diary edit screen with diary ID
  * When: DiaryEditScreen component is rendered
@@ -11,6 +12,7 @@
  *   - User should be able to modify title and content
  *   - Submit button should be present
  *   - User should be able to add images
+ *   - User should be able to submit edited diary
  */
 import React from 'react';
 import {
@@ -214,6 +216,106 @@ describe('DiaryEditScreen', () => {
         expect(images[0].props.source).toEqual({
           uri: 'file:///mock-image.jpg',
         });
+      });
+    });
+  });
+
+  describe('test_diary_edit_submission', () => {
+    it('should submit edited diary and navigate back', async () => {
+      /**
+       * Test 4.15: 편집 제출
+       *
+       * Given: 일기 편집 화면에서 내용을 수정함
+       * When: "저장" 버튼을 누름
+       * Then:
+       *   - useUpdateDiary mutation이 호출됨
+       *   - 수정된 데이터 (title, content, images)가 전달됨
+       *   - 저장 성공 후 이전 화면으로 돌아감 (navigation.goBack)
+       */
+
+      // Arrange
+      const mockDiary = {
+        id: '123e4567-e89b-12d3-a456-426614174001',
+        title: '기존 일기 제목',
+        content: '기존 일기 내용입니다.',
+        images: [],
+        location: null,
+        user_id: '123e4567-e89b-12d3-a456-426614174000',
+        created_at: '2025-01-01T00:00:00.000Z',
+        updated_at: '2025-01-01T00:00:00.000Z',
+      };
+
+      const updatedDiary = {
+        ...mockDiary,
+        title: '수정된 제목',
+        content: '수정된 내용입니다.',
+        updated_at: '2025-01-02T00:00:00.000Z',
+      };
+
+      // Mock initial fetch
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockDiary,
+      });
+
+      const mockToken = 'mock-jwt-token-12345';
+
+      // Act - Render component
+      const Wrapper = createWrapper();
+      render(
+        <Wrapper>
+          <DiaryEditScreen
+            navigation={mockNavigation}
+            route={mockRoute}
+            token={mockToken}
+          />
+        </Wrapper>
+      );
+
+      // Wait for data to load
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('기존 일기 제목')).toBeTruthy();
+      });
+
+      // Modify title and content
+      const titleInput = screen.getByPlaceholderText('제목');
+      const contentInput = screen.getByPlaceholderText('내용');
+
+      fireEvent.changeText(titleInput, '수정된 제목');
+      fireEvent.changeText(contentInput, '수정된 내용입니다.');
+
+      // Mock update API call
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => updatedDiary,
+      });
+
+      // Press save button
+      const saveButton = screen.getByText('저장');
+      fireEvent.press(saveButton);
+
+      // Assert - API should be called with updated data
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          'http://localhost:8000/diary/123e4567-e89b-12d3-a456-426614174001',
+          expect.objectContaining({
+            method: 'PUT',
+            headers: expect.objectContaining({
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${mockToken}`,
+            }),
+            body: JSON.stringify({
+              title: '수정된 제목',
+              content: '수정된 내용입니다.',
+              images: [],
+            }),
+          })
+        );
+      });
+
+      // Assert - Should navigate back after successful save
+      await waitFor(() => {
+        expect(mockGoBack).toHaveBeenCalled();
       });
     });
   });

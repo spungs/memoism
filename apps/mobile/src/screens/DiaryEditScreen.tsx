@@ -11,7 +11,7 @@ import {
   Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { useDiaryDetail } from '../api/diaryApi';
+import { useDiaryDetail, useUpdateDiary } from '../api/diaryApi';
 
 interface DiaryEditScreenProps {
   navigation: any;
@@ -30,6 +30,7 @@ export default function DiaryEditScreen({
 }: DiaryEditScreenProps) {
   const { diaryId } = route.params;
   const { data: diary, isLoading, isError } = useDiaryDetail(token, diaryId);
+  const updateDiaryMutation = useUpdateDiary(token);
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -54,6 +55,20 @@ export default function DiaryEditScreen({
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const newImageUri = result.assets[0].uri;
       setSelectedImages([...selectedImages, newImageUri]);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      await updateDiaryMutation.mutateAsync({
+        id: diaryId,
+        title,
+        content,
+        images: selectedImages,
+      });
+      navigation.goBack();
+    } catch (error) {
+      console.error('Failed to update diary:', error);
     }
   };
 
@@ -113,7 +128,7 @@ export default function DiaryEditScreen({
           </View>
         )}
 
-        <TouchableOpacity style={styles.saveButton}>
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
           <Text style={styles.saveButtonText}>저장</Text>
         </TouchableOpacity>
       </ScrollView>
