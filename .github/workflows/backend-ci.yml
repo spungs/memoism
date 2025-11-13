@@ -1,0 +1,129 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - main
+      - tdd-rewrite
+    paths:
+      - 'apps/backend/**'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    branches:
+      - main
+      - tdd-rewrite
+    paths:
+      - 'apps/backend/**'
+      - '.github/workflows/backend-ci.yml'
+
+jobs:
+  test:
+    name: Run Backend Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: memoism_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    strategy:
+      matrix:
+        python-version: ['3.12', '3.14']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: apps/backend/requirements.txt
+
+      - name: Install dependencies
+        working-directory: apps/backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run linting (optional)
+        working-directory: apps/backend
+        run: |
+          # Install linting tools if needed
+          # pip install ruff black
+          # ruff check src/
+          # black --check src/
+          echo "Linting step (add your linter here)"
+
+      - name: Run tests with coverage
+        working-directory: apps/backend
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/memoism_test
+          JWT_SECRET: test-secret-key-for-ci-cd-environment
+          JWT_ALGORITHM: HS256
+          JWT_EXPIRATION_MINUTES: 30
+          ALLOWED_ORIGINS: http://localhost:8081
+          ENVIRONMENT: test
+        run: |
+          python -m pytest tests/ -v --cov=src --cov-report=xml --cov-report=term
+
+      - name: Check test coverage threshold
+        working-directory: apps/backend
+        run: |
+          python -m pytest tests/ --cov=src --cov-report=term --cov-fail-under=80
+
+      - name: Upload coverage to Codecov (optional)
+        uses: codecov/codecov-action@v4
+        with:
+          files: apps/backend/coverage.xml
+          flags: backend
+          name: backend-coverage
+          fail_ci_if_error: false
+
+  build:
+    name: Build Backend Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        working-directory: apps/backend
+        run: |
+          # Create a simple Dockerfile for testing
+          cat > Dockerfile <<EOF
+          FROM python:3.14-slim
+          WORKDIR /app
+          COPY requirements.txt .
+          RUN pip install --no-cache-dir -r requirements.txt
+          COPY . .
+          EXPOSE 8000
+          CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+          EOF
+
+          docker build -t memoism-backend:test .
+
+      - name: Test Docker image
+        run: |
+          docker run -d -p 8000:8000 \
+            -e DATABASE_URL=sqlite:///./test.db \
+            -e JWT_SECRET=test-secret \
+            memoism-backend:test
+          sleep 5
+          curl -f http://localhost:8000 || exit 1

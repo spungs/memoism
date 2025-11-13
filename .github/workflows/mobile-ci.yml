@@ -1,0 +1,123 @@
+name: Mobile CI
+
+on:
+  push:
+    branches:
+      - main
+      - tdd-rewrite
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/mobile-ci.yml'
+  pull_request:
+    branches:
+      - main
+      - tdd-rewrite
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/mobile-ci.yml'
+
+jobs:
+  test:
+    name: Run Mobile Tests
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: ['18.x', '20.x']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/mobile
+        run: npm ci
+
+      - name: Run linting (optional)
+        working-directory: apps/mobile
+        run: |
+          # npm run lint
+          echo "Linting step (add your linter here)"
+
+      - name: Run tests with coverage
+        working-directory: apps/mobile
+        env:
+          API_URL: http://localhost:8000
+          ENVIRONMENT: test
+        run: |
+          npm test -- --coverage --watchAll=false
+
+      - name: Check test coverage threshold (optional)
+        working-directory: apps/mobile
+        run: |
+          # npm test -- --coverage --watchAll=false --coverageThreshold='{"global":{"statements":70,"branches":70,"functions":70,"lines":70}}'
+          echo "Coverage threshold check (configure in package.json)"
+
+      - name: Upload coverage to Codecov (optional)
+        uses: codecov/codecov-action@v4
+        with:
+          files: apps/mobile/coverage/coverage-final.json
+          flags: mobile
+          name: mobile-coverage
+          fail_ci_if_error: false
+
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/mobile
+        run: npm ci
+
+      - name: Set up Expo
+        working-directory: apps/mobile
+        run: |
+          npm install -g eas-cli
+          # eas build --platform android --profile preview --non-interactive
+          echo "Expo build step (requires EAS configuration)"
+
+  build-ios:
+    name: Build iOS IPA
+    runs-on: macos-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/mobile
+        run: npm ci
+
+      - name: Set up Expo
+        working-directory: apps/mobile
+        run: |
+          npm install -g eas-cli
+          # eas build --platform ios --profile preview --non-interactive
+          echo "Expo build step (requires EAS configuration)"
