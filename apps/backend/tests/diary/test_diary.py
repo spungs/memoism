@@ -341,7 +341,7 @@ class TestDiary:
           - Only diaries matching the date filter are returned
           - Date filter supports both specific date and date range
         """
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         from src.models import Diary
 
         # Arrange
@@ -354,7 +354,7 @@ class TestDiary:
         }
 
         # Create diaries with different dates (directly in DB to control created_at)
-        today = datetime.utcnow().replace(hour=12, minute=0, second=0, microsecond=0)
+        today = datetime.now(timezone.utc).replace(hour=12, minute=0, second=0, microsecond=0)
         yesterday = today - timedelta(days=1)
         two_days_ago = today - timedelta(days=2)
         three_days_ago = today - timedelta(days=3)

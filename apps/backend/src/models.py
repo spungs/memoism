@@ -3,7 +3,7 @@ Database models.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from uuid import UUID, uuid4
 from sqlmodel import Field, SQLModel, Column
@@ -19,7 +19,7 @@ class User(SQLModel, table=True):
     email: str = Field(unique=True, index=True)
     username: str = Field(unique=True, index=True)
     hashed_password: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class Diary(SQLModel, table=True):
@@ -33,4 +33,4 @@ class Diary(SQLModel, table=True):
     content: str
     images: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     location: Optional[dict] = Field(default=None, sa_column=Column(JSON))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

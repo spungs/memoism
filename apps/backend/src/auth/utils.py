@@ -1,7 +1,7 @@
 """
 Authentication utility functions.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import os
 from jose import jwt
@@ -32,9 +32,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     """Create a JWT access token."""
     token_payload = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=JWT_EXPIRATION_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=JWT_EXPIRATION_MINUTES)
 
     token_payload.update({"exp": expire})
     access_token = jwt.encode(token_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
