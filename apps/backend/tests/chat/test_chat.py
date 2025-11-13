@@ -123,3 +123,82 @@ class TestChatMessage:
         assert str(saved_message.user_id) == user_id
         assert saved_message.role == "user"
         assert saved_message.content == message_data["content"]
+
+    def test_get_chat_history(self, client: TestClient, create_and_login_user, session: Session):
+        """
+        Test 7.3: API should retrieve chat history with pagination.
+
+        Given: An authenticated user with multiple chat messages
+        When: GET /chat with pagination parameters
+        Then:
+          - Response status is 200 OK
+          - Messages are returned in reverse chronological order (newest first)
+          - Pagination works correctly (skip and limit)
+          - Only user's own messages are returned
+        """
+        # Arrange: Create and login user
+        auth_data = create_and_login_user(
+            email="chathistory@example.com",
+            username="chathistory",
+            password="ChatTest123!"
+        )
+        token = auth_data["access_token"]
+        user_id = auth_data["user_id"]
+
+        # Arrange: Create multiple chat messages
+        messages_content = [
+            ("user", "첫 번째 메시지"),
+            ("assistant", "첫 번째 응답"),
+            ("user", "두 번째 메시지"),
+            ("assistant", "두 번째 응답"),
+            ("user", "세 번째 메시지"),
+        ]
+
+        for role, content in messages_content:
+            chat_message = ChatMessage(
+                user_id=user_id,
+                role=role,
+                content=content,
+            )
+            session.add(chat_message)
+        session.commit()
+
+        # Act: Get all chat history
+        response = client.get(
+            "/chat",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+
+        # Assert: Response is successful
+        assert response.status_code == 200
+        messages = response.json()
+        assert isinstance(messages, list)
+        assert len(messages) == 5
+
+        # Assert: Messages are in reverse chronological order (newest first)
+        assert messages[0]["content"] == "세 번째 메시지"
+        assert messages[1]["content"] == "두 번째 응답"
+        assert messages[2]["content"] == "두 번째 메시지"
+        assert messages[3]["content"] == "첫 번째 응답"
+        assert messages[4]["content"] == "첫 번째 메시지"
+
+        # Act: Test pagination with skip and limit
+        response_paginated = client.get(
+            "/chat?skip=1&limit=2",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+
+        # Assert: Pagination works
+        assert response_paginated.status_code == 200
+        paginated_messages = response_paginated.json()
+        assert len(paginated_messages) == 2
+        assert paginated_messages[0]["content"] == "두 번째 응답"
+        assert paginated_messages[1]["content"] == "두 번째 메시지"
+
+        # Assert: Each message has correct structure
+        for msg in messages:
+            assert "id" in msg
+            assert "role" in msg
+            assert "content" in msg
+            assert "created_at" in msg
+            assert msg["role"] in ["user", "assistant"]

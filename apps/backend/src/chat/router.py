@@ -1,8 +1,9 @@
 """
 Chat API endpoints.
 """
-from fastapi import APIRouter, Depends, status
-from sqlmodel import Session
+from typing import List
+from fastapi import APIRouter, Depends, status, Query
+from sqlmodel import Session, select, desc
 from uuid import UUID
 
 from src.database import get_session
@@ -43,3 +44,37 @@ def send_message(
     session.refresh(chat_message)
 
     return chat_message
+
+
+@router.get("", response_model=List[ChatMessageResponse])
+def get_chat_history(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=100),
+    current_user_id: UUID = Depends(get_current_user_id),
+    session: Session = Depends(get_session),
+):
+    """
+    Get chat message history for the authenticated user.
+
+    Messages are returned in reverse chronological order (newest first).
+
+    Args:
+        skip: Number of messages to skip (for pagination)
+        limit: Maximum number of messages to return
+        current_user_id: The authenticated user's ID
+        session: Database session
+
+    Returns:
+        List of chat messages
+    """
+    # Query messages for this user, ordered by created_at descending (newest first)
+    statement = (
+        select(ChatMessage)
+        .where(ChatMessage.user_id == current_user_id)
+        .order_by(desc(ChatMessage.created_at))
+        .offset(skip)
+        .limit(limit)
+    )
+
+    messages = session.exec(statement).all()
+    return messages
