@@ -1141,3 +1141,281 @@ class TestUserJourney:
         # Verify all created IDs are present
         for created_id in created_diary_ids:
             assert created_id in all_paginated_ids
+
+    def test_multiple_images_upload(self, client: TestClient, create_and_login_user):
+        """
+        Test 5.9: API should handle multiple image uploads correctly.
+
+        Given: A user wants to attach multiple images to diary entries
+        When: Various scenarios with multiple images are tested
+        Then:
+          - Multiple images (10+) can be stored and retrieved
+          - Empty image arrays are handled correctly
+          - Images can be updated (added/removed)
+          - Very long URLs are supported
+          - Image data persists correctly across operations
+          - Images are returned in the same order they were uploaded
+        """
+        # Setup: Create test user
+        auth_data = create_and_login_user(
+            email="imagetest@example.com",
+            username="imagetestuser",
+            password="ImageTest123!"
+        )
+        token = auth_data["access_token"]
+
+        # Test 1: Create diary with multiple images (10 images)
+        many_images = [
+            f"https://example.com/images/photo{i}.jpg"
+            for i in range(1, 11)
+        ]
+        diary_data = {
+            "content": "오늘 여행에서 찍은 많은 사진들",
+            "title": "여행 사진 모음",
+            "images": many_images,
+        }
+
+        create_response = client.post(
+            "/diary",
+            json=diary_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert create_response.status_code == 201
+        created_diary = create_response.json()
+        assert created_diary["images"] == many_images
+        assert len(created_diary["images"]) == 10
+        diary_id_1 = created_diary["id"]
+
+        # Test 2: Verify images are returned in the same order
+        detail_response = client.get(
+            f"/diary/{diary_id_1}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert detail_response.status_code == 200
+        detail_data = detail_response.json()
+        assert detail_data["images"] == many_images
+        # Verify order is preserved
+        for i, image_url in enumerate(detail_data["images"]):
+            assert image_url == f"https://example.com/images/photo{i+1}.jpg"
+
+        # Test 3: Create diary with empty image array
+        empty_images_data = {
+            "content": "이미지 없는 일기",
+            "title": "텍스트만",
+            "images": [],
+        }
+        empty_response = client.post(
+            "/diary",
+            json=empty_images_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert empty_response.status_code == 201
+        empty_diary = empty_response.json()
+        assert empty_diary["images"] == []
+        diary_id_2 = empty_diary["id"]
+
+        # Test 4: Create diary without images field (null/None)
+        no_images_data = {
+            "content": "이미지 필드 없는 일기",
+            "title": "텍스트 전용",
+        }
+        no_images_response = client.post(
+            "/diary",
+            json=no_images_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert no_images_response.status_code == 201
+        no_images_diary = no_images_response.json()
+        # Should return None or empty array
+        assert no_images_diary["images"] in [None, []]
+        diary_id_3 = no_images_diary["id"]
+
+        # Test 5: Update diary to add images (empty -> multiple images)
+        new_images = [
+            "https://example.com/updated/image1.png",
+            "https://example.com/updated/image2.png",
+            "https://example.com/updated/image3.png",
+        ]
+        update_response = client.put(
+            f"/diary/{diary_id_2}",
+            json={
+                "content": "이미지 추가됨",
+                "title": "업데이트된 일기",
+                "images": new_images,
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert update_response.status_code == 200
+        updated_diary = update_response.json()
+        assert updated_diary["images"] == new_images
+        assert len(updated_diary["images"]) == 3
+
+        # Test 6: Update diary to remove images (multiple -> empty)
+        remove_images_response = client.put(
+            f"/diary/{diary_id_1}",
+            json={
+                "content": "이미지 제거됨",
+                "title": "이미지 없는 일기",
+                "images": [],
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert remove_images_response.status_code == 200
+        removed_diary = remove_images_response.json()
+        assert removed_diary["images"] == []
+
+        # Test 7: Very long image URLs
+        very_long_url = "https://example.com/images/" + "a" * 500 + ".jpg"
+        long_url_data = {
+            "content": "매우 긴 URL 테스트",
+            "title": "Long URL Test",
+            "images": [very_long_url],
+        }
+        long_url_response = client.post(
+            "/diary",
+            json=long_url_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert long_url_response.status_code == 201
+        long_url_diary = long_url_response.json()
+        assert long_url_diary["images"][0] == very_long_url
+        assert len(long_url_diary["images"][0]) > 500
+
+        # Test 8: Mixed image URLs (different formats)
+        mixed_images = [
+            "https://example.com/photo.jpg",
+            "https://cdn.example.com/assets/image.png",
+            "https://storage.example.com/uploads/pic.gif",
+            "https://example.com/images/photo.webp",
+            "https://example.com/images/photo.svg",
+        ]
+        mixed_data = {
+            "content": "다양한 이미지 형식",
+            "title": "Mixed Images",
+            "images": mixed_images,
+        }
+        mixed_response = client.post(
+            "/diary",
+            json=mixed_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert mixed_response.status_code == 201
+        mixed_diary = mixed_response.json()
+        assert mixed_diary["images"] == mixed_images
+
+        # Test 9: Large number of images (20 images)
+        large_images = [
+            f"https://example.com/gallery/img{i:03d}.jpg"
+            for i in range(1, 21)
+        ]
+        large_data = {
+            "content": "대량 이미지 테스트 (20개)",
+            "title": "Gallery Test",
+            "images": large_images,
+        }
+        large_response = client.post(
+            "/diary",
+            json=large_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert large_response.status_code == 201
+        large_diary = large_response.json()
+        assert len(large_diary["images"]) == 20
+        assert large_diary["images"] == large_images
+        diary_id_4 = large_diary["id"]
+
+        # Test 10: Verify images persist across list operations
+        list_response = client.get(
+            "/diary",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert list_response.status_code == 200
+        diaries = list_response.json()
+
+        # Find diary with 20 images
+        diary_with_20_images = next(
+            (d for d in diaries if d["id"] == diary_id_4),
+            None
+        )
+        assert diary_with_20_images is not None
+        assert len(diary_with_20_images["images"]) == 20
+        assert diary_with_20_images["images"] == large_images
+
+        # Test 11: Update images - replace some but keep others
+        updated_large_images = large_images[:10] + [
+            "https://example.com/new/image1.jpg",
+            "https://example.com/new/image2.jpg",
+        ]
+        update_large_response = client.put(
+            f"/diary/{diary_id_4}",
+            json={
+                "content": "일부 이미지 교체",
+                "title": "Updated Gallery",
+                "images": updated_large_images,
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert update_large_response.status_code == 200
+        updated_large_diary = update_large_response.json()
+        assert len(updated_large_diary["images"]) == 12
+        assert updated_large_diary["images"] == updated_large_images
+
+        # Test 12: Verify image data integrity after deletion
+        # Delete diary with images
+        delete_response = client.delete(
+            f"/diary/{diary_id_1}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert delete_response.status_code == 204
+
+        # Verify it's gone
+        deleted_verify = client.get(
+            f"/diary/{diary_id_1}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert deleted_verify.status_code == 404
+
+        # Verify other diaries with images still exist
+        remaining_verify = client.get(
+            f"/diary/{diary_id_4}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert remaining_verify.status_code == 200
+        assert len(remaining_verify.json()["images"]) == 12
+
+        # Test 13: Special characters in image URLs
+        special_char_urls = [
+            "https://example.com/images/photo%20with%20spaces.jpg",
+            "https://example.com/images/фото.jpg",  # Cyrillic
+            "https://example.com/images/照片.jpg",  # Chinese
+            "https://example.com/images/사진.jpg",  # Korean
+        ]
+        special_data = {
+            "content": "특수 문자가 포함된 URL",
+            "title": "Special Characters Test",
+            "images": special_char_urls,
+        }
+        special_response = client.post(
+            "/diary",
+            json=special_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert special_response.status_code == 201
+        special_diary = special_response.json()
+        assert special_diary["images"] == special_char_urls
+
+        # Test 14: Verify total count of diaries with different image configurations
+        final_list = client.get(
+            "/diary",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert final_list.status_code == 200
+        final_diaries = final_list.json()
+
+        # Count diaries by image status
+        diaries_with_images = [d for d in final_diaries if d["images"] and len(d["images"]) > 0]
+        diaries_without_images = [d for d in final_diaries if not d["images"] or len(d["images"]) == 0]
+
+        # Should have multiple diaries with various image configurations
+        assert len(diaries_with_images) >= 4
+        assert len(final_diaries) >= 6  # At least 6 diaries created (minus 1 deleted)
