@@ -245,7 +245,7 @@
 - [x] 7.1 test_chat_message_model: ChatMessage 모델 생성 (user_id, role, content, created_at)
 - [x] 7.2 test_send_chat_message: 사용자 메시지 저장
 - [x] 7.3 test_get_chat_history: 채팅 기록 조회 (페이지네이션)
-- [ ] 7.4 test_chat_unauthorized: 인증 없이 채팅 접근 실패
+- [x] 7.4 test_chat_unauthorized: 인증 없이 채팅 접근 실패
 
 #### OpenAI API 통합
 - [ ] 7.5 test_openai_api_connection: OpenAI API 연결 성공

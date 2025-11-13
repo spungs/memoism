@@ -202,3 +202,28 @@ class TestChatMessage:
             assert "content" in msg
             assert "created_at" in msg
             assert msg["role"] in ["user", "assistant"]
+
+    def test_chat_unauthorized(self, client: TestClient):
+        """
+        Test 7.4: Chat endpoints should reject unauthenticated requests.
+
+        Given: No authentication token
+        When: Attempting to POST /chat or GET /chat
+        Then:
+          - Response status is 401 Unauthorized
+          - Error message indicates authentication required
+        """
+        # Act: Try to send a message without authentication
+        message_data = {"content": "인증 없이 메시지 보내기"}
+        response_post = client.post("/chat", json=message_data)
+
+        # Assert: POST /chat requires authentication
+        assert response_post.status_code == 401
+        assert "detail" in response_post.json()
+
+        # Act: Try to get chat history without authentication
+        response_get = client.get("/chat")
+
+        # Assert: GET /chat requires authentication
+        assert response_get.status_code == 401
+        assert "detail" in response_get.json()
