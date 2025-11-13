@@ -128,7 +128,7 @@
 - [x] 3.10 test_login_form_validation: 로그인 폼 유효성 검증
 - [x] 3.11 test_login_submission: 로그인 폼 제출
 - [x] 3.12 test_signup_screen_renders: 회원가입 화면 렌더링
-- [ ] 3.13 test_signup_form_validation: 회원가입 폼 유효성 검증
+- [x] 3.13 test_signup_form_validation: 회원가입 폼 유효성 검증
 - [ ] 3.14 test_signup_submission: 회원가입 폼 제출
 
 ### 소셜 로그인 - 카카오 (SKIP - 나중에 구현)
@@ -240,13 +240,13 @@
 ## 진행 상황
 
 - **현재 단계**: Phase 3 진행 중 (Mobile Authentication)
-- **다음 작업**: Phase 3.13 - test_signup_form_validation
-- **완료된 테스트**: 39개 / 총 100개 (소셜 로그인 제외)
+- **다음 작업**: Phase 3.14 - test_signup_submission
+- **완료된 테스트**: 40개 / 총 100개 (소셜 로그인 제외)
   - Phase 0: 6개 ✅
   - Phase 1: 11개 ✅
   - Phase 1.5 (소셜 로그인 백엔드): SKIP (나중에 구현)
   - Phase 2: 16개 ✅
-  - Phase 3: 12/14개 (기본 인증 12개, 소셜 로그인 SKIP)
+  - Phase 3: 13/14개 (기본 인증 13개, 소셜 로그인 SKIP)
   - Phase 4-6: 0개
 - **테스트 커버리지**:
   - Backend: 85.45%
