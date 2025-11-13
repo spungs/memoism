@@ -1,5 +1,6 @@
 /**
  * Test 4.7: DiaryListScreen empty state
+ * Test 4.8: DiaryListScreen with data
  *
  * Given: User has no diary entries
  * When: DiaryListScreen component is rendered
@@ -80,6 +81,72 @@ describe('DiaryListScreen', () => {
       // Verify no diary items are displayed
       const diaryItems = screen.queryAllByTestId('diary-item');
       expect(diaryItems).toHaveLength(0);
+    });
+  });
+
+  describe('test_diary_list_with_data', () => {
+    it('should display list of diaries when data exists', async () => {
+      /**
+       * Test 4.8: 일기 목록 화면 데이터 있음
+       *
+       * Given: 서버에 일기 데이터가 있음
+       * When: DiaryListScreen 렌더링
+       * Then:
+       *   - 일기 아이템이 표시됨
+       *   - 각 일기의 제목과 내용이 보임
+       *   - testID로 일기 아이템을 찾을 수 있음
+       */
+
+      // Arrange
+      const mockDiaries = [
+        {
+          id: '123e4567-e89b-12d3-a456-426614174001',
+          title: '첫 번째 일기',
+          content: '오늘 날씨가 좋았다.',
+          images: [],
+          location: null,
+          user_id: '123e4567-e89b-12d3-a456-426614174000',
+          created_at: '2025-01-01T00:00:00.000Z',
+          updated_at: '2025-01-01T00:00:00.000Z',
+        },
+        {
+          id: '123e4567-e89b-12d3-a456-426614174002',
+          title: '두 번째 일기',
+          content: '오늘은 친구를 만났다.',
+          images: [],
+          location: null,
+          user_id: '123e4567-e89b-12d3-a456-426614174000',
+          created_at: '2025-01-02T00:00:00.000Z',
+          updated_at: '2025-01-02T00:00:00.000Z',
+        },
+      ];
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockDiaries,
+      });
+
+      const mockToken = 'mock-jwt-token-12345';
+
+      // Act
+      const Wrapper = createWrapper();
+      render(
+        <Wrapper>
+          <DiaryListScreen navigation={mockNavigation} token={mockToken} />
+        </Wrapper>
+      );
+
+      // Assert
+      await waitFor(() => {
+        const diaryItems = screen.getAllByTestId('diary-item');
+        expect(diaryItems).toHaveLength(2);
+      });
+
+      // Verify diary content is displayed
+      expect(screen.getByText('첫 번째 일기')).toBeTruthy();
+      expect(screen.getByText('오늘 날씨가 좋았다.')).toBeTruthy();
+      expect(screen.getByText('두 번째 일기')).toBeTruthy();
+      expect(screen.getByText('오늘은 친구를 만났다.')).toBeTruthy();
     });
   });
 });
