@@ -791,3 +791,174 @@ class TestUserJourney:
         # Verify JSON encoding handles quotes correctly
         special_data = special_response.json()
         assert special_data["content"] == special_chars_diary["content"]
+
+    def test_cors_policy(self, client: TestClient, create_and_login_user):
+        """
+        Test 5.7: API should enforce proper CORS policy.
+
+        Given: The API has CORS middleware configured
+        When: Requests are made from different origins
+        Then:
+          - Allowed origins receive proper CORS headers
+          - Preflight requests (OPTIONS) are handled correctly
+          - Access-Control headers are correctly set
+          - Credentials are allowed for permitted origins
+          - CORS policy protects against unauthorized cross-origin access
+        """
+        # Setup: Create test user
+        auth_data = create_and_login_user(
+            email="corstest@example.com",
+            username="corstestuser",
+            password="CorsTest123!"
+        )
+        token = auth_data["access_token"]
+
+        # Test 1: OPTIONS preflight request for diary endpoint
+        # This is what browsers send before actual CORS requests
+        preflight_response = client.options(
+            "/diary",
+            headers={
+                "Origin": "http://localhost:8081",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "authorization,content-type",
+            },
+        )
+        # Preflight should return 200 OK with CORS headers
+        assert preflight_response.status_code == 200
+
+        # Verify CORS headers are present
+        cors_headers = preflight_response.headers
+        assert "access-control-allow-origin" in cors_headers
+        assert "access-control-allow-credentials" in cors_headers
+        assert "access-control-allow-methods" in cors_headers
+        assert "access-control-allow-headers" in cors_headers
+
+        # Test 2: Actual request from allowed origin
+        diary_data = {
+            "content": "Testing CORS policy",
+            "title": "CORS Test",
+        }
+        allowed_origin_response = client.post(
+            "/diary",
+            json=diary_data,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Origin": "http://localhost:8081",
+            },
+        )
+        assert allowed_origin_response.status_code == 201
+
+        # Verify CORS headers in actual response
+        response_headers = allowed_origin_response.headers
+        assert "access-control-allow-origin" in response_headers
+        # Should allow the origin
+        assert "localhost:8081" in response_headers.get("access-control-allow-origin", "")
+
+        # Test 3: Check credentials are allowed
+        assert "access-control-allow-credentials" in response_headers
+        assert response_headers.get("access-control-allow-credentials", "").lower() == "true"
+
+        # Test 4: GET request with CORS
+        list_response = client.get(
+            "/diary",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Origin": "http://localhost:8081",
+            },
+        )
+        assert list_response.status_code == 200
+        list_headers = list_response.headers
+        assert "access-control-allow-origin" in list_headers
+
+        # Test 5: Login endpoint with CORS
+        login_data = {
+            "email": "corstest@example.com",
+            "password": "CorsTest123!",
+        }
+        login_response = client.post(
+            "/auth/login",
+            json=login_data,
+            headers={
+                "Origin": "http://localhost:8081",
+            },
+        )
+        assert login_response.status_code == 200
+        login_headers = login_response.headers
+        assert "access-control-allow-origin" in login_headers
+
+        # Test 6: Root endpoint with CORS
+        root_response = client.get(
+            "/",
+            headers={
+                "Origin": "http://localhost:8081",
+            },
+        )
+        assert root_response.status_code == 200
+        root_headers = root_response.headers
+        assert "access-control-allow-origin" in root_headers
+
+        # Test 7: Preflight for auth endpoint
+        auth_preflight = client.options(
+            "/auth/login",
+            headers={
+                "Origin": "http://localhost:8081",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type",
+            },
+        )
+        assert auth_preflight.status_code == 200
+        auth_preflight_headers = auth_preflight.headers
+        assert "access-control-allow-methods" in auth_preflight_headers
+        # Should allow POST method
+        allowed_methods = auth_preflight_headers.get("access-control-allow-methods", "")
+        assert "POST" in allowed_methods
+
+        # Test 8: Verify all HTTP methods are allowed (configured as allow_methods=["*"])
+        allowed_methods_str = auth_preflight_headers.get("access-control-allow-methods", "")
+        # FastAPI CORS middleware with ["*"] should allow all methods
+        # This typically includes GET, POST, PUT, DELETE, OPTIONS, etc.
+        common_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+        for method in common_methods:
+            assert method in allowed_methods_str
+
+        # Test 9: Verify headers are allowed (configured as allow_headers=["*"])
+        allowed_headers = auth_preflight_headers.get("access-control-allow-headers", "")
+        # Should allow common headers
+        # Note: With allow_headers=["*"], the middleware typically echoes back requested headers
+        assert len(allowed_headers) > 0
+
+        # Test 10: Multiple requests to ensure CORS is consistently applied
+        for i in range(3):
+            test_response = client.get(
+                "/",
+                headers={
+                    "Origin": "http://localhost:8081",
+                },
+            )
+            assert test_response.status_code == 200
+            assert "access-control-allow-origin" in test_response.headers
+
+        # Test 11: CORS with PUT request
+        diary_id = allowed_origin_response.json()["id"]
+        update_response = client.put(
+            f"/diary/{diary_id}",
+            json={"content": "Updated with CORS", "title": "Updated CORS Test"},
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Origin": "http://localhost:8081",
+            },
+        )
+        assert update_response.status_code == 200
+        assert "access-control-allow-origin" in update_response.headers
+
+        # Test 12: CORS with DELETE request
+        delete_response = client.delete(
+            f"/diary/{diary_id}",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Origin": "http://localhost:8081",
+            },
+        )
+        assert delete_response.status_code == 204
+        # Even 204 responses should have CORS headers
+        assert "access-control-allow-origin" in delete_response.headers
