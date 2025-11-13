@@ -126,7 +126,7 @@
 - [x] 3.8 test_use_login_error: 로그인 훅 (에러 처리)
 - [x] 3.9 test_login_screen_renders: 로그인 화면 렌더링
 - [x] 3.10 test_login_form_validation: 로그인 폼 유효성 검증
-- [ ] 3.11 test_login_submission: 로그인 폼 제출
+- [x] 3.11 test_login_submission: 로그인 폼 제출
 - [ ] 3.12 test_signup_screen_renders: 회원가입 화면 렌더링
 - [ ] 3.13 test_signup_form_validation: 회원가입 폼 유효성 검증
 - [ ] 3.14 test_signup_submission: 회원가입 폼 제출
@@ -240,13 +240,13 @@
 ## 진행 상황
 
 - **현재 단계**: Phase 3 진행 중 (Mobile Authentication)
-- **다음 작업**: Phase 3.11 - test_login_submission
-- **완료된 테스트**: 37개 / 총 100개 (소셜 로그인 제외)
+- **다음 작업**: Phase 3.12 - test_signup_screen_renders
+- **완료된 테스트**: 38개 / 총 100개 (소셜 로그인 제외)
   - Phase 0: 6개 ✅
   - Phase 1: 11개 ✅
   - Phase 1.5 (소셜 로그인 백엔드): SKIP (나중에 구현)
   - Phase 2: 16개 ✅
-  - Phase 3: 10/14개 (기본 인증 10개, 소셜 로그인 SKIP)
+  - Phase 3: 11/14개 (기본 인증 11개, 소셜 로그인 SKIP)
   - Phase 4-6: 0개
 - **테스트 커버리지**:
   - Backend: 85.45%

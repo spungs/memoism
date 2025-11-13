@@ -7,6 +7,8 @@ import {
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
+import { useLogin } from '../api/authApi';
+import { useAuthStore } from '../store/authStore';
 
 interface LoginScreenProps {
   navigation: any;
@@ -17,6 +19,9 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+
+  const { setToken, setUser } = useAuthStore();
+  const loginMutation = useLogin();
 
   const validateEmail = (email: string): boolean => {
     if (!email) {
@@ -50,7 +55,15 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
     const isPasswordValid = validatePassword(password);
 
     if (isEmailValid && isPasswordValid) {
-      // TODO: Implement login logic in next phase
+      loginMutation.mutate(
+        { email, password },
+        {
+          onSuccess: (data) => {
+            setToken(data.access_token);
+            setUser(data.user);
+          },
+        }
+      );
     }
   };
 
