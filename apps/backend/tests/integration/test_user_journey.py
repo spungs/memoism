@@ -222,3 +222,101 @@ class TestUserJourney:
 
         assert recovery_response.status_code == 201
         assert recovery_response.json()["content"] == recovery_data["content"]
+
+    def test_token_expiration_flow(self, client: TestClient):
+        """
+        Test 5.3: Complete token expiration and renewal flow.
+
+        Given: A user has logged in and received a valid token
+        When: The token expires and user tries to use it
+        Then:
+          - API returns 401 Unauthorized for expired token
+          - User can log in again to get a new token
+          - New token works for authenticated requests
+          - Full flow: login → use token → expire → fail → re-login → succeed
+        """
+        from datetime import timedelta
+        from src.auth.utils import create_access_token
+
+        # Step 1: Create user and login
+        signup_data = {
+            "email": "tokenexp@example.com",
+            "username": "tokenexpuser",
+            "password": "TokenExp123!",
+        }
+
+        signup_response = client.post("/auth/signup", json=signup_data)
+        assert signup_response.status_code == 201
+        user_id = signup_response.json()["id"]
+
+        login_data = {
+            "email": signup_data["email"],
+            "password": signup_data["password"],
+        }
+
+        login_response = client.post("/auth/login", json=login_data)
+        assert login_response.status_code == 200
+        valid_token = login_response.json()["access_token"]
+
+        # Step 2: Use valid token to create a diary entry (should succeed)
+        diary_data = {
+            "content": "Test with valid token",
+            "title": "Valid Token Test",
+        }
+
+        create_response = client.post(
+            "/diary",
+            json=diary_data,
+            headers={"Authorization": f"Bearer {valid_token}"},
+        )
+        assert create_response.status_code == 201
+
+        # Step 3: Create an expired token (negative expiration time)
+        expired_token = create_access_token(
+            data={"sub": str(user_id)},
+            expires_delta=timedelta(seconds=-1)  # Already expired
+        )
+
+        # Step 4: Try to use expired token (should fail with 401)
+        expired_diary_data = {
+            "content": "This should fail with expired token",
+            "title": "Expired Token Test",
+        }
+
+        expired_response = client.post(
+            "/diary",
+            json=expired_diary_data,
+            headers={"Authorization": f"Bearer {expired_token}"},
+        )
+        assert expired_response.status_code == 401
+        error_data = expired_response.json()
+        assert "detail" in error_data
+
+        # Step 5: Verify that existing diary is still accessible with valid token
+        list_response = client.get(
+            "/diary",
+            headers={"Authorization": f"Bearer {valid_token}"},
+        )
+        assert list_response.status_code == 200
+        diaries = list_response.json()
+        assert len(diaries) >= 1
+
+        # Step 6: Re-login to get a new token (token renewal flow)
+        relogin_response = client.post("/auth/login", json=login_data)
+        assert relogin_response.status_code == 200
+        new_token = relogin_response.json()["access_token"]
+        assert new_token != valid_token  # Should be a different token
+
+        # Step 7: Use new token successfully
+        new_diary_data = {
+            "content": "Created with renewed token after expiration",
+            "title": "Renewed Token Test",
+        }
+
+        new_diary_response = client.post(
+            "/diary",
+            json=new_diary_data,
+            headers={"Authorization": f"Bearer {new_token}"},
+        )
+        assert new_diary_response.status_code == 201
+        assert new_diary_response.json()["content"] == new_diary_data["content"]
