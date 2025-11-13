@@ -183,7 +183,7 @@
 - [x] 4.11 test_diary_detail_images: 이미지 표시
 - [x] 4.12 test_diary_detail_location: 위치 정보 표시
 - [x] 4.13 test_diary_edit_form: 일기 편집 폼
-- [ ] 4.14 test_diary_edit_image_picker: 이미지 선택
+- [x] 4.14 test_diary_edit_image_picker: 이미지 선택
 - [ ] 4.15 test_diary_edit_submission: 편집 제출
 - [ ] 4.16 test_map_screen_renders: 지도 화면 렌더링
 - [ ] 4.17 test_map_markers: 지도 마커 표시
@@ -240,8 +240,8 @@
 ## 진행 상황
 
 - **현재 단계**: Phase 4 진행 중 (Mobile Diary Features)
-- **다음 작업**: Phase 4.14 - test_diary_edit_image_picker (이미지 선택)
-- **완료된 테스트**: 42개 / 총 100개 (소셜 로그인 제외)
+- **다음 작업**: Phase 4.15 - test_diary_edit_submission (편집 제출)
+- **완료된 테스트**: 43개 / 총 100개 (소셜 로그인 제외)
   - Phase 0: 6개 ✅
   - Phase 1: 11개 ✅
   - Phase 1.5 (소셜 로그인 백엔드): SKIP (나중에 구현)

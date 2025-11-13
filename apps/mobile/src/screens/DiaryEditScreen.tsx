@@ -8,7 +8,9 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useDiaryDetail } from '../api/diaryApi';
 
 interface DiaryEditScreenProps {
@@ -31,14 +33,29 @@ export default function DiaryEditScreen({
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
 
   // Load existing data into form when diary is fetched
   useEffect(() => {
     if (diary) {
       setTitle(diary.title || '');
       setContent(diary.content);
+      setSelectedImages(diary.images || []);
     }
   }, [diary]);
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const newImageUri = result.assets[0].uri;
+      setSelectedImages([...selectedImages, newImageUri]);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -76,6 +93,26 @@ export default function DiaryEditScreen({
           onChangeText={setContent}
           multiline
         />
+
+        {/* Image picker button */}
+        <TouchableOpacity style={styles.addImageButton} onPress={pickImage}>
+          <Text style={styles.addImageButtonText}>이미지 추가</Text>
+        </TouchableOpacity>
+
+        {/* Display selected images */}
+        {selectedImages.length > 0 && (
+          <View style={styles.imagesContainer}>
+            {selectedImages.map((imageUri, index) => (
+              <Image
+                key={index}
+                source={{ uri: imageUri }}
+                style={styles.image}
+                testID="selected-image"
+              />
+            ))}
+          </View>
+        )}
+
         <TouchableOpacity style={styles.saveButton}>
           <Text style={styles.saveButtonText}>저장</Text>
         </TouchableOpacity>
@@ -122,6 +159,27 @@ const styles = StyleSheet.create({
     borderColor: '#E5E5EA',
     minHeight: 200,
     textAlignVertical: 'top',
+  },
+  addImageButton: {
+    backgroundColor: '#34C759',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  addImageButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  imagesContainer: {
+    marginBottom: 24,
+  },
+  image: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 12,
   },
   saveButton: {
     backgroundColor: '#007AFF',
