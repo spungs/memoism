@@ -111,3 +111,24 @@ export const useDeleteDiary = (token: string) => {
     },
   });
 };
+
+export const useDiaryDetail = (token: string, diaryId: string) => {
+  return useQuery({
+    queryKey: ['diary', diaryId],
+    queryFn: async (): Promise<DiaryResponse> => {
+      const response = await fetch(`${API_URL}/diary/${diaryId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch diary detail');
+      }
+
+      return response.json();
+    },
+  });
+};
