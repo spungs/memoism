@@ -7,6 +7,7 @@ import {
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
+import { useSignup } from '../api/authApi';
 
 interface SignupScreenProps {
   navigation: any;
@@ -19,6 +20,8 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
   const [emailError, setEmailError] = useState('');
   const [usernameError, setUsernameError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+
+  const signupMutation = useSignup();
 
   const validateEmail = (email: string): boolean => {
     if (!email) {
@@ -66,7 +69,15 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
     const isPasswordValid = validatePassword(password);
 
     if (isEmailValid && isUsernameValid && isPasswordValid) {
-      // TODO: Implement signup logic in next phase
+      signupMutation.mutate(
+        { email, username, password },
+        {
+          onSuccess: () => {
+            // Navigate to login screen after successful signup
+            navigation.navigate('AuthLogin');
+          },
+        }
+      );
     }
   };
 

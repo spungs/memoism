@@ -1,7 +1,11 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import SignupScreen from '../../src/screens/SignupScreen';
+import { useAuthStore } from '../../src/store/authStore';
+
+// Mock fetch
+global.fetch = jest.fn();
 
 // Helper to create QueryClient wrapper
 const createWrapper = () => {
@@ -24,6 +28,8 @@ describe('SignupScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Reset auth store
+    useAuthStore.getState().clearAuth();
   });
 
   describe('test_signup_screen_renders', () => {
@@ -180,6 +186,60 @@ describe('SignupScreen', () => {
       expect(screen.queryByText('사용자명은 최소 3자 이상이어야 합니다')).toBeNull();
       expect(screen.queryByText('비밀번호를 입력해주세요')).toBeNull();
       expect(screen.queryByText('비밀번호는 최소 6자 이상이어야 합니다')).toBeNull();
+    });
+  });
+
+  describe('test_signup_submission', () => {
+    it('should call signup API and store user data when form is submitted with valid data', async () => {
+      // Arrange
+      const mockResponse = {
+        id: '123e4567-e89b-12d3-a456-426614174000',
+        email: 'newuser@example.com',
+        username: 'newuser',
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      });
+
+      const Wrapper = createWrapper();
+      render(
+        <Wrapper>
+          <SignupScreen navigation={mockNavigation} />
+        </Wrapper>
+      );
+
+      // Act
+      const emailInput = screen.getByPlaceholderText('이메일');
+      const usernameInput = screen.getByPlaceholderText('사용자명');
+      const passwordInput = screen.getByPlaceholderText('비밀번호');
+      const submitButton = screen.getAllByText('회원가입')[1];
+
+      fireEvent.changeText(emailInput, 'newuser@example.com');
+      fireEvent.changeText(usernameInput, 'newuser');
+      fireEvent.changeText(passwordInput, 'password123');
+      fireEvent.press(submitButton);
+
+      // Assert
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining('/auth/signup'),
+          expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({
+              email: 'newuser@example.com',
+              username: 'newuser',
+              password: 'password123',
+            }),
+          })
+        );
+      });
+
+      // Check that navigation occurred (회원가입 성공 후 로그인 화면으로 이동)
+      await waitFor(() => {
+        expect(mockNavigation.navigate).toHaveBeenCalledWith('AuthLogin');
+      });
     });
   });
 });
