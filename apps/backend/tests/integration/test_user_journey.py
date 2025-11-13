@@ -962,3 +962,182 @@ class TestUserJourney:
         assert delete_response.status_code == 204
         # Even 204 responses should have CORS headers
         assert "access-control-allow-origin" in delete_response.headers
+
+    def test_large_diary_list_pagination(self, client: TestClient, create_and_login_user):
+        """
+        Test 5.8: API should handle large diary lists with proper pagination.
+
+        Given: A user has many diary entries (50+ entries)
+        When: User requests diary list with different pagination parameters
+        Then:
+          - Pagination works correctly with skip and limit parameters
+          - First page returns correct number of entries
+          - Middle page returns correct entries
+          - Last page returns remaining entries
+          - Total count of entries is preserved across pages
+          - Entries are ordered consistently (e.g., by creation date desc)
+          - Empty pages return empty arrays (not errors)
+        """
+        # Setup: Create test user
+        auth_data = create_and_login_user(
+            email="pagination@example.com",
+            username="paginationuser",
+            password="PageTest123!"
+        )
+        token = auth_data["access_token"]
+
+        # Create 50 diary entries
+        num_diaries = 50
+        created_diary_ids = []
+
+        for i in range(num_diaries):
+            diary_data = {
+                "content": f"일기 내용 #{i+1}: TDD로 개발하는 페이지네이션 테스트",
+                "title": f"일기 제목 {i+1}",
+            }
+            create_response = client.post(
+                "/diary",
+                json=diary_data,
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            assert create_response.status_code == 201
+            created_diary_ids.append(create_response.json()["id"])
+
+        # Test 1: Get all diaries without pagination (default behavior)
+        all_response = client.get(
+            "/diary",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert all_response.status_code == 200
+        all_diaries = all_response.json()
+        assert len(all_diaries) == num_diaries
+
+        # Test 2: First page with limit=10
+        first_page_response = client.get(
+            "/diary?skip=0&limit=10",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert first_page_response.status_code == 200
+        first_page = first_page_response.json()
+        assert len(first_page) == 10
+
+        # Test 3: Second page with skip=10, limit=10
+        second_page_response = client.get(
+            "/diary?skip=10&limit=10",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert second_page_response.status_code == 200
+        second_page = second_page_response.json()
+        assert len(second_page) == 10
+
+        # Verify first and second pages have different entries (no overlap)
+        first_page_ids = {d["id"] for d in first_page}
+        second_page_ids = {d["id"] for d in second_page}
+        assert len(first_page_ids.intersection(second_page_ids)) == 0
+
+        # Test 4: Middle page - skip=20, limit=15
+        middle_page_response = client.get(
+            "/diary?skip=20&limit=15",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert middle_page_response.status_code == 200
+        middle_page = middle_page_response.json()
+        assert len(middle_page) == 15
+
+        # Test 5: Last page - skip=45, limit=10 (should return only 5 remaining)
+        last_page_response = client.get(
+            "/diary?skip=45&limit=10",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert last_page_response.status_code == 200
+        last_page = last_page_response.json()
+        assert len(last_page) == 5  # Only 5 entries remain
+
+        # Test 6: Beyond last page - skip=100, limit=10 (should return empty array)
+        empty_page_response = client.get(
+            "/diary?skip=100&limit=10",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert empty_page_response.status_code == 200
+        empty_page = empty_page_response.json()
+        assert len(empty_page) == 0
+        assert isinstance(empty_page, list)
+
+        # Test 7: Large limit (request more than available)
+        large_limit_response = client.get(
+            "/diary?skip=0&limit=1000",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert large_limit_response.status_code == 200
+        large_limit_diaries = large_limit_response.json()
+        # Should return all 50 diaries (not fail or return more)
+        assert len(large_limit_diaries) == num_diaries
+
+        # Test 8: Small pages - iterate through all with limit=5
+        page_size = 5
+        collected_ids = set()
+
+        for page_num in range(num_diaries // page_size):
+            skip = page_num * page_size
+            page_response = client.get(
+                f"/diary?skip={skip}&limit={page_size}",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            assert page_response.status_code == 200
+            page_diaries = page_response.json()
+            assert len(page_diaries) == page_size
+
+            # Collect IDs
+            for diary in page_diaries:
+                collected_ids.add(diary["id"])
+
+        # Verify all diaries were collected (no duplicates, no missing)
+        assert len(collected_ids) == num_diaries
+
+        # Test 9: Verify ordering is consistent across pages
+        # Get first entry from page 1
+        page1_first = first_page[0]["id"]
+
+        # Get same page again - should have same first entry
+        page1_again_response = client.get(
+            "/diary?skip=0&limit=10",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        page1_again = page1_again_response.json()
+        assert page1_again[0]["id"] == page1_first
+
+        # Test 10: skip=0, limit=1 (minimal page)
+        single_response = client.get(
+            "/diary?skip=0&limit=1",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert single_response.status_code == 200
+        single_page = single_response.json()
+        assert len(single_page) == 1
+
+        # Test 11: Verify all created diaries are accessible through pagination
+        all_paginated_ids = set()
+        current_skip = 0
+        page_limit = 7  # Use odd number to test edge cases
+
+        while True:
+            page_response = client.get(
+                f"/diary?skip={current_skip}&limit={page_limit}",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            assert page_response.status_code == 200
+            page_data = page_response.json()
+
+            if len(page_data) == 0:
+                break
+
+            for diary in page_data:
+                all_paginated_ids.add(diary["id"])
+
+            current_skip += page_limit
+
+        # Should have collected all diary IDs
+        assert len(all_paginated_ids) == num_diaries
+        # Verify all created IDs are present
+        for created_id in created_diary_ids:
+            assert created_id in all_paginated_ids
