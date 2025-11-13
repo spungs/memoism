@@ -103,4 +103,44 @@ describe('DiaryApi', () => {
       );
     });
   });
+
+  describe('test_use_diaries_query_empty', () => {
+    it('should handle empty diary list', async () => {
+      /**
+       * Test 4.2: 빈 일기 목록 처리
+       *
+       * Given: 서버에 일기가 없음
+       * When: useDiariesQuery 훅을 호출
+       * Then:
+       *   - 빈 배열이 반환됨
+       *   - 에러가 발생하지 않음
+       *   - isSuccess는 true
+       */
+
+      // Arrange
+      const mockEmptyDiaries: any[] = [];
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockEmptyDiaries,
+      });
+
+      const mockToken = 'mock-jwt-token-12345';
+
+      // Act
+      const Wrapper = createWrapper();
+      const { result } = renderHook(() => useDiariesQuery(mockToken), {
+        wrapper: Wrapper,
+      });
+
+      // Assert
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(result.current.data).toEqual([]);
+      expect(result.current.data).toHaveLength(0);
+      expect(result.current.isError).toBe(false);
+    });
+  });
 });
