@@ -201,7 +201,7 @@
 
 ### 통합 테스트 (Red → Green)
 
-- [ ] 5.1 test_full_user_journey: 회원가입 → 로그인 → 일기 작성 → 조회 → 수정 → 삭제 → 로그아웃
+- [x] 5.1 test_full_user_journey: 회원가입 → 로그인 → 일기 작성 → 조회 → 수정 → 삭제 → 로그아웃
 - [ ] 5.2 test_network_failure_handling: 네트워크 실패 처리
 - [ ] 5.3 test_token_expiration_flow: 토큰 만료 처리
 - [ ] 5.4 test_invalid_input_handling: 잘못된 입력 처리
@@ -239,17 +239,18 @@
 
 ## 진행 상황
 
-- **현재 단계**: Phase 4 완료 ✅, Phase 5 시작 예정 (Integration & Polish)
-- **다음 작업**: Phase 5.1 - test_full_user_journey (전체 사용자 여정 통합 테스트)
-- **완료된 테스트**: 46개 / 총 100개 (소셜 로그인 제외)
+- **현재 단계**: Phase 5 진행 중 (Integration & Polish)
+- **다음 작업**: Phase 5.2 - test_network_failure_handling (네트워크 실패 처리)
+- **완료된 테스트**: 47개 / 총 100개 (소셜 로그인 제외)
   - Phase 0: 6개 ✅
   - Phase 1: 11개 ✅
   - Phase 1.5 (소셜 로그인 백엔드): SKIP (나중에 구현)
   - Phase 2: 16개 ✅
   - Phase 3: 14/14개 ✅ (기본 인증 완료, 소셜 로그인 SKIP)
   - Phase 4: 17/17개 ✅ (Diary Features 완료)
+  - Phase 5: 1/9개 (통합 테스트 진행 중)
 - **테스트 커버리지**:
-  - Backend: 85.45%
+  - Backend: 85.45% (28개 테스트 통과, 목표 80% 초과 ✅)
   - Mobile: 43개 테스트 통과 (authStore, Auth screens, Diary screens, Map screen with markers)
 
 ---
