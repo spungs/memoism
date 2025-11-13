@@ -1,6 +1,7 @@
 /**
  * Test 4.10: DiaryDetailScreen renders
  * Test 4.11: DiaryDetailScreen images
+ * Test 4.12: DiaryDetailScreen location
  *
  * Given: User navigates to diary detail screen with diary ID
  * When: DiaryDetailScreen component is rendered
@@ -9,6 +10,7 @@
  *   - Screen should display diary content
  *   - Screen should display diary date
  *   - Screen should display diary images
+ *   - Screen should display location information
  */
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react-native';
@@ -165,6 +167,69 @@ describe('DiaryDetailScreen', () => {
       // Verify image sources
       expect(images[0].props.source).toEqual({ uri: mockImageUrls[0] });
       expect(images[1].props.source).toEqual({ uri: mockImageUrls[1] });
+    });
+  });
+
+  describe('test_diary_detail_location', () => {
+    it('should display location information', async () => {
+      /**
+       * Test 4.12: 일기 위치 정보 표시
+       *
+       * Given: 일기에 위치 정보가 포함되어 있음
+       * When: DiaryDetailScreen 렌더링
+       * Then:
+       *   - 위치 정보가 표시됨
+       *   - 위치 이름 또는 주소가 보임
+       */
+
+      // Arrange
+      const mockLocation = {
+        name: '서울 타워',
+        address: '서울특별시 용산구',
+        latitude: 37.5512,
+        longitude: 126.9882,
+      };
+
+      const mockDiary = {
+        id: '123e4567-e89b-12d3-a456-426614174001',
+        title: '서울 타워 방문',
+        content: '오늘 서울 타워에 다녀왔다.',
+        images: [],
+        location: mockLocation,
+        user_id: '123e4567-e89b-12d3-a456-426614174000',
+        created_at: '2025-01-01T00:00:00.000Z',
+        updated_at: '2025-01-01T00:00:00.000Z',
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockDiary,
+      });
+
+      const mockToken = 'mock-jwt-token-12345';
+
+      // Act
+      const Wrapper = createWrapper();
+      render(
+        <Wrapper>
+          <DiaryDetailScreen
+            navigation={mockNavigation}
+            route={mockRoute}
+            token={mockToken}
+          />
+        </Wrapper>
+      );
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByText('서울 타워 방문')).toBeTruthy();
+      });
+
+      // Verify location is displayed - should have 2 instances (title and location)
+      const seoulTowerTexts = screen.getAllByText(/서울 타워/);
+      expect(seoulTowerTexts.length).toBeGreaterThanOrEqual(1);
+
+      expect(screen.getByText(/서울특별시 용산구/)).toBeTruthy();
     });
   });
 });

@@ -74,6 +74,23 @@ export default function DiaryDetailScreen({
             ))}
           </View>
         )}
+
+        {/* Display location if available */}
+        {diary.location && (
+          <View style={styles.locationContainer}>
+            <Text style={styles.locationIcon}>📍</Text>
+            <View style={styles.locationTextContainer}>
+              {diary.location.name && (
+                <Text style={styles.locationName}>{diary.location.name}</Text>
+              )}
+              {diary.location.address && (
+                <Text style={styles.locationAddress}>
+                  {diary.location.address}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -119,6 +136,33 @@ const styles = StyleSheet.create({
     height: 300,
     borderRadius: 12,
     marginBottom: 16,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  locationIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  locationTextContainer: {
+    flex: 1,
+  },
+  locationName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 4,
+  },
+  locationAddress: {
+    fontSize: 14,
+    color: '#8E8E93',
   },
   errorText: {
     fontSize: 17,

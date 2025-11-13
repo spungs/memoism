@@ -181,7 +181,7 @@
 - [x] 4.9 test_diary_list_navigation: 일기 상세로 네비게이션
 - [x] 4.10 test_diary_detail_renders: 일기 상세 화면 렌더링
 - [x] 4.11 test_diary_detail_images: 이미지 표시
-- [ ] 4.12 test_diary_detail_location: 위치 정보 표시
+- [x] 4.12 test_diary_detail_location: 위치 정보 표시
 - [ ] 4.13 test_diary_edit_form: 일기 편집 폼
 - [ ] 4.14 test_diary_edit_image_picker: 이미지 선택
 - [ ] 4.15 test_diary_edit_submission: 편집 제출
