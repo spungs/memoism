@@ -4,6 +4,7 @@
  * Test 4.1: test_use_diaries_query - 일기 목록 조회 훅 테스트
  * Test 4.2: test_use_diaries_query_empty - 빈 목록 처리
  * Test 4.3: test_use_create_diary_mutation - 일기 생성 훅 테스트
+ * Test 4.4: test_use_create_diary_with_images - 이미지 포함 일기 생성
  */
 import React from 'react';
 import { renderHook, waitFor } from '@testing-library/react-native';
@@ -209,6 +210,77 @@ describe('DiaryApi', () => {
             Authorization: `Bearer ${mockToken}`,
             'Content-Type': 'application/json',
           }),
+          body: JSON.stringify(diaryData),
+        })
+      );
+    });
+  });
+
+  describe('test_use_create_diary_with_images', () => {
+    it('should create a diary with images successfully', async () => {
+      /**
+       * Test 4.4: 이미지 포함 일기 생성 성공
+       *
+       * Given: 인증된 사용자
+       * When: useCreateDiary 훅으로 이미지가 포함된 일기 생성 요청
+       * Then:
+       *   - POST /diary 요청에 images 배열이 포함됨
+       *   - 생성된 일기 정보가 반환됨
+       *   - images 필드가 요청한 이미지 URL 배열과 일치
+       */
+
+      // Arrange
+      const mockImageUrls = [
+        'https://example.com/image1.jpg',
+        'https://example.com/image2.jpg',
+      ];
+
+      const mockCreatedDiary = {
+        id: '123e4567-e89b-12d3-a456-426614174001',
+        title: '사진과 함께한 일기',
+        content: '오늘 멋진 풍경을 봤다.',
+        images: mockImageUrls,
+        location: null,
+        user_id: '123e4567-e89b-12d3-a456-426614174000',
+        created_at: '2025-01-01T00:00:00.000Z',
+        updated_at: '2025-01-01T00:00:00.000Z',
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockCreatedDiary,
+      });
+
+      const mockToken = 'mock-jwt-token-12345';
+
+      // Act
+      const Wrapper = createWrapper();
+      const { result } = renderHook(() => useCreateDiary(mockToken), {
+        wrapper: Wrapper,
+      });
+
+      const diaryData = {
+        title: '사진과 함께한 일기',
+        content: '오늘 멋진 풍경을 봤다.',
+        images: mockImageUrls,
+      };
+
+      result.current.mutate(diaryData);
+
+      // Assert
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(result.current.data).toEqual(mockCreatedDiary);
+      expect(result.current.data?.images).toEqual(mockImageUrls);
+      expect(result.current.data?.images).toHaveLength(2);
+
+      // Verify API call includes images
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/diary'),
+        expect.objectContaining({
+          method: 'POST',
           body: JSON.stringify(diaryData),
         })
       );
