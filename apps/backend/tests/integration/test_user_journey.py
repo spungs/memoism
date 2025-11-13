@@ -305,7 +305,8 @@ class TestUserJourney:
         relogin_response = client.post("/auth/login", json=login_data)
         assert relogin_response.status_code == 200
         new_token = relogin_response.json()["access_token"]
-        assert new_token != valid_token  # Should be a different token
+        # Note: Tokens might be identical if created in the same second (JWT exp is in seconds)
+        # What matters is that we can get a new valid token after re-login
 
         # Step 7: Use new token successfully
         new_diary_data = {
@@ -441,3 +442,170 @@ class TestUserJourney:
         assert invalid_email_signup.status_code in [400, 422]
         error_data = invalid_email_signup.json()
         assert "detail" in error_data
+
+    def test_sql_injection_prevention(self, client: TestClient, create_and_login_user):
+        """
+        Test 5.5: API should prevent SQL injection attacks.
+
+        Given: An attacker tries to exploit SQL injection vulnerabilities
+        When: Various SQL injection payloads are submitted through API endpoints
+        Then:
+          - All malicious inputs are safely handled
+          - No SQL injection can occur due to parameterized queries
+          - System remains stable and secure
+          - No data is exposed or manipulated
+          - Error responses do not leak database information
+        """
+        # Setup: Create test user and diary entries
+        auth_data = create_and_login_user(
+            email="sqlinjection@example.com",
+            username="sqlinjectionuser",
+            password="SqlTest123!"
+        )
+        token = auth_data["access_token"]
+
+        # Create a legitimate diary entry for comparison
+        legitimate_diary = {
+            "content": "This is a normal diary entry",
+            "title": "Normal Diary",
+        }
+        create_response = client.post(
+            "/diary",
+            json=legitimate_diary,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert create_response.status_code == 201
+        legitimate_diary_id = create_response.json()["id"]
+
+        # Test 1: SQL injection in email field during login
+        # Attempt: ' OR '1'='1' -- (classic SQL injection)
+        sql_injection_login = {
+            "email": "' OR '1'='1' --",
+            "password": "anything",
+        }
+        login_response = client.post("/auth/login", json=sql_injection_login)
+        # Should fail authentication (not bypass it)
+        # Can be 401 (invalid credentials) or 422 (validation error for invalid email format)
+        assert login_response.status_code in [401, 422]
+        error_data = login_response.json()
+        # Verify error message doesn't leak database info
+        assert "detail" in error_data
+        error_detail = str(error_data.get("detail", ""))
+        assert "SQL" not in error_detail.upper()
+        assert "DATABASE" not in error_detail.upper()
+
+        # Test 2: SQL injection in signup username
+        # Attempt: admin'; DROP TABLE users; --
+        sql_injection_signup = {
+            "email": "hacker@example.com",
+            "username": "admin'; DROP TABLE users; --",
+            "password": "HackerPass123!",
+        }
+        signup_response = client.post("/auth/signup", json=sql_injection_signup)
+        # Should either succeed (storing the malicious string as-is) or fail validation
+        # But NEVER execute the SQL command
+        assert signup_response.status_code in [201, 400, 422]
+
+        # Verify users table still exists by making a valid request
+        verify_login = client.post(
+            "/auth/login",
+            json={
+                "email": "sqlinjection@example.com",
+                "password": "SqlTest123!",
+            },
+        )
+        assert verify_login.status_code == 200  # Should still work
+
+        # Test 3: SQL injection in diary content
+        # Attempt: '; DELETE FROM diaries WHERE '1'='1
+        sql_injection_diary = {
+            "content": "'; DELETE FROM diaries WHERE '1'='1",
+            "title": "SQL Injection Test",
+        }
+        diary_response = client.post(
+            "/diary",
+            json=sql_injection_diary,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        # Should store the content as plain text, not execute it
+        assert diary_response.status_code == 201
+
+        # Verify legitimate diary still exists (wasn't deleted by injection)
+        verify_diary = client.get(
+            f"/diary/{legitimate_diary_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert verify_diary.status_code == 200
+        assert verify_diary.json()["content"] == legitimate_diary["content"]
+
+        # Test 4: SQL injection in diary title
+        # Attempt: ' UNION SELECT * FROM users --
+        union_injection_diary = {
+            "content": "Testing UNION injection",
+            "title": "' UNION SELECT * FROM users --",
+        }
+        union_response = client.post(
+            "/diary",
+            json=union_injection_diary,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert union_response.status_code == 201
+        # Verify the malicious title is stored as plain text
+        created_diary = union_response.json()
+        assert created_diary["title"] == union_injection_diary["title"]
+
+        # Test 5: SQL injection through URL parameters
+        # Attempt to inject through diary_id in GET request
+        malicious_id = "1' OR '1'='1"
+        malicious_get = client.get(
+            f"/diary/{malicious_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        # Should return 422 (validation error) or 404 (not found), not 200
+        assert malicious_get.status_code in [404, 422]
+
+        # Test 6: Boolean-based blind SQL injection
+        # Attempt: 1' AND '1'='1
+        blind_injection = {
+            "email": "test@example.com' AND '1'='1 --",
+            "password": "password",
+        }
+        blind_response = client.post("/auth/login", json=blind_injection)
+        # Should fail with 401 or 422, not succeed
+        assert blind_response.status_code in [401, 422]
+
+        # Test 7: Time-based SQL injection
+        # Attempt: '; WAITFOR DELAY '00:00:05'--
+        time_injection_diary = {
+            "content": "'; WAITFOR DELAY '00:00:05'--",
+            "title": "Time Injection Test",
+        }
+        # This should complete quickly (not wait 5 seconds)
+        import time
+        start_time = time.time()
+        time_response = client.post(
+            "/diary",
+            json=time_injection_diary,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        elapsed_time = time.time() - start_time
+
+        assert time_response.status_code == 201
+        # Request should complete in under 2 seconds (not execute WAITFOR)
+        assert elapsed_time < 2.0
+
+        # Test 8: Verify all legitimate data is still intact
+        final_list = client.get(
+            "/diary",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert final_list.status_code == 200
+        diaries = final_list.json()
+        # Should have at least the legitimate diary we created
+        assert len(diaries) >= 1
+        # Verify legitimate diary content is unchanged
+        legitimate_exists = any(
+            d["id"] == legitimate_diary_id and d["content"] == legitimate_diary["content"]
+            for d in diaries
+        )
+        assert legitimate_exists
