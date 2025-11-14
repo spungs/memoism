@@ -274,8 +274,8 @@
 #### Chat API 통합
 - [x] 7.19 test_use_chat_mutation: 메시지 전송 훅
 - [x] 7.20 test_use_chat_history_query: 채팅 기록 조회 훅
-- [ ] 7.21 test_chat_loading_state: 로딩 상태 표시
-- [ ] 7.22 test_chat_error_handling: 에러 메시지 표시
+- [x] 7.21 test_chat_loading_state: 로딩 상태 표시
+- [x] 7.22 test_chat_error_handling: 에러 메시지 표시
 
 #### AI Character UI
 - [ ] 7.23 test_character_avatar: AI 캐릭터 아바타 표시

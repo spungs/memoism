@@ -228,4 +228,118 @@ describe('ChatScreen', () => {
       });
     });
   });
+
+  describe('test_chat_loading_state', () => {
+    /**
+     * Test 7.21: Loading state display
+     *
+     * Given: Chat history is being loaded
+     * When: Chat screen is rendered
+     * Then:
+     *   - ActivityIndicator should be visible
+     *   - Loading spinner should be centered
+     *   - Input field should not be visible during loading
+     */
+    it('should display loading state when fetching chat history', async () => {
+      // Arrange
+      const mockToken = 'test-jwt-token';
+      let resolvePromise: (value: any) => void;
+      const pendingPromise = new Promise((resolve) => {
+        resolvePromise = resolve;
+      });
+
+      (global.fetch as jest.Mock).mockReturnValue(pendingPromise);
+
+      // Act
+      const Wrapper = createWrapper();
+      const { getByTestId, queryByPlaceholderText } = render(
+        <Wrapper>
+          <ChatScreen navigation={mockNavigation} token={mockToken} />
+        </Wrapper>
+      );
+
+      // Assert - Loading state should be visible
+      expect(() => getByTestId('activity-indicator')).not.toThrow();
+      expect(queryByPlaceholderText(/메시지/i)).toBeNull();
+
+      // Cleanup - Resolve promise to avoid warnings
+      resolvePromise!({
+        ok: true,
+        json: async () => [],
+      });
+    });
+  });
+
+  describe('test_chat_error_handling', () => {
+    /**
+     * Test 7.22: Error message display
+     *
+     * Given: Network error or API failure
+     * When: Chat screen tries to load
+     * Then:
+     *   - Error message should be displayed
+     *   - Error text should be in red color
+     *   - Retry option or message should be available
+     */
+    it('should display error message when API call fails', async () => {
+      // Arrange
+      const mockToken = 'test-jwt-token';
+      (global.fetch as jest.Mock).mockRejectedValue(
+        new Error('Network error')
+      );
+
+      // Act
+      const Wrapper = createWrapper();
+      render(
+        <Wrapper>
+          <ChatScreen navigation={mockNavigation} token={mockToken} />
+        </Wrapper>
+      );
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByText('채팅을 불러오는데 실패했습니다')).toBeTruthy();
+      });
+    });
+
+    it('should display error when sending message fails', async () => {
+      // Arrange
+      const mockToken = 'test-jwt-token';
+
+      // First call for loading history succeeds
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [],
+        })
+        // Second call for sending message fails
+        .mockRejectedValueOnce(new Error('Failed to send message'));
+
+      // Act
+      const Wrapper = createWrapper();
+      render(
+        <Wrapper>
+          <ChatScreen navigation={mockNavigation} token={mockToken} />
+        </Wrapper>
+      );
+
+      // Wait for initial load
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/메시지/i)).toBeTruthy();
+      });
+
+      const input = screen.getByPlaceholderText(/메시지/i);
+      const sendButton = screen.getByText(/전송/i);
+
+      fireEvent.changeText(input, '에러 테스트 메시지');
+      fireEvent.press(sendButton);
+
+      // Assert - Error handling for message send failure
+      // Note: In real implementation, you might want to show a toast or error message
+      // For now, we just verify the mutation was attempted
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
 });

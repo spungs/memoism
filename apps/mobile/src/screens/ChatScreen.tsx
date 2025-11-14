@@ -41,7 +41,11 @@ export default function ChatScreen({ navigation, token }: ChatScreenProps) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator
+            size="large"
+            color="#007AFF"
+            testID="activity-indicator"
+          />
         </View>
       </SafeAreaView>
     );
