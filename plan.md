@@ -266,10 +266,10 @@
 ### Mobile - AI Chat UI
 
 #### Chat 화면 및 상태 관리
-- [ ] 7.15 test_chat_screen_renders: 채팅 화면 렌더링
-- [ ] 7.16 test_chat_input_field: 메시지 입력 필드 동작
-- [ ] 7.17 test_send_message_button: 메시지 전송 버튼
-- [ ] 7.18 test_chat_message_display: 메시지 말풍선 표시 (사용자/AI 구분)
+- [x] 7.15 test_chat_screen_renders: 채팅 화면 렌더링
+- [x] 7.16 test_chat_input_field: 메시지 입력 필드 동작
+- [x] 7.17 test_send_message_button: 메시지 전송 버튼
+- [x] 7.18 test_chat_message_display: 메시지 말풍선 표시 (사용자/AI 구분)
 
 #### Chat API 통합
 - [x] 7.19 test_use_chat_mutation: 메시지 전송 훅
