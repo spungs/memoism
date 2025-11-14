@@ -1,0 +1,57 @@
+/**
+ * Chat API hooks using React Query
+ */
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { API_URL } from '../config/api';
+
+interface SendMessageRequest {
+  content: string;
+}
+
+interface ChatMessageResponse {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: string;
+}
+
+export const useSendMessage = (token: string) => {
+  return useMutation({
+    mutationFn: async (data: SendMessageRequest): Promise<ChatMessageResponse> => {
+      const response = await fetch(`${API_URL}/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send message');
+      }
+
+      return response.json();
+    },
+  });
+};
+
+export const useChatHistory = (token: string) => {
+  return useQuery({
+    queryKey: ['chat-history'],
+    queryFn: async (): Promise<ChatMessageResponse[]> => {
+      const response = await fetch(`${API_URL}/chat`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch chat history');
+      }
+
+      return response.json();
+    },
+  });
+};

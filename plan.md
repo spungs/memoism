@@ -247,21 +247,21 @@
 - [x] 7.3 test_get_chat_history: 채팅 기록 조회 (페이지네이션)
 - [x] 7.4 test_chat_unauthorized: 인증 없이 채팅 접근 실패
 
-#### OpenAI API 통합
-- [ ] 7.5 test_openai_api_connection: OpenAI API 연결 성공
-- [ ] 7.6 test_openai_simple_response: 단순 질문에 AI 응답
-- [ ] 7.7 test_openai_api_error_handling: OpenAI API 에러 처리
+#### OpenAI API 통합 (SKIP - 비용 발생으로 나중에 구현)
+- [-] 7.5 test_openai_api_connection: OpenAI API 연결 성공
+- [-] 7.6 test_openai_simple_response: 단순 질문에 AI 응답
+- [-] 7.7 test_openai_api_error_handling: OpenAI API 에러 처리
 
-#### RAG (Retrieval-Augmented Generation)
-- [ ] 7.8 test_diary_context_retrieval: 사용자 일기 검색 (키워드 기반)
-- [ ] 7.9 test_chat_with_diary_context: 일기 내용 기반 AI 응답
-- [ ] 7.10 test_relevant_diary_selection: 관련 일기만 컨텍스트에 포함
-- [ ] 7.11 test_chat_without_diaries: 일기가 없을 때 AI 응답
+#### RAG (Retrieval-Augmented Generation) (SKIP - OpenAI 통합 후 구현)
+- [-] 7.8 test_diary_context_retrieval: 사용자 일기 검색 (키워드 기반)
+- [-] 7.9 test_chat_with_diary_context: 일기 내용 기반 AI 응답
+- [-] 7.10 test_relevant_diary_selection: 관련 일기만 컨텍스트에 포함
+- [-] 7.11 test_chat_without_diaries: 일기가 없을 때 AI 응답
 
-#### Subscription 체크
-- [ ] 7.12 test_chat_with_active_subscription: 구독자 채팅 허용
-- [ ] 7.13 test_chat_without_subscription: 비구독자 채팅 차단 (30일 체험 후)
-- [ ] 7.14 test_free_trial_chat: 30일 무료 체험 사용자 채팅 허용
+#### Subscription 체크 (SKIP - 나중에 구현)
+- [-] 7.12 test_chat_with_active_subscription: 구독자 채팅 허용
+- [-] 7.13 test_chat_without_subscription: 비구독자 채팅 차단 (30일 체험 후)
+- [-] 7.14 test_free_trial_chat: 30일 무료 체험 사용자 채팅 허용
 
 ### Mobile - AI Chat UI
 
@@ -272,8 +272,8 @@
 - [ ] 7.18 test_chat_message_display: 메시지 말풍선 표시 (사용자/AI 구분)
 
 #### Chat API 통합
-- [ ] 7.19 test_use_chat_mutation: 메시지 전송 훅
-- [ ] 7.20 test_use_chat_history_query: 채팅 기록 조회 훅
+- [x] 7.19 test_use_chat_mutation: 메시지 전송 훅
+- [x] 7.20 test_use_chat_history_query: 채팅 기록 조회 훅
 - [ ] 7.21 test_chat_loading_state: 로딩 상태 표시
 - [ ] 7.22 test_chat_error_handling: 에러 메시지 표시
 
@@ -285,8 +285,8 @@
 
 ### 리팩토링 (Tidy First)
 
-- [ ] 7.R1 OpenAI API 클라이언트 유틸리티 분리
-- [ ] 7.R2 일기 검색 로직 최적화
+- [-] 7.R1 OpenAI API 클라이언트 유틸리티 분리 (SKIP)
+- [-] 7.R2 일기 검색 로직 최적화 (SKIP)
 - [ ] 7.R3 채팅 컴포넌트 재사용성 개선
 - [ ] 7.R4 에러 메시지 일관성 개선
 
