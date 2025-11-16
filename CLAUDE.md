@@ -4,6 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **IMPORTANT: Always follow the instructions in [plan.md](plan.md). When I say "go", find the next unmarked test in plan.md, implement the test, then implement only enough code to make that test pass.**
 
+**IMPORTANT: When updating plan.md checkbox status, use the following format:**
+- `[ ]` : Tasks not yet started
+- `[✅]` : Completed tasks (NOT `[x]`)
+- `[🛑]` : Tasks to be skipped/implemented later (NOT `[-]`)
+
 **IMPORTANT: Always respond in Korean (한국어). All explanations, summaries, and communications with the user should be in Korean.**
 
 ---
