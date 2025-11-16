@@ -4,14 +4,12 @@ on:
   push:
     branches:
       - main
-      - tdd-rewrite
     paths:
       - 'apps/backend/**'
       - '.github/workflows/backend-ci.yml'
   pull_request:
     branches:
       - main
-      - tdd-rewrite
     paths:
       - 'apps/backend/**'
       - '.github/workflows/backend-ci.yml'
