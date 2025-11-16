@@ -2,7 +2,7 @@
  * Authentication API hooks using React Query
  */
 import { useMutation } from '@tanstack/react-query';
-import { API_URL } from '../config/api';
+import { apiFetch } from '../utils/apiClient';
 
 interface SignupRequest {
   email: string;
@@ -28,42 +28,14 @@ interface LoginResponse {
 
 export const useSignup = () => {
   return useMutation({
-    mutationFn: async (data: SignupRequest): Promise<UserResponse> => {
-      const response = await fetch(`${API_URL}/auth/signup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Signup failed');
-      }
-
-      return response.json();
-    },
+    mutationFn: (data: SignupRequest) =>
+      apiFetch<UserResponse>('/auth/signup', { method: 'POST', body: data }),
   });
 };
 
 export const useLogin = () => {
   return useMutation({
-    mutationFn: async (data: LoginRequest): Promise<LoginResponse> => {
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Login failed');
-      }
-
-      return response.json();
-    },
+    mutationFn: (data: LoginRequest) =>
+      apiFetch<LoginResponse>('/auth/login', { method: 'POST', body: data }),
   });
 };

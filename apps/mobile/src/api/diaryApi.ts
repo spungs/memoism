@@ -2,7 +2,7 @@
  * Diary API hooks using React Query
  */
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { API_URL } from '../config/api';
+import { apiFetch } from '../utils/apiClient';
 
 interface DiaryResponse {
   id: string;
@@ -33,106 +33,40 @@ interface UpdateDiaryRequest {
 export const useDiariesQuery = (token: string) => {
   return useQuery({
     queryKey: ['diaries'],
-    queryFn: async (): Promise<DiaryResponse[]> => {
-      const response = await fetch(`${API_URL}/diary`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to fetch diaries');
-      }
-
-      return response.json();
-    },
+    queryFn: () => apiFetch<DiaryResponse[]>('/diary', { token }),
   });
 };
 
 export const useCreateDiary = (token: string) => {
   return useMutation({
-    mutationFn: async (data: CreateDiaryRequest): Promise<DiaryResponse> => {
-      const response = await fetch(`${API_URL}/diary`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to create diary');
-      }
-
-      return response.json();
-    },
+    mutationFn: (data: CreateDiaryRequest) =>
+      apiFetch<DiaryResponse>('/diary', { method: 'POST', token, body: data }),
   });
 };
 
 export const useUpdateDiary = (token: string) => {
   return useMutation({
-    mutationFn: async (data: UpdateDiaryRequest): Promise<DiaryResponse> => {
+    mutationFn: (data: UpdateDiaryRequest) => {
       const { id, ...updateData } = data;
-      const response = await fetch(`${API_URL}/diary/${id}`, {
+      return apiFetch<DiaryResponse>(`/diary/${id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(updateData),
+        token,
+        body: updateData,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to update diary');
-      }
-
-      return response.json();
     },
   });
 };
 
 export const useDeleteDiary = (token: string) => {
   return useMutation({
-    mutationFn: async (id: string): Promise<void> => {
-      const response = await fetch(`${API_URL}/diary/${id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to delete diary');
-      }
-    },
+    mutationFn: (id: string) =>
+      apiFetch<void>(`/diary/${id}`, { method: 'DELETE', token }),
   });
 };
 
 export const useDiaryDetail = (token: string, diaryId: string) => {
   return useQuery({
     queryKey: ['diary', diaryId],
-    queryFn: async (): Promise<DiaryResponse> => {
-      const response = await fetch(`${API_URL}/diary/${diaryId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to fetch diary detail');
-      }
-
-      return response.json();
-    },
+    queryFn: () => apiFetch<DiaryResponse>(`/diary/${diaryId}`, { token }),
   });
 };
