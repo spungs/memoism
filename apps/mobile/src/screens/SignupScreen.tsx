@@ -8,6 +8,11 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useSignup } from '../api/authApi';
+import {
+  validateEmail as validateEmailUtil,
+  validatePassword as validatePasswordUtil,
+  validateUsername as validateUsernameUtil,
+} from '../utils/validation';
 
 interface SignupScreenProps {
   navigation: any;
@@ -24,50 +29,18 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
 
   const signupMutation = useSignup();
 
-  const validateEmail = (email: string): boolean => {
-    if (!email) {
-      setEmailError('이메일을 입력해주세요');
-      return false;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setEmailError('올바른 이메일 형식이 아닙니다');
-      return false;
-    }
-    setEmailError('');
-    return true;
-  };
-
-  const validateUsername = (username: string): boolean => {
-    if (!username) {
-      setUsernameError('사용자명을 입력해주세요');
-      return false;
-    }
-    if (username.length < 3) {
-      setUsernameError('사용자명은 최소 3자 이상이어야 합니다');
-      return false;
-    }
-    setUsernameError('');
-    return true;
-  };
-
-  const validatePassword = (password: string): boolean => {
-    if (!password) {
-      setPasswordError('비밀번호를 입력해주세요');
-      return false;
-    }
-    if (password.length < 6) {
-      setPasswordError('비밀번호는 최소 6자 이상이어야 합니다');
-      return false;
-    }
-    setPasswordError('');
-    return true;
-  };
-
   const handleSubmit = () => {
-    const isEmailValid = validateEmail(email);
-    const isUsernameValid = validateUsername(username);
-    const isPasswordValid = validatePassword(password);
+    const emailResult = validateEmailUtil(email);
+    const usernameResult = validateUsernameUtil(username);
+    const passwordResult = validatePasswordUtil(password);
+
+    setEmailError(emailResult.errorMessage);
+    setUsernameError(usernameResult.errorMessage);
+    setPasswordError(passwordResult.errorMessage);
+
+    const isEmailValid = emailResult.isValid;
+    const isUsernameValid = usernameResult.isValid;
+    const isPasswordValid = passwordResult.isValid;
 
     if (isEmailValid && isUsernameValid && isPasswordValid) {
       setServerError('');
