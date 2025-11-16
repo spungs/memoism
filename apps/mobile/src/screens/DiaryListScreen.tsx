@@ -4,11 +4,13 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  ActivityIndicator,
   FlatList,
   TouchableOpacity,
 } from 'react-native';
 import { useDiariesQuery } from '../api/diaryApi';
+import LoadingScreen from '../components/LoadingScreen';
+import ErrorScreen from '../components/ErrorScreen';
+import EmptyState from '../components/EmptyState';
 
 interface DiaryListScreenProps {
   navigation: any;
@@ -22,34 +24,16 @@ export default function DiaryListScreen({
   const { data: diaries, isLoading, isError } = useDiariesQuery(token);
 
   if (isLoading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#007AFF" />
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen />;
   }
 
   if (isError) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>일기를 불러오는데 실패했습니다</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <ErrorScreen message="일기를 불러오는데 실패했습니다" />;
   }
 
   // Empty state
   if (!diaries || diaries.length === 0) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centered}>
-          <Text style={styles.emptyText}>작성된 일기가 없습니다</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <EmptyState message="작성된 일기가 없습니다" />;
   }
 
   // List of diaries
@@ -95,11 +79,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 16,
   },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   title: {
     fontSize: 34,
     fontWeight: 'bold',
@@ -132,15 +111,5 @@ const styles = StyleSheet.create({
   diaryDate: {
     fontSize: 13,
     color: '#8E8E93',
-  },
-  emptyText: {
-    fontSize: 17,
-    color: '#8E8E93',
-    textAlign: 'center',
-  },
-  errorText: {
-    fontSize: 17,
-    color: '#FF3B30',
-    textAlign: 'center',
   },
 });

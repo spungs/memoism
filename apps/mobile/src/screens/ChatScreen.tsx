@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   SafeAreaView,
-  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -14,6 +12,8 @@ import AiCharacter from '../components/AiCharacter';
 import MessageBubble from '../components/MessageBubble';
 import ChatInput from '../components/ChatInput';
 import TypingIndicator from '../components/TypingIndicator';
+import LoadingScreen from '../components/LoadingScreen';
+import ErrorScreen from '../components/ErrorScreen';
 import { ERROR_MESSAGES } from '../constants/errorMessages';
 
 interface ChatScreenProps {
@@ -51,27 +51,11 @@ export default function ChatScreen({ navigation, token }: ChatScreenProps) {
   };
 
   if (isLoading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centered}>
-          <ActivityIndicator
-            size="large"
-            color="#007AFF"
-            testID="activity-indicator"
-          />
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen testID="activity-indicator" />;
   }
 
   if (isError) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>{ERROR_MESSAGES.CHAT_FETCH_ERROR}</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <ErrorScreen message={ERROR_MESSAGES.CHAT_FETCH_ERROR} />;
   }
 
   return (
@@ -140,15 +124,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#FF3B30',
   },
   messageList: {
     paddingHorizontal: 16,
