@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { useChatHistory, useSendMessage } from '../api/chatApi';
+import AiCharacter from '../components/AiCharacter';
 
 interface ChatScreenProps {
   navigation: any;
@@ -20,6 +21,8 @@ interface ChatScreenProps {
 
 export default function ChatScreen({ navigation, token }: ChatScreenProps) {
   const [message, setMessage] = useState('');
+  const [isAiTyping, setIsAiTyping] = useState(false);
+  const characterCreatedAt = new Date('2025-01-01'); // AI 캐릭터 생성 날짜
 
   const { data: messages, isLoading, isError } = useChatHistory(token);
   const sendMessageMutation = useSendMessage(token);
@@ -27,11 +30,19 @@ export default function ChatScreen({ navigation, token }: ChatScreenProps) {
   const handleSendMessage = () => {
     if (message.trim() === '') return;
 
+    // Show typing indicator while waiting for response
+    setIsAiTyping(true);
+
     sendMessageMutation.mutate(
       { content: message },
       {
         onSuccess: () => {
           setMessage('');
+          // Hide typing indicator after a delay (simulating AI response)
+          setTimeout(() => setIsAiTyping(false), 1500);
+        },
+        onError: () => {
+          setIsAiTyping(false);
         },
       }
     );
@@ -80,6 +91,17 @@ export default function ChatScreen({ navigation, token }: ChatScreenProps) {
                     : styles.assistantMessageContainer,
                 ]}
               >
+                {/* AI Character Avatar for assistant messages */}
+                {item.role === 'assistant' && (
+                  <View style={styles.avatarContainer}>
+                    <AiCharacter
+                      status="idle"
+                      size="small"
+                      createdAt={characterCreatedAt}
+                    />
+                  </View>
+                )}
+
                 <View
                   style={[
                     styles.messageBubble,
@@ -104,6 +126,22 @@ export default function ChatScreen({ navigation, token }: ChatScreenProps) {
             contentContainerStyle={styles.messageList}
             inverted={false}
           />
+
+          {/* AI Typing Indicator */}
+          {isAiTyping && (
+            <View style={styles.typingIndicatorContainer}>
+              <View style={styles.avatarContainer}>
+                <AiCharacter
+                  status="typing"
+                  size="small"
+                  createdAt={characterCreatedAt}
+                />
+              </View>
+              <View style={styles.assistantMessageBubble}>
+                <Text style={styles.assistantMessageText}>입력 중...</Text>
+              </View>
+            </View>
+          )}
         </View>
 
         <View style={styles.inputContainer}>
@@ -158,6 +196,7 @@ const styles = StyleSheet.create({
   },
   assistantMessageContainer: {
     alignItems: 'flex-start',
+    flexDirection: 'row',
   },
   messageBubble: {
     maxWidth: '80%',
@@ -208,5 +247,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  avatarContainer: {
+    marginRight: 8,
+  },
+  typingIndicatorContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
 });

@@ -278,10 +278,10 @@
 - [x] 7.22 test_chat_error_handling: 에러 메시지 표시
 
 #### AI Character UI
-- [ ] 7.23 test_character_avatar: AI 캐릭터 아바타 표시
-- [ ] 7.24 test_character_typing_indicator: 입력 중 표시 (...)
-- [ ] 7.25 test_character_sleep_state: 구독 없을 때 잠자는 상태 (Zzz)
-- [ ] 7.26 test_character_age_display: 캐릭터 나이 표시
+- [x] 7.23 test_character_avatar: AI 캐릭터 아바타 표시
+- [x] 7.24 test_character_typing_indicator: 입력 중 표시 (...)
+- [x] 7.25 test_character_sleep_state: 구독 없을 때 잠자는 상태 (Zzz)
+- [x] 7.26 test_character_age_display: 캐릭터 나이 표시
 
 ### 리팩토링 (Tidy First)
 
