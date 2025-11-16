@@ -3,17 +3,7 @@
  */
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { API_URL } from '../config/api';
-
-interface SendMessageRequest {
-  content: string;
-}
-
-interface ChatMessageResponse {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  created_at: string;
-}
+import { ChatMessageResponse, SendMessageRequest } from '../types/chat';
 
 export const useSendMessage = (token: string) => {
   return useMutation({
