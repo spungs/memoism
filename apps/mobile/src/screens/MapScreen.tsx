@@ -7,9 +7,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useDiariesQuery } from '../api/diaryApi';
+import { MapScreenNavigationProp } from '../types/navigation';
 
 interface MapScreenProps {
-  navigation: any;
+  navigation: MapScreenNavigationProp;
   token: string;
 }
 

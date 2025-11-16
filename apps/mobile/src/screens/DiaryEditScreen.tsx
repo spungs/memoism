@@ -13,14 +13,14 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { useDiaryDetail, useUpdateDiary } from '../api/diaryApi';
 import { ERROR_MESSAGES } from '../constants/errorMessages';
+import {
+  DiaryEditScreenNavigationProp,
+  DiaryEditScreenRouteProp,
+} from '../types/navigation';
 
 interface DiaryEditScreenProps {
-  navigation: any;
-  route: {
-    params: {
-      diaryId: string;
-    };
-  };
+  navigation: DiaryEditScreenNavigationProp;
+  route: DiaryEditScreenRouteProp;
   token: string;
 }
 

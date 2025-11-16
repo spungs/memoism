@@ -9,14 +9,14 @@ import {
   Image,
 } from 'react-native';
 import { useDiaryDetail } from '../api/diaryApi';
+import {
+  DiaryDetailScreenNavigationProp,
+  DiaryDetailScreenRouteProp,
+} from '../types/navigation';
 
 interface DiaryDetailScreenProps {
-  navigation: any;
-  route: {
-    params: {
-      diaryId: string;
-    };
-  };
+  navigation: DiaryDetailScreenNavigationProp;
+  route: DiaryDetailScreenRouteProp;
   token: string;
 }
 

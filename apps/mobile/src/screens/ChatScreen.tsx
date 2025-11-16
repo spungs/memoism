@@ -15,9 +15,10 @@ import TypingIndicator from '../components/TypingIndicator';
 import LoadingScreen from '../components/LoadingScreen';
 import ErrorScreen from '../components/ErrorScreen';
 import { ERROR_MESSAGES } from '../constants/errorMessages';
+import { ChatScreenNavigationProp } from '../types/navigation';
 
 interface ChatScreenProps {
-  navigation: any;
+  navigation: ChatScreenNavigationProp;
   token: string;
 }
 

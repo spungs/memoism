@@ -2,12 +2,7 @@
  * Authentication store using Zustand
  */
 import { create } from 'zustand';
-
-interface User {
-  id: string;
-  email: string;
-  username: string;
-}
+import { User } from '../types/user';
 
 interface AuthState {
   token: string | null;

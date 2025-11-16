@@ -12,9 +12,10 @@ import { validateEmail as validateEmailUtil, validatePassword as validatePasswor
 import FormInput from '../components/FormInput';
 import PrimaryButton from '../components/PrimaryButton';
 import ErrorMessage from '../components/ErrorMessage';
+import { LoginScreenNavigationProp } from '../types/navigation';
 
 interface LoginScreenProps {
-  navigation: any;
+  navigation: LoginScreenNavigationProp;
 }
 
 export default function LoginScreen({ navigation }: LoginScreenProps) {

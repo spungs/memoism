@@ -15,9 +15,10 @@ import {
 import FormInput from '../components/FormInput';
 import PrimaryButton from '../components/PrimaryButton';
 import ErrorMessage from '../components/ErrorMessage';
+import { SignupScreenNavigationProp } from '../types/navigation';
 
 interface SignupScreenProps {
-  navigation: any;
+  navigation: SignupScreenNavigationProp;
 }
 
 export default function SignupScreen({ navigation }: SignupScreenProps) {

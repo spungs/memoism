@@ -11,9 +11,10 @@ import { useDiariesQuery } from '../api/diaryApi';
 import LoadingScreen from '../components/LoadingScreen';
 import ErrorScreen from '../components/ErrorScreen';
 import EmptyState from '../components/EmptyState';
+import { DiaryListScreenNavigationProp } from '../types/navigation';
 
 interface DiaryListScreenProps {
-  navigation: any;
+  navigation: DiaryListScreenNavigationProp;
   token: string;
 }
 
