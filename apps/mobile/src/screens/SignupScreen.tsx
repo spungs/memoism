@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
@@ -13,6 +12,9 @@ import {
   validatePassword as validatePasswordUtil,
   validateUsername as validateUsernameUtil,
 } from '../utils/validation';
+import FormInput from '../components/FormInput';
+import PrimaryButton from '../components/PrimaryButton';
+import ErrorMessage from '../components/ErrorMessage';
 
 interface SignupScreenProps {
   navigation: any;
@@ -63,35 +65,28 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>회원가입</Text>
-        <TextInput
-          style={styles.input}
+        <FormInput
           placeholder="이메일"
           value={email}
           onChangeText={setEmail}
-          autoCapitalize="none"
           keyboardType="email-address"
         />
-        {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
-        <TextInput
-          style={styles.input}
+        <ErrorMessage message={emailError} />
+        <FormInput
           placeholder="사용자명"
           value={username}
           onChangeText={setUsername}
-          autoCapitalize="none"
         />
-        {usernameError ? <Text style={styles.errorText}>{usernameError}</Text> : null}
-        <TextInput
-          style={styles.input}
+        <ErrorMessage message={usernameError} />
+        <FormInput
           placeholder="비밀번호"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
         />
-        {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
-        {serverError ? <Text style={styles.serverErrorText}>{serverError}</Text> : null}
-        <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-          <Text style={styles.buttonText}>회원가입</Text>
-        </TouchableOpacity>
+        <ErrorMessage message={passwordError} />
+        <ErrorMessage message={serverError} variant="server" />
+        <PrimaryButton title="회원가입" onPress={handleSubmit} />
         <TouchableOpacity onPress={() => navigation.navigate('AuthLogin')}>
           <Text style={styles.link}>이미 계정이 있으신가요? 로그인</Text>
         </TouchableOpacity>
@@ -116,47 +111,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#000',
   },
-  input: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
-    fontSize: 17,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 17,
-    fontWeight: '600',
-  },
   link: {
     color: '#007AFF',
     textAlign: 'center',
     fontSize: 15,
-  },
-  errorText: {
-    color: '#FF3B30',
-    fontSize: 14,
-    marginTop: -12,
-    marginBottom: 16,
-    marginLeft: 4,
-  },
-  serverErrorText: {
-    color: '#FF3B30',
-    fontSize: 15,
-    marginBottom: 16,
-    padding: 12,
-    backgroundColor: '#FFE5E5',
-    borderRadius: 8,
-    textAlign: 'center',
   },
 });
