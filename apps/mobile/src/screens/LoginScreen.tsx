@@ -19,6 +19,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [serverError, setServerError] = useState('');
 
   const { setToken, setUser } = useAuthStore();
   const loginMutation = useLogin();
@@ -55,12 +56,16 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
     const isPasswordValid = validatePassword(password);
 
     if (isEmailValid && isPasswordValid) {
+      setServerError('');
       loginMutation.mutate(
         { email, password },
         {
           onSuccess: (data) => {
             setToken(data.access_token);
             setUser(data.user);
+          },
+          onError: (error) => {
+            setServerError(error.message);
           },
         }
       );
@@ -88,6 +93,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           secureTextEntry
         />
         {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+        {serverError ? <Text style={styles.serverErrorText}>{serverError}</Text> : null}
         <TouchableOpacity style={styles.button} onPress={handleSubmit}>
           <Text style={styles.buttonText}>로그인</Text>
         </TouchableOpacity>
@@ -148,5 +154,14 @@ const styles = StyleSheet.create({
     marginTop: -12,
     marginBottom: 16,
     marginLeft: 4,
+  },
+  serverErrorText: {
+    color: '#FF3B30',
+    fontSize: 15,
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#FFE5E5',
+    borderRadius: 8,
+    textAlign: 'center',
   },
 });

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useDiaryDetail, useUpdateDiary } from '../api/diaryApi';
+import { ERROR_MESSAGES } from '../constants/errorMessages';
 
 interface DiaryEditScreenProps {
   navigation: any;
@@ -86,7 +87,7 @@ export default function DiaryEditScreen({
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centered}>
-          <Text style={styles.errorText}>일기를 불러오는데 실패했습니다</Text>
+          <Text style={styles.errorText}>{ERROR_MESSAGES.DIARY_FETCH_ERROR}</Text>
         </View>
       </SafeAreaView>
     );

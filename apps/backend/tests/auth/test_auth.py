@@ -75,8 +75,8 @@ class TestAuthentication:
 
         error_data = second_response.json()
         assert "detail" in error_data
-        assert "email" in error_data["detail"].lower()
-        assert "already" in error_data["detail"].lower()
+        assert "이메일" in error_data["detail"]
+        assert "등록" in error_data["detail"]
 
     def test_signup_invalid_email(self, client: TestClient):
         """
@@ -278,7 +278,7 @@ class TestAuthentication:
 
         error_data = response.json()
         assert "detail" in error_data, "Response should contain error detail"
-        assert "incorrect" in error_data["detail"].lower(), \
+        assert "올바르지" in error_data["detail"], \
             f"Error message should indicate incorrect credentials, got: {error_data['detail']}"
 
     def test_login_invalid_password(self, client: TestClient, create_user):
@@ -314,7 +314,7 @@ class TestAuthentication:
 
         error_data = response.json()
         assert "detail" in error_data, "Response should contain error detail"
-        assert "incorrect" in error_data["detail"].lower(), \
+        assert "올바르지" in error_data["detail"], \
             f"Error message should indicate incorrect credentials, got: {error_data['detail']}"
 
     def test_token_validation(self, create_and_login_user, jwt_settings):

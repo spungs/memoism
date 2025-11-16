@@ -43,7 +43,8 @@ export const useDiariesQuery = (token: string) => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch diaries');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to fetch diaries');
       }
 
       return response.json();
@@ -64,7 +65,8 @@ export const useCreateDiary = (token: string) => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create diary');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to create diary');
       }
 
       return response.json();
@@ -86,7 +88,8 @@ export const useUpdateDiary = (token: string) => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update diary');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to update diary');
       }
 
       return response.json();
@@ -105,7 +108,8 @@ export const useDeleteDiary = (token: string) => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete diary');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to delete diary');
       }
     },
   });
@@ -124,7 +128,8 @@ export const useDiaryDetail = (token: string, diaryId: string) => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch diary detail');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to fetch diary detail');
       }
 
       return response.json();

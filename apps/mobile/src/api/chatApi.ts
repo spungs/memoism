@@ -18,7 +18,8 @@ export const useSendMessage = (token: string) => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send message');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to send message');
       }
 
       return response.json();
@@ -38,7 +39,8 @@ export const useChatHistory = (token: string) => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch chat history');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to fetch chat history');
       }
 
       return response.json();

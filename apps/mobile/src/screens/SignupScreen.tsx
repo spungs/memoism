@@ -20,6 +20,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
   const [emailError, setEmailError] = useState('');
   const [usernameError, setUsernameError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [serverError, setServerError] = useState('');
 
   const signupMutation = useSignup();
 
@@ -69,12 +70,16 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
     const isPasswordValid = validatePassword(password);
 
     if (isEmailValid && isUsernameValid && isPasswordValid) {
+      setServerError('');
       signupMutation.mutate(
         { email, username, password },
         {
           onSuccess: () => {
             // Navigate to login screen after successful signup
             navigation.navigate('AuthLogin');
+          },
+          onError: (error) => {
+            setServerError(error.message);
           },
         }
       );
@@ -110,6 +115,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           secureTextEntry
         />
         {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+        {serverError ? <Text style={styles.serverErrorText}>{serverError}</Text> : null}
         <TouchableOpacity style={styles.button} onPress={handleSubmit}>
           <Text style={styles.buttonText}>회원가입</Text>
         </TouchableOpacity>
@@ -170,5 +176,14 @@ const styles = StyleSheet.create({
     marginTop: -12,
     marginBottom: 16,
     marginLeft: 4,
+  },
+  serverErrorText: {
+    color: '#FF3B30',
+    fontSize: 15,
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#FFE5E5',
+    borderRadius: 8,
+    textAlign: 'center',
   },
 });

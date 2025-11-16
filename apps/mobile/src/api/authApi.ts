@@ -38,7 +38,8 @@ export const useSignup = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Signup failed');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Signup failed');
       }
 
       return response.json();
@@ -58,7 +59,8 @@ export const useLogin = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Login failed');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Login failed');
       }
 
       return response.json();

@@ -14,6 +14,7 @@ import AiCharacter from '../components/AiCharacter';
 import MessageBubble from '../components/MessageBubble';
 import ChatInput from '../components/ChatInput';
 import TypingIndicator from '../components/TypingIndicator';
+import { ERROR_MESSAGES } from '../constants/errorMessages';
 
 interface ChatScreenProps {
   navigation: any;
@@ -67,7 +68,7 @@ export default function ChatScreen({ navigation, token }: ChatScreenProps) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centered}>
-          <Text style={styles.errorText}>채팅을 불러오는데 실패했습니다</Text>
+          <Text style={styles.errorText}>{ERROR_MESSAGES.CHAT_FETCH_ERROR}</Text>
         </View>
       </SafeAreaView>
     );

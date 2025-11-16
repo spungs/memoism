@@ -498,7 +498,7 @@ class TestDiary:
         assert response.status_code == 404
         data = response.json()
         assert "detail" in data
-        assert "not found" in data["detail"].lower()
+        assert "찾을 수" in data["detail"]
 
     def test_update_diary(self, client: TestClient, create_and_login_user):
         """
@@ -613,7 +613,7 @@ class TestDiary:
         assert response.status_code == 404
         data = response.json()
         assert "detail" in data
-        assert "not found" in data["detail"].lower()
+        assert "찾을 수" in data["detail"]
 
         # Verify User A's diary remains unchanged
         verify_response = client.get(f"/diary/{diary_id}", headers=headers_a)
@@ -716,7 +716,7 @@ class TestDiary:
         assert response.status_code == 404
         data = response.json()
         assert "detail" in data
-        assert "not found" in data["detail"].lower()
+        assert "찾을 수" in data["detail"]
 
         # Verify User A's diary still exists
         verify_response = client.get(f"/diary/{diary_id}", headers=headers_a)
@@ -775,7 +775,7 @@ class TestDiary:
         assert response.status_code == 404
         data = response.json()
         assert "detail" in data
-        assert "not found" in data["detail"].lower()
+        assert "찾을 수" in data["detail"]
 
         # Verify User A can still access their own diary
         verify_response = client.get(f"/diary/{diary_id}", headers=headers_a)
