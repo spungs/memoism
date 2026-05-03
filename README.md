@@ -16,7 +16,7 @@ Memoism is a **mobile‐first diary application** that pairs every user with a v
 | US‑04 | Character Sleep | non‑subscriber | the character to appear asleep                                  | monetisation is visually reinforced |
 | US‑05 | Shop – Coins    | user           | to buy app‑coins (1 coin = ₩100) via IAP                        | I can purchase outfits              |
 | US‑06 | Outfit Change   | user           | to dress my character or revert its age                         | personalisation & revenue           |
-| US‑07 | Diary Share     | user           | to share a diary publicly with comments & reactions             | social engagement                   |
+| US‑07 | Diary Share     | user           | to export a diary as an image or text card and share it to external SNS (KakaoTalk, Instagram, etc.) | spread memories beyond the app      |
 
 ---
 
@@ -44,10 +44,11 @@ Memoism is a **mobile‐first diary application** that pairs every user with a v
 * Packages: 100 c (₩9,900), 550 c (₩52,000), 1,200 c (₩99,000).
 * Outfits & age‑revert items priced in coins; content list pulled from backend.
 
-### 3.5 Diary Sharing
+### 3.5 Diary Sharing (External)
 
-* Public link: `/u/{username}/d/{id}`.
-* Comment & reaction (❤️ 👍 😢). Negative users managed via blacklist.
+* Convert a diary entry into a shareable **image card** or **text card**.
+* Use the OS share sheet to send the card to external SNS apps (KakaoTalk, Instagram, X, etc.).
+* No in‑app social features (no public links, comments, reactions, or follower graph).
 
 ---
 
@@ -174,7 +175,7 @@ Memoism은 **모바일 우선 일기 애플리케이션**으로, 사용자마다
 | US‑04 | 캐릭터 수면   | 미구독자   | 캐릭터가 자는 모습 표시          | 수익 모델 시각화 |
 | US‑05 | 상점 – 코인  | 사용자    | IAP로 코인 구매(1코인 = ₩100) | 의상 구매     |
 | US‑06 | 의상/나이 변경 | 사용자    | 캐릭터 의상 교체·나이 되돌리기      | 개인화·매출    |
-| US‑07 | 일기 공유    | 사용자    | 댓글·리액션 가능한 공개 링크 공유    | 소셜 참여     |
+| US‑07 | 일기 공유    | 사용자    | 일기를 이미지·텍스트 카드로 만들어 카카오톡·인스타그램 등 외부 SNS에 공유 | 앱 밖으로 추억 확산 |
 
 ---
 
@@ -202,10 +203,11 @@ Memoism은 **모바일 우선 일기 애플리케이션**으로, 사용자마다
 * 패키지: 100c(₩9,900), 550c(₩52,000), 1,200c(₩99,000)
 * 의상·나이 되돌리기 항목은 코인 결제, 목록은 백엔드에서 수신
 
-### 3.5 일기 공유
+### 3.5 일기 공유 (외부 SNS)
 
-* 공개 링크: `/u/{username}/d/{id}`
-* 댓글·리액션(❤️ 👍 😢), 악성 사용자는 블랙리스트 관리
+* 일기 항목을 **이미지 카드** 또는 **텍스트 카드**로 변환
+* OS 공유 시트를 통해 카카오톡·인스타그램·X 등 외부 SNS 앱으로 전송
+* 앱 내 소셜 기능 없음(공개 링크·댓글·리액션·팔로우 등 미제공)
 
 ---
 
