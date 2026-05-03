@@ -1,3 +1,0 @@
-"""
-Diary tests module.
-"""
