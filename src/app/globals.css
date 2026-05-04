@@ -1,3 +1,6 @@
+/* Webfonts — must precede other @imports because Tailwind inlines its imports */
+@import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&family=Gaegu:wght@300;400;700&display=swap');
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -6,10 +9,6 @@
    Memoism Design System — Foundations
    메모이즘: 스쳐지나가는 일상들을 기록하기 위한 나만의 일기장
    ==================================================== */
-
-/* Webfonts */
-@import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&family=Gaegu:wght@300;400;700&display=swap');
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
 
 @custom-variant dark (&:is(.dark *));
 
