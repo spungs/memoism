@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth/session'
 import { prisma } from '@/lib/db'
+import { outfitIdToSkin } from '@/lib/character/skins'
 import { CharacterChatView } from '@/components/character/character-chat-view'
 
 export default async function CharacterPage() {
@@ -8,7 +9,10 @@ export default async function CharacterPage() {
   if (!session) redirect('/login')
 
   const [character, diaryCount, messages] = await Promise.all([
-    prisma.character.findUnique({ where: { userId: session.userId } }),
+    prisma.character.findUnique({
+      where: { userId: session.userId },
+      include: { equipped: true },
+    }),
     prisma.diary.count({ where: { userId: session.userId } }),
     prisma.chatMessage.findMany({
       where: { userId: session.userId },
@@ -18,6 +22,8 @@ export default async function CharacterPage() {
   ])
 
   if (!character) redirect('/login')
+
+  const skin = outfitIdToSkin(character.equipped?.outfitId)
 
   return (
     <CharacterChatView
@@ -30,6 +36,7 @@ export default async function CharacterPage() {
         updatedAt: character.updatedAt.toISOString(),
       }}
       diaryCount={diaryCount}
+      skin={skin}
       initialMessages={messages.map(m => ({
         id: m.id,
         role: m.role,

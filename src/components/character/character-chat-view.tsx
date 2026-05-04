@@ -1,7 +1,8 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useRef, useEffect } from 'react'
-import { CharacterSVG } from './character-svg'
+import { CharacterSVG, type CharacterSkinSlug } from './character-svg'
 import {
   calcGrowthPoints,
   getGrowthLevel,
@@ -34,12 +35,14 @@ interface CharacterChatViewProps {
   character: CharacterData
   diaryCount: number
   initialMessages: Message[]
+  skin?: CharacterSkinSlug
 }
 
 export function CharacterChatView({
   character,
   diaryCount,
   initialMessages,
+  skin,
 }: CharacterChatViewProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [input, setInput] = useState('')
@@ -127,7 +130,7 @@ export function CharacterChatView({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
           <div style={{ flexShrink: 0 }}>
-            <CharacterSVG level={currentLevel.level} isAsleep={character.isAsleep} size={80} />
+            <CharacterSVG skin={skin} level={currentLevel.level} isAsleep={character.isAsleep} size={80} />
           </div>
 
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -151,6 +154,19 @@ export function CharacterChatView({
               }}>
                 {statusLabel}
               </span>
+              <Link
+                href="/character/shop"
+                style={{
+                  marginLeft: 'auto',
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--accent-rose)',
+                  textDecoration: 'none',
+                  fontWeight: 500,
+                }}
+              >
+                🛍 상점 →
+              </Link>
             </div>
 
             {nextLevel && (

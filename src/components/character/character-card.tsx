@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { CharacterSVG } from "./character-svg";
+import { CharacterCompanion } from "./character-companion";
+import type { CharacterSkinSlug } from "./character-svg";
 import {
   calcGrowthPoints,
   getBubbleMessage,
@@ -17,9 +18,10 @@ interface CharacterCardProps {
     subscriptionStatus: string;
   };
   diaryCount: number;
+  skin?: CharacterSkinSlug;
 }
 
-export function CharacterCard({ character, diaryCount }: CharacterCardProps) {
+export function CharacterCard({ character, diaryCount, skin }: CharacterCardProps) {
   const daysSinceBorn = Math.floor(
     (Date.now() - new Date(character.bornAt).getTime()) / 86400000,
   );
@@ -124,8 +126,9 @@ export function CharacterCard({ character, diaryCount }: CharacterCardProps) {
         />
       </Link>
 
-      {/* 캐릭터 SVG */}
-      <CharacterSVG
+      {/* 캐릭터 (탭 시 반응) */}
+      <CharacterCompanion
+        skin={skin}
         level={currentLevel.level}
         isAsleep={character.isAsleep}
         size={160}

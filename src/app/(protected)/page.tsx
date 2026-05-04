@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { CharacterCard } from "@/components/character/character-card";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
+import { outfitIdToSkin } from "@/lib/character/skins";
 import { getRecentDiaries } from "@/lib/diary/queries";
 
 export default async function HomePage() {
@@ -10,12 +11,17 @@ export default async function HomePage() {
   if (!session) redirect("/login");
 
   const [character, recentDiaries, diaryCount] = await Promise.all([
-    prisma.character.findUnique({ where: { userId: session.userId } }),
+    prisma.character.findUnique({
+      where: { userId: session.userId },
+      include: { equipped: true },
+    }),
     getRecentDiaries(session.userId, 3),
     prisma.diary.count({ where: { userId: session.userId } }),
   ]);
 
   if (!character) redirect("/login");
+
+  const skin = outfitIdToSkin(character.equipped?.outfitId);
 
   return (
     <div
@@ -73,7 +79,7 @@ export default async function HomePage() {
           paddingBottom: recentDiaries.length > 0 ? 0 : "var(--space-8)",
         }}
       >
-        <CharacterCard character={character} diaryCount={diaryCount} />
+        <CharacterCard character={character} diaryCount={diaryCount} skin={skin} />
       </div>
 
       {/* 최근 일기 */}
