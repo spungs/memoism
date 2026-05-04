@@ -1,8 +1,9 @@
 "use server";
 
-import { Prisma } from "@prisma/client";
+import { Prisma, SubscriptionStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { trialEndDate } from "@/lib/character/utils";
 import { hashPassword, verifyPassword } from "./password";
 import { signupSchema, loginSchema } from "./schemas";
 import { createSession, deleteSession } from "./session";
@@ -33,11 +34,26 @@ export async function signupAction(
   const { email, password } = parsed.data;
   const passwordHash = await hashPassword(password);
 
+  // Create the User and their AI character together so a User never exists
+  // without the 1:1 Character ChatMessage and most app surfaces depend on.
+  // The trial starts now and runs for 30 days (PRD §3.3).
   let user;
   try {
-    user = await prisma.user.create({
-      data: { email: email.toLowerCase(), passwordHash },
-      select: { id: true, email: true },
+    const trialStart = new Date();
+    user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: { email: email.toLowerCase(), passwordHash },
+        select: { id: true, email: true },
+      });
+      await tx.character.create({
+        data: {
+          userId: created.id,
+          subscriptionStatus: SubscriptionStatus.TRIAL,
+          trialStartedAt: trialStart,
+          subscriptionExpiresAt: trialEndDate(trialStart),
+        },
+      });
+      return created;
     });
   } catch (e) {
     if (
