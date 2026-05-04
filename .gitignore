@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# user uploads (local dev storage; swap for object storage in prod)
+/public/uploads/
+
 # production
 /build
 

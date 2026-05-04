@@ -8,6 +8,7 @@ export async function middleware(req: NextRequest) {
   const isPublic = PUBLIC_PATHS.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
+  const isApi = pathname.startsWith("/api/");
 
   const token = req.cookies.get("session")?.value;
   const session = token ? await verifySessionToken(token) : null;
@@ -17,8 +18,12 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
-  // Unauthed user hitting a protected page → bounce to login (preserve target).
   if (!session && !isPublic) {
+    // API routes return JSON 401 so client fetches don't follow a redirect
+    // into HTML and break JSON parsing. Page routes redirect to /login.
+    if (isApi) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const url = new URL("/login", req.url);
     if (pathname !== "/") url.searchParams.set("from", pathname);
     return NextResponse.redirect(url);
