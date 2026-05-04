@@ -1,29 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { QueryProvider } from "@/providers/query-provider";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
   title: {
-    default: "Memoism",
-    template: "%s | Memoism",
+    default: "메모이즘",
+    template: "%s | 메모이즘",
   },
-  description: "AI 캐릭터와 함께 쓰는 일기 — 추억을 기록하고 자연스럽게 회상하세요.",
+  description: "스쳐지나가는 일상들을 기록하기 위한 나만의 일기장",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Memoism",
+    title: "메모이즘",
   },
   icons: {
     icon: "/icons/icon-192.png",
@@ -40,7 +29,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#ffffff",
+  themeColor: "#FBF6EC",
 };
 
 export default function RootLayout({
@@ -50,13 +39,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-neutral-100`}
-      >
+      <body className="antialiased">
         <QueryProvider>
-          <div className="mx-auto min-h-screen w-full max-w-[430px] bg-background shadow-sm">
-            {children}
-          </div>
+          <div className="app-shell">{children}</div>
         </QueryProvider>
       </body>
     </html>
