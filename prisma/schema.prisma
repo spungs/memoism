@@ -79,6 +79,7 @@ model Diary {
 model Character {
   id                    String             @id @default(uuid())
   userId                String             @unique @map("user_id")
+  name                  String             @default("메모")
   age                   Int                @default(1)
   bornAt                DateTime           @default(now()) @map("born_at")
   isAsleep              Boolean            @default(false) @map("is_asleep")

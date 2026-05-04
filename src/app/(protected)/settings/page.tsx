@@ -1,8 +1,23 @@
-export default function SettingsPage() {
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth/session";
+import { prisma } from "@/lib/db";
+import { SettingsView } from "@/components/settings/settings-view";
+
+export default async function SettingsPage() {
+  const session = await getSession();
+  if (!session) redirect("/login");
+
+  const character = await prisma.character.findUnique({
+    where: { userId: session.userId },
+    select: { name: true, bornAt: true },
+  });
+  if (!character) redirect("/login");
+
   return (
-    <div style={{ padding: 'var(--space-6)' }}>
-      <h1 className="memo-h2" style={{ marginBottom: 'var(--space-2)' }}>설정</h1>
-      <p className="memo-body">준비 중이에요 ⚙️</p>
-    </div>
-  )
+    <SettingsView
+      email={session.email}
+      characterName={character.name}
+      bornAt={character.bornAt.toISOString()}
+    />
+  );
 }

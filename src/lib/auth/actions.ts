@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { trialEndDate } from "@/lib/character/utils";
 import { hashPassword, verifyPassword } from "./password";
 import { signupSchema, loginSchema } from "./schemas";
-import { createSession, deleteSession } from "./session";
+import { createSession, deleteSession, getSession } from "./session";
 
 export type AuthFormState = {
   error?: string;
@@ -110,4 +110,50 @@ export async function loginAction(
 export async function logoutAction(): Promise<void> {
   await deleteSession();
   redirect("/login");
+}
+
+export type ChangePasswordState = {
+  ok?: boolean;
+  error?: string;
+  fieldErrors?: Partial<Record<"currentPassword" | "newPassword" | "confirmPassword", string>>;
+};
+
+export async function changePasswordAction(
+  _prev: ChangePasswordState,
+  formData: FormData,
+): Promise<ChangePasswordState> {
+  const session = await getSession();
+  if (!session) return { error: "로그인이 필요합니다" };
+
+  const currentPassword = String(formData.get("currentPassword") ?? "");
+  const newPassword = String(formData.get("newPassword") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+  const fieldErrors: NonNullable<ChangePasswordState["fieldErrors"]> = {};
+  if (!currentPassword) fieldErrors.currentPassword = "현재 비밀번호를 입력해주세요";
+  if (newPassword.length < 8) fieldErrors.newPassword = "8자 이상이어야 합니다";
+  else if (newPassword.length > 72) fieldErrors.newPassword = "72자를 초과할 수 없습니다";
+  if (confirmPassword !== newPassword) fieldErrors.confirmPassword = "새 비밀번호가 일치하지 않습니다";
+  if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { passwordHash: true },
+  });
+  if (!user) return { error: "사용자를 찾을 수 없습니다" };
+
+  const ok = await verifyPassword(currentPassword, user.passwordHash);
+  if (!ok) return { fieldErrors: { currentPassword: "현재 비밀번호가 올바르지 않습니다" } };
+
+  if (await verifyPassword(newPassword, user.passwordHash)) {
+    return { fieldErrors: { newPassword: "현재 비밀번호와 다르게 설정해주세요" } };
+  }
+
+  const newHash = await hashPassword(newPassword);
+  await prisma.user.update({
+    where: { id: session.userId },
+    data: { passwordHash: newHash },
+  });
+
+  return { ok: true };
 }
