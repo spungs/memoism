@@ -4,6 +4,11 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DiaryContent } from "@/components/diary/diary-content";
+import {
+  MOOD_EMOJI,
+  MOOD_LABEL,
+  type MoodKey,
+} from "@/components/diary/mood-picker";
 import { getSession } from "@/lib/auth/session";
 import { getDiary } from "@/lib/diary/queries";
 
@@ -35,6 +40,8 @@ export default async function DiaryDetailPage({ params }: PageProps) {
   if (!diary) notFound();
 
   const cover = diary.images[0];
+  const moodKey =
+    diary.mood && diary.mood in MOOD_EMOJI ? (diary.mood as MoodKey) : null;
 
   return (
     <main className="flex min-h-screen flex-col p-4">
@@ -57,9 +64,18 @@ export default async function DiaryDetailPage({ params }: PageProps) {
       <article className="space-y-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold">{diary.title}</h1>
-          <time className="text-sm text-muted-foreground">
-            {dateFmt.format(diary.createdAt)}
-          </time>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <time>{dateFmt.format(diary.createdAt)}</time>
+            {moodKey && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-0.5 text-xs"
+                aria-label={`감정: ${MOOD_LABEL[moodKey]}`}
+              >
+                <span aria-hidden>{MOOD_EMOJI[moodKey]}</span>
+                <span>{MOOD_LABEL[moodKey]}</span>
+              </span>
+            )}
+          </div>
         </div>
 
         {cover && (

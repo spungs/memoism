@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { MOOD_EMOJI, type MoodKey } from "./mood-picker";
 
 const dateFmt = new Intl.DateTimeFormat("ko-KR", {
   year: "numeric",
@@ -28,7 +29,13 @@ export interface DiaryCardData {
   title: string;
   content: string;
   images?: string[];
+  mood?: string | null;
   createdAt: string | Date;
+}
+
+function moodEmoji(mood?: string | null): string | null {
+  if (!mood) return null;
+  return MOOD_EMOJI[mood as MoodKey] ?? null;
 }
 
 interface DiaryCardProps {
@@ -68,7 +75,14 @@ export function DiaryCard({ diary, onDelete, deleting }: DiaryCardProps) {
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
-            <h3 className="truncate text-base font-medium">{diary.title}</h3>
+            <h3 className="flex min-w-0 items-baseline gap-1.5 truncate text-base font-medium">
+              {moodEmoji(diary.mood) && (
+                <span aria-hidden className="text-base leading-none">
+                  {moodEmoji(diary.mood)}
+                </span>
+              )}
+              <span className="truncate">{diary.title}</span>
+            </h3>
             <time className="flex-shrink-0 text-xs text-muted-foreground">
               {dateFmt.format(new Date(diary.createdAt))}
             </time>

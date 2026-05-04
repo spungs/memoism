@@ -6,6 +6,15 @@ export const locationSchema = z.object({
   name: z.string().max(200).optional(),
 });
 
+export const moodKeySchema = z.enum([
+  "joy",
+  "calm",
+  "sad",
+  "love",
+  "anger",
+  "tired",
+]);
+
 export const diaryInputSchema = z.object({
   title: z
     .string()
@@ -14,7 +23,9 @@ export const diaryInputSchema = z.object({
     .max(200, "제목은 200자 이내여야 합니다"),
   content: z.string().trim().min(1, "내용을 입력해주세요"),
   location: locationSchema.nullable().optional(),
+  mood: moodKeySchema.nullable().optional(),
 });
 
 export type DiaryInput = z.infer<typeof diaryInputSchema>;
 export type DiaryLocation = z.infer<typeof locationSchema>;
+export type MoodKey = z.infer<typeof moodKeySchema>;

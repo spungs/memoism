@@ -14,6 +14,7 @@ interface DiaryListItem {
   title: string;
   content: string;
   images: string[];
+  mood: string | null;
   createdAt: string;
 }
 

@@ -5,7 +5,12 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { deleteImage, saveImage, StorageError } from "@/lib/storage";
-import { diaryInputSchema, type DiaryLocation } from "./schemas";
+import {
+  diaryInputSchema,
+  moodKeySchema,
+  type DiaryLocation,
+  type MoodKey,
+} from "./schemas";
 
 export type DiaryActionResult =
   | { ok: true; data: { id: string } }
@@ -24,6 +29,12 @@ function parseLocation(raw: FormDataEntryValue | null): DiaryLocation | null {
   } catch {
     return null;
   }
+}
+
+function parseMood(raw: FormDataEntryValue | null): MoodKey | null {
+  if (typeof raw !== "string" || raw === "" || raw === "null") return null;
+  const result = moodKeySchema.safeParse(raw);
+  return result.success ? result.data : null;
 }
 
 function fieldErrorsFromZod(
@@ -60,6 +71,7 @@ export async function createDiaryAction(
     title: formData.get("title"),
     content: formData.get("content"),
     location: parseLocation(formData.get("location")),
+    mood: parseMood(formData.get("mood")),
   });
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsFromZod(parsed) };
 
@@ -85,6 +97,7 @@ export async function createDiaryAction(
       content: parsed.data.content,
       images: imageUrl ? [imageUrl] : [],
       location: parsed.data.location ?? Prisma.DbNull,
+      mood: parsed.data.mood ?? null,
     },
     select: { id: true },
   });
@@ -111,6 +124,7 @@ export async function updateDiaryAction(
     title: formData.get("title"),
     content: formData.get("content"),
     location: parseLocation(formData.get("location")),
+    mood: parseMood(formData.get("mood")),
   });
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsFromZod(parsed) };
 
@@ -151,6 +165,7 @@ export async function updateDiaryAction(
       content: parsed.data.content,
       images: nextImages,
       location: parsed.data.location ?? Prisma.DbNull,
+      mood: parsed.data.mood ?? null,
     },
   });
 

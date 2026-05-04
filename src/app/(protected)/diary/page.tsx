@@ -22,6 +22,7 @@ export default async function DiaryListPage() {
       title: d.title,
       content: d.content,
       images: d.images,
+      mood: d.mood,
       createdAt: d.createdAt.toISOString(),
     })),
   };

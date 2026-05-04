@@ -3,22 +3,13 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   createDiaryAction,
   updateDiaryAction,
   type DiaryActionResult,
 } from "@/lib/diary/actions";
-import {
-  diaryInputSchema,
-  type DiaryInput,
-  type DiaryLocation,
-} from "@/lib/diary/schemas";
+import type { DiaryLocation } from "@/lib/diary/schemas";
+import { MoodPicker, type MoodKey } from "./mood-picker";
 
 type Mode = "create" | "edit";
 
@@ -30,15 +21,39 @@ interface DiaryFormProps {
     content: string;
     images: string[];
     location: DiaryLocation | null;
+    mood: MoodKey | null;
   };
 }
+
+const dateFmt = new Intl.DateTimeFormat("ko-KR", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+  weekday: "long",
+});
+
+const MUTED_LABEL: React.CSSProperties = {
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-subtle)",
+  letterSpacing: "var(--tracking-wider)",
+  fontWeight: 600,
+  textTransform: "uppercase",
+  margin: 0,
+};
 
 export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Image state — separate from RHF because file inputs are uncontrolled.
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [content, setContent] = useState(initial?.content ?? "");
+  const [mood, setMood] = useState<MoodKey | null>(initial?.mood ?? null);
+  const [location, setLocation] = useState<DiaryLocation | null>(
+    initial?.location ?? null,
+  );
+  const [locationError, setLocationError] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pickedFile, setPickedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -46,26 +61,20 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     Boolean(initial?.images?.[0]),
   );
 
-  const [location, setLocation] = useState<DiaryLocation | null>(
-    initial?.location ?? null,
-  );
-  const [locationError, setLocationError] = useState<string | null>(null);
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const [contentError, setContentError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    setError,
-    formState: { errors },
-  } = useForm<DiaryInput>({
-    resolver: zodResolver(diaryInputSchema),
-    defaultValues: {
-      title: initial?.title ?? "",
-      content: initial?.content ?? "",
-      location: initial?.location ?? null,
-    },
-  });
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Object URLs need to be revoked or they leak.
+  // Auto-grow textarea on initial render and when content is set externally.
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.max(240, ta.scrollHeight) + "px";
+  }, []);
+
   useEffect(() => {
     if (!pickedFile) {
       setPreviewUrl(null);
@@ -75,6 +84,8 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [pickedFile]);
+
+  const dateStr = dateFmt.format(new Date());
 
   const handlePickFile: React.ChangeEventHandler<HTMLInputElement> = (e) => {
     const file = e.target.files?.[0] ?? null;
@@ -105,12 +116,31 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     );
   };
 
-  const onSubmit = (values: DiaryInput) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setTitleError(null);
+    setContentError(null);
     setSubmitError(null);
+
+    const trimmedTitle = title.trim();
+    const trimmedContent = content.trim();
+
+    if (!trimmedContent) {
+      setContentError("내용을 입력해주세요");
+      return;
+    }
+
+    // Title is required by the schema; auto-derive from first line if empty.
+    const effectiveTitle =
+      trimmedTitle ||
+      trimmedContent.split("\n")[0]?.slice(0, 60) ||
+      "일기";
+
     const fd = new FormData();
-    fd.set("title", values.title);
-    fd.set("content", values.content);
+    fd.set("title", effectiveTitle);
+    fd.set("content", trimmedContent);
     fd.set("location", location ? JSON.stringify(location) : "null");
+    fd.set("mood", mood ?? "");
 
     if (pickedFile) {
       fd.set("image", pickedFile);
@@ -128,11 +158,9 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
       if (!result.ok) {
         if (result.fieldErrors) {
           for (const [k, msg] of Object.entries(result.fieldErrors)) {
-            if (k === "title" || k === "content") {
-              setError(k, { message: msg });
-            } else if (k === "image") {
-              setSubmitError(msg ?? "이미지 처리 중 오류가 발생했습니다");
-            }
+            if (k === "title") setTitleError(msg ?? null);
+            else if (k === "content") setContentError(msg ?? null);
+            else if (k === "image") setSubmitError(msg ?? "이미지 처리 중 오류가 발생했습니다");
           }
         }
         if (result.error) setSubmitError(result.error);
@@ -146,146 +174,329 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
 
   const showExistingImage = mode === "edit" && keepExisting && !pickedFile;
   const existingImage = initial?.images?.[0];
+  const canSubmit = content.trim().length > 0 && !pending;
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
-      <div className="space-y-2">
-        <Label htmlFor="title">제목</Label>
-        <Input
-          id="title"
-          autoComplete="off"
-          aria-invalid={Boolean(errors.title)}
-          aria-describedby={errors.title ? "title-error" : undefined}
-          {...register("title")}
-        />
-        {errors.title && (
-          <p id="title-error" className="text-sm text-destructive">
-            {errors.title.message}
-          </p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="content">내용 (마크다운 지원)</Label>
-        <Textarea
-          id="content"
-          rows={12}
-          aria-invalid={Boolean(errors.content)}
-          aria-describedby={errors.content ? "content-error" : undefined}
-          {...register("content")}
-        />
-        {errors.content && (
-          <p id="content-error" className="text-sm text-destructive">
-            {errors.content.message}
-          </p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="image">이미지 (선택)</Label>
-        {showExistingImage && existingImage && (
-          <div className="relative aspect-video w-full overflow-hidden rounded-md border border-border">
-            <Image
-              src={existingImage}
-              alt="현재 첨부된 이미지"
-              fill
-              sizes="(max-width: 430px) 100vw, 430px"
-              className="object-cover"
-            />
-          </div>
-        )}
-        {previewUrl && (
-          <div className="relative aspect-video w-full overflow-hidden rounded-md border border-border">
-            <Image
-              src={previewUrl}
-              alt="선택한 이미지 미리보기"
-              fill
-              sizes="(max-width: 430px) 100vw, 430px"
-              className="object-cover"
-              unoptimized
-            />
-          </div>
-        )}
-        <Input
-          id="image"
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
-          onChange={handlePickFile}
-        />
-        {(showExistingImage || previewUrl) && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleRemoveImage}
-            className="text-destructive hover:text-destructive"
-          >
-            이미지 제거
-          </Button>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <Label>위치 (선택)</Label>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleAttachLocation}
-          >
-            현재 위치 사용
-          </Button>
-          {location && (
-            <>
-              <span className="text-xs text-muted-foreground">
-                {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setLocation(null)}
-              >
-                제거
-              </Button>
-            </>
-          )}
-        </div>
-        {locationError && (
-          <p className="text-sm text-destructive">{locationError}</p>
-        )}
-      </div>
-
-      {submitError && (
-        <p
-          role="alert"
-          className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          {submitError}
-        </p>
-      )}
-
-      <div className="flex gap-2">
-        <Button type="submit" className="flex-1" disabled={pending}>
-          {pending
-            ? mode === "create"
-              ? "저장 중..."
-              : "수정 중..."
-            : mode === "create"
-              ? "저장"
-              : "수정 완료"}
-        </Button>
-        <Button
+    <div
+      style={{
+        minHeight: "calc(100svh - 56px - env(safe-area-inset-bottom))",
+        backgroundColor: "var(--bg)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "var(--space-3) var(--space-5)",
+          borderBottom: "1px solid var(--border)",
+          backgroundColor: "var(--surface-raised)",
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+        }}
+      >
+        <button
           type="button"
-          variant="outline"
           onClick={() => router.back()}
           disabled={pending}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: "var(--fg-muted)",
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-sm)",
+            padding: "4px 0",
+          }}
         >
-          취소
-        </Button>
-      </div>
-    </form>
+          ← 취소
+        </button>
+        <span
+          style={{
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-xs)",
+            color: "var(--fg-subtle)",
+            letterSpacing: "var(--tracking-wider)",
+            textTransform: "uppercase",
+          }}
+        >
+          {mode === "create" ? "새 일기" : "수정하기"}
+        </span>
+        <button
+          form="diary-form"
+          type="submit"
+          disabled={!canSubmit}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: canSubmit ? "pointer" : "default",
+            color: canSubmit ? "var(--accent-rose)" : "var(--fg-subtle)",
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-sm)",
+            fontWeight: 600,
+            padding: "4px 0",
+          }}
+        >
+          {pending ? "저장 중..." : "저장"}
+        </button>
+      </header>
+
+      <form
+        id="diary-form"
+        onSubmit={handleSubmit}
+        noValidate
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          padding: "var(--space-5)",
+          gap: "var(--space-5)",
+        }}
+      >
+        <p
+          style={{
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-xs)",
+            color: "var(--fg-subtle)",
+            letterSpacing: "var(--tracking-wider)",
+            margin: 0,
+          }}
+        >
+          {dateStr}
+        </p>
+
+        <MoodPicker value={mood} onChange={setMood} />
+
+        <div style={{ height: 1, backgroundColor: "var(--border)" }} />
+
+        <div>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="제목 (선택)"
+            maxLength={200}
+            aria-invalid={Boolean(titleError)}
+            style={{
+              width: "100%",
+              fontFamily: "var(--font-serif)",
+              fontSize: "var(--text-xl)",
+              fontWeight: 600,
+              lineHeight: 1.3,
+              color: "var(--fg)",
+              backgroundColor: "transparent",
+              border: "none",
+              outline: "none",
+              padding: 0,
+            }}
+          />
+          {titleError && (
+            <p
+              role="alert"
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                color: "var(--danger)",
+                marginTop: 4,
+              }}
+            >
+              {titleError}
+            </p>
+          )}
+        </div>
+
+        <div style={{ flex: 1 }}>
+          <textarea
+            ref={textareaRef}
+            value={content}
+            onChange={(e) => {
+              setContent(e.target.value);
+              const el = e.currentTarget;
+              el.style.height = "auto";
+              el.style.height = Math.max(240, el.scrollHeight) + "px";
+            }}
+            placeholder="오늘 하루를 기록해요..."
+            autoFocus={mode === "create"}
+            aria-invalid={Boolean(contentError)}
+            style={{
+              width: "100%",
+              minHeight: 240,
+              fontFamily: "var(--font-serif)",
+              fontSize: "var(--text-md)",
+              lineHeight: "var(--leading-relaxed)",
+              color: "var(--fg)",
+              backgroundColor: "transparent",
+              border: "none",
+              outline: "none",
+              resize: "none",
+              padding: 0,
+            }}
+          />
+          {contentError && (
+            <p
+              role="alert"
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                color: "var(--danger)",
+                marginTop: 4,
+              }}
+            >
+              {contentError}
+            </p>
+          )}
+        </div>
+
+        <div style={{ height: 1, backgroundColor: "var(--border)" }} />
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+          <p style={MUTED_LABEL}>이미지</p>
+          {(showExistingImage && existingImage) || previewUrl ? (
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                aspectRatio: "16 / 9",
+                overflow: "hidden",
+                borderRadius: "var(--radius-md)",
+                backgroundColor: "var(--surface)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <Image
+                src={previewUrl ?? existingImage!}
+                alt={previewUrl ? "선택한 이미지 미리보기" : "현재 첨부된 이미지"}
+                fill
+                sizes="(max-width: 430px) 100vw, 430px"
+                style={{ objectFit: "cover" }}
+                unoptimized={Boolean(previewUrl)}
+              />
+            </div>
+          ) : null}
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
+            <label
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                color: "var(--fg-muted)",
+                padding: "6px 12px",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--border)",
+                backgroundColor: "var(--surface)",
+                cursor: "pointer",
+              }}
+            >
+              {previewUrl || showExistingImage ? "다른 사진 선택" : "사진 추가"}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={handlePickFile}
+                style={{ display: "none" }}
+              />
+            </label>
+            {(showExistingImage || previewUrl) && (
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-sm)",
+                  color: "var(--danger)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "6px 8px",
+                }}
+              >
+                제거
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+          <p style={MUTED_LABEL}>위치</p>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={handleAttachLocation}
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                color: "var(--fg-muted)",
+                padding: "6px 12px",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--border)",
+                backgroundColor: "var(--surface)",
+                cursor: "pointer",
+              }}
+            >
+              {location ? "현재 위치로 갱신" : "현재 위치 사용"}
+            </button>
+            {location && (
+              <>
+                <span
+                  style={{
+                    fontFamily: "var(--font-sans)",
+                    fontSize: "var(--text-xs)",
+                    color: "var(--fg-subtle)",
+                  }}
+                >
+                  {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setLocation(null)}
+                  style={{
+                    fontFamily: "var(--font-sans)",
+                    fontSize: "var(--text-sm)",
+                    color: "var(--fg-subtle)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: "6px 8px",
+                  }}
+                >
+                  제거
+                </button>
+              </>
+            )}
+          </div>
+          {locationError && (
+            <p
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                color: "var(--danger)",
+                margin: 0,
+              }}
+            >
+              {locationError}
+            </p>
+          )}
+        </div>
+
+        {submitError && (
+          <p
+            role="alert"
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-sm)",
+              color: "var(--danger)",
+              backgroundColor: "color-mix(in srgb, var(--danger) 10%, transparent)",
+              padding: "var(--space-2) var(--space-3)",
+              borderRadius: "var(--radius-md)",
+              margin: 0,
+            }}
+          >
+            {submitError}
+          </p>
+        )}
+      </form>
+    </div>
   );
 }

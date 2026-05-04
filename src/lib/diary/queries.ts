@@ -14,6 +14,7 @@ const listSelect = {
   content: true,
   images: true,
   location: true,
+  mood: true,
   createdAt: true,
   updatedAt: true,
 } as const;
