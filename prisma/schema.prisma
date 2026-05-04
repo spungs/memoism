@@ -1,6 +1,9 @@
 // Prisma schema — see https://pris.ly/d/prisma-schema
+//
 // Datasource uses DATABASE_URL so we can switch from local Postgres to Supabase
-// (or any other Postgres-compatible host) by changing the connection string only.
+// (or any other Postgres-compatible host) by changing the connection string.
+// The `?schema=app` query param in DATABASE_URL routes every model to the `app`
+// schema — no @@schema annotations needed (single-schema mode).
 
 generator client {
   provider = "prisma-client-js"
@@ -11,14 +14,38 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// =============================================================================
+// Enums
+// =============================================================================
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum SubscriptionStatus {
+  NONE
+  TRIAL
+  ACTIVE
+  EXPIRED
+}
+
+// =============================================================================
+// Account & user-owned content
+// =============================================================================
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
   passwordHash String   @map("password_hash")
   createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  diaries      Diary[]
-  chatMessages ChatMessage[]
+  character        Character?
+  diaries          Diary[]
+  chatMessages     ChatMessage[]
+  coinTransactions CoinTransaction[]
 
   @@map("users")
 }
@@ -39,15 +66,131 @@ model Diary {
   @@map("diaries")
 }
 
+// =============================================================================
+// AI character (1:1 with User)
+//   - Age starts at 1 year on sign-up, +1 per 365 days from `bornAt`.
+//   - `isAsleep` is a cached visual state set by the subscription job; the
+//     authoritative source is `subscriptionStatus`.
+//   - `coinBalance` is denormalised SUM(CoinTransaction.amount) cached for
+//     fast reads. Always update inside the same transaction as the txn insert.
+// =============================================================================
+
+model Character {
+  id                    String             @id @default(uuid())
+  userId                String             @unique @map("user_id")
+  age                   Int                @default(1)
+  bornAt                DateTime           @default(now()) @map("born_at")
+  isAsleep              Boolean            @default(false) @map("is_asleep")
+  coinBalance           Int                @default(0) @map("coin_balance")
+  trialStartedAt        DateTime?          @map("trial_started_at")
+  subscriptionStatus    SubscriptionStatus @default(NONE) @map("subscription_status")
+  subscriptionExpiresAt DateTime?          @map("subscription_expires_at")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ownedOutfits CharacterOutfitOwned[]
+  equipped     CharacterEquipped?
+  chatMessages ChatMessage[]
+
+  @@index([subscriptionStatus, subscriptionExpiresAt])
+  @@map("characters")
+}
+
+// =============================================================================
+// Chat history (one row per AI character message exchange)
+//   - characterId is denormalised from user.character.id; storing both lets us
+//     query a character's window without joining through User.
+// =============================================================================
+
 model ChatMessage {
+  id          String      @id @default(uuid())
+  userId      String      @map("user_id")
+  characterId String      @map("character_id")
+  role        MessageRole
+  content     String
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@index([characterId, createdAt])
+  @@index([userId, createdAt])
+  @@map("chat_messages")
+}
+
+// =============================================================================
+// Outfit catalog (admin-managed) and per-character ownership / equip state
+// =============================================================================
+
+model CharacterOutfit {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  coinPrice   Int      @map("coin_price")
+  imageUrl    String   @map("image_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  ownedBy    CharacterOutfitOwned[]
+  equippedAs CharacterEquipped[]
+
+  @@map("character_outfits")
+}
+
+model CharacterOutfitOwned {
+  id          String   @id @default(uuid())
+  characterId String   @map("character_id")
+  outfitId    String   @map("outfit_id")
+  purchasedAt DateTime @default(now()) @map("purchased_at")
+
+  character Character       @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  outfit    CharacterOutfit @relation(fields: [outfitId], references: [id], onDelete: Restrict)
+
+  @@unique([characterId, outfitId])
+  @@index([characterId])
+  @@map("character_outfits_owned")
+}
+
+// 1:1 with Character — modelled as a separate table so equipping is optional
+// (a freshly-created character has no row here).
+model CharacterEquipped {
+  characterId String @id @map("character_id")
+  outfitId    String @map("outfit_id")
+
+  character Character       @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  outfit    CharacterOutfit @relation(fields: [outfitId], references: [id], onDelete: Restrict)
+
+  @@map("character_equipped")
+}
+
+// =============================================================================
+// Coin economy
+//   - amount > 0  → top-up (IAP, refund, promo)
+//   - amount < 0  → spend (outfit purchase, age revert)
+//   - reason is a free-form audit trail (e.g. "iap:com.memoism.coins.550",
+//     "outfit:purchase:<outfit_id>")
+//   - CoinPackage is the IAP catalog displayed in the store.
+// =============================================================================
+
+model CoinTransaction {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
-  role      String
-  content   String
+  amount    Int
+  reason    String
   createdAt DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, createdAt])
-  @@map("chat_messages")
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("coin_transactions")
+}
+
+model CoinPackage {
+  id        String   @id @default(uuid())
+  name      String
+  coins     Int
+  priceKrw  Int      @map("price_krw")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("coin_packages")
 }
