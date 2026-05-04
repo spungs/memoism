@@ -181,15 +181,13 @@ export function CharacterCard({ character, diaryCount }: CharacterCardProps) {
         </div>
       )}
 
-      {/* 코인 & 채팅 링크 */}
+      {/* 코인 & 채팅 - 한 row */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
-          width: "100%",
-          maxWidth: 200,
-          marginTop: "var(--space-4)",
+          gap: "var(--space-3)",
+          marginTop: "var(--space-3)",
         }}
       >
         <span
@@ -197,6 +195,9 @@ export function CharacterCard({ character, diaryCount }: CharacterCardProps) {
             fontFamily: "var(--font-sans)",
             fontSize: "var(--text-sm)",
             color: "var(--fg-subtle)",
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
           }}
         >
           🪙 {character.coinBalance}
@@ -206,9 +207,12 @@ export function CharacterCard({ character, diaryCount }: CharacterCardProps) {
           style={{
             fontFamily: "var(--font-sans)",
             fontSize: "var(--text-sm)",
-            color: "var(--accent-rose)",
+            color: "var(--surface-raised)",
+            backgroundColor: "var(--accent-rose)",
+            padding: "4px 14px",
+            borderRadius: "var(--radius-pill)",
             textDecoration: "none",
-            opacity: 0.85,
+            fontWeight: 500,
           }}
         >
           💬 대화하기
