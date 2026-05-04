@@ -1,14 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Pencil } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 import { DiaryContent } from "@/components/diary/diary-content";
-import {
-  MOOD_EMOJI,
-  MOOD_LABEL,
-  type MoodKey,
-} from "@/components/diary/mood-picker";
+import { DiaryDetailActions } from "@/components/diary/diary-detail-actions";
+import { MoodBadge } from "@/components/diary/mood-badge";
 import { getSession } from "@/lib/auth/session";
 import { getDiary } from "@/lib/diary/queries";
 
@@ -16,8 +12,8 @@ const dateFmt = new Intl.DateTimeFormat("ko-KR", {
   year: "numeric",
   month: "long",
   day: "numeric",
-  weekday: "short",
 });
+const weekdayFmt = new Intl.DateTimeFormat("ko-KR", { weekday: "long" });
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -40,52 +36,120 @@ export default async function DiaryDetailPage({ params }: PageProps) {
   if (!diary) notFound();
 
   const cover = diary.images[0];
-  const moodKey =
-    diary.mood && diary.mood in MOOD_EMOJI ? (diary.mood as MoodKey) : null;
+  const date = diary.createdAt;
 
   return (
-    <main className="flex min-h-screen flex-col p-4">
-      <header className="mb-4 flex items-center justify-between">
+    <main
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "var(--bg)",
+      }}
+    >
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "var(--space-3) var(--space-4)",
+          backgroundColor: "var(--surface-raised)",
+          borderBottom: "1px solid var(--border)",
+          backdropFilter: "saturate(140%) blur(8px)",
+        }}
+      >
         <Link
           href="/diary"
           aria-label="목록으로"
-          className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-accent"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "6px 8px",
+            borderRadius: "var(--radius-md)",
+            color: "var(--fg-muted)",
+            textDecoration: "none",
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-sm)",
+          }}
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft size={16} aria-hidden />
+          뒤로
         </Link>
-        <Link href={`/diary/${diary.id}/edit`}>
-          <Button variant="ghost" size="sm">
-            <Pencil className="mr-1 h-4 w-4" />
-            수정
-          </Button>
-        </Link>
+        <DiaryDetailActions diaryId={diary.id} />
       </header>
 
-      <article className="space-y-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold">{diary.title}</h1>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <time>{dateFmt.format(diary.createdAt)}</time>
-            {moodKey && (
-              <span
-                className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-0.5 text-xs"
-                aria-label={`감정: ${MOOD_LABEL[moodKey]}`}
-              >
-                <span aria-hidden>{MOOD_EMOJI[moodKey]}</span>
-                <span>{MOOD_LABEL[moodKey]}</span>
-              </span>
-            )}
-          </div>
+      <article
+        style={{
+          padding: "var(--space-6) var(--space-5) var(--space-12)",
+          maxWidth: 720,
+          margin: "0 auto",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "var(--space-3)",
+            marginBottom: "var(--space-5)",
+            flexWrap: "wrap",
+          }}
+        >
+          {diary.mood ? (
+            <MoodBadge mood={diary.mood} />
+          ) : (
+            <span aria-hidden style={{ width: 1 }} />
+          )}
+          <time
+            dateTime={date.toISOString()}
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-xs)",
+              color: "var(--fg-subtle)",
+              letterSpacing: "var(--tracking-wide)",
+            }}
+          >
+            {dateFmt.format(date)} · {weekdayFmt.format(date)}
+          </time>
         </div>
 
+        {diary.title && (
+          <h1
+            style={{
+              margin: "0 0 var(--space-5) 0",
+              fontFamily: "var(--font-serif)",
+              fontSize: "var(--text-2xl)",
+              fontWeight: 600,
+              color: "var(--fg)",
+              letterSpacing: "var(--tracking-tight)",
+              lineHeight: "var(--leading-snug)",
+            }}
+          >
+            {diary.title}
+          </h1>
+        )}
+
         {cover && (
-          <div className="relative aspect-video w-full overflow-hidden rounded-md bg-muted">
+          <div
+            style={{
+              position: "relative",
+              aspectRatio: "16 / 9",
+              width: "100%",
+              overflow: "hidden",
+              borderRadius: "var(--radius-md)",
+              backgroundColor: "var(--surface)",
+              border: "1px solid var(--border)",
+              marginBottom: "var(--space-5)",
+            }}
+          >
             <Image
               src={cover}
               alt=""
               fill
-              sizes="(max-width: 430px) 100vw, 430px"
-              className="object-cover"
+              sizes="(max-width: 720px) 100vw, 720px"
+              style={{ objectFit: "cover" }}
             />
           </div>
         )}
