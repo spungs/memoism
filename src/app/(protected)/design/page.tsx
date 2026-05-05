@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function DesignPreviewPage() {
   return (
     <main style={{ padding: "var(--space-6)" }}>
@@ -42,13 +44,13 @@ export default function DesignPreviewPage() {
         ))}
       </div>
 
-      <a
+      <Link
         href="/diary"
         className="memo-ui"
         style={{ color: "var(--brand)" }}
       >
         일기 목록 →
-      </a>
+      </Link>
     </main>
   );
 }

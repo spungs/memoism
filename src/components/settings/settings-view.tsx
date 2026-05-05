@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { logoutAction, changePasswordAction, type ChangePasswordState } from "@/lib/auth/actions";
-import { updateCharacterName, type UpdateCharacterNameState } from "@/lib/character/actions";
+import { updateCharacterName } from "@/lib/character/actions";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 
