@@ -342,6 +342,7 @@ export function CharacterChatView({
             placeholder="캐릭터에게 말 걸어봐요..."
             disabled={character.isAsleep}
             rows={1}
+            className="no-scrollbar"
             style={{
               flex: 1,
               fontFamily: 'var(--font-serif)',

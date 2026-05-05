@@ -360,3 +360,11 @@ html {
 .memo-hand {
   font-family: var(--font-hand);
 }
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
