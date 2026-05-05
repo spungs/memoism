@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import type { AuthFormState } from "@/lib/auth/actions";
 
 type Mode = "login" | "signup";
@@ -101,9 +101,14 @@ export function AuthForm({ mode, action }: AuthFormProps) {
     action,
     {},
   );
-  // React 19는 server action 완료 시 form의 uncontrolled 필드를 자동 리셋한다.
-  // email을 controlled로 두면 검증 실패 시 비밀번호만 비워지고 이메일은 보존됨.
   const [email, setEmail] = useState("");
+  // 검증 실패 시 password input을 remount해서 비움 (key 변경 방식).
+  // form에 onReset preventDefault를 걸어 React 19 auto-reset을 막고,
+  // controlled email input의 "uncontrolled→controlled" 경고도 제거한다.
+  const [passwordKey, setPasswordKey] = useState(0);
+  useEffect(() => {
+    if (state.fieldErrors || state.error) setPasswordKey((k) => k + 1);
+  }, [state]);
   const copy = COPY[mode];
 
   return (
@@ -149,6 +154,7 @@ export function AuthForm({ mode, action }: AuthFormProps) {
       <form
         action={formAction}
         noValidate
+        onReset={(e) => e.preventDefault()}
         style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}
       >
         <div>
@@ -182,6 +188,7 @@ export function AuthForm({ mode, action }: AuthFormProps) {
             비밀번호
           </label>
           <FieldInput
+            key={passwordKey}
             id="password"
             name="password"
             type="password"

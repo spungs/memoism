@@ -20,6 +20,7 @@ type Message = {
 type CharacterData = {
   id: string
   userId: string
+  name: string
   age: number
   bornAt: string
   isAsleep: boolean
@@ -83,16 +84,33 @@ export function CharacterChatView({
     setInput('')
     setIsLoading(true)
 
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      })
+      const data = await res.json()
       const reply: Message = {
         id: crypto.randomUUID(),
         role: 'ASSISTANT',
-        content: getPlaceholderReply(text, currentLevel.name),
+        content: res.ok ? data.message : '잠깐, 뭔가 잘못된 것 같아. 조금 뒤에 다시 말 걸어줘.',
         createdAt: new Date().toISOString(),
       }
       setMessages(prev => [...prev, reply])
+    } catch {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'ASSISTANT',
+          content: '네트워크 오류가 났어. 잠깐 뒤에 다시 해줘.',
+          createdAt: new Date().toISOString(),
+        },
+      ])
+    } finally {
       setIsLoading(false)
-    }, 800)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -376,37 +394,4 @@ export function CharacterChatView({
       </div>
     </div>
   )
-}
-
-function getPlaceholderReply(userText: string, levelName: string): string {
-  const replies: Record<string, string[]> = {
-    '아기': [
-      '응응! 🍼',
-      '좋아좋아!',
-      '나도 그런 거 같아~ 😊',
-      '일기에도 써줘!',
-    ],
-    '유아': [
-      '그렇구나~ 나도 궁금했어!',
-      '오늘 일기에 적어둘게 📖',
-      '더 말해줘, 듣고 싶어!',
-    ],
-    '어린이': [
-      '음... 생각해봤는데, 그게 맞는 것 같아.',
-      '오늘 하루 어떤 기분이었어?',
-      '일기에 적어두면 나중에 좋을 것 같아.',
-    ],
-    '청소년': [
-      '공감해. 그런 날 있잖아.',
-      '나도 같이 기억해줄게.',
-      '그 감정, 일기에 남겨둬.',
-    ],
-    '성인': [
-      '오늘도 수고했어. 그 마음, 기억해둘게.',
-      '작은 것도 소중하니까.',
-      '말해줘서 고마워.',
-    ],
-  }
-  const pool = replies[levelName] ?? replies['아기']
-  return pool[Math.floor(Math.random() * pool.length)]
 }

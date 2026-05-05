@@ -9,6 +9,7 @@ import {
   type DiaryActionResult,
 } from "@/lib/diary/actions";
 import type { DiaryLocation } from "@/lib/diary/schemas";
+import { DiaryDatePicker } from "./date-picker";
 import { MoodPicker, type MoodKey } from "./mood-picker";
 
 type Mode = "create" | "edit";
@@ -22,15 +23,14 @@ interface DiaryFormProps {
     images: string[];
     location: DiaryLocation | null;
     mood: MoodKey | null;
+    date?: string; // YYYY-MM-DD
   };
 }
 
-const dateFmt = new Intl.DateTimeFormat("ko-KR", {
-  year: "numeric",
-  month: "long",
-  day: "numeric",
-  weekday: "long",
-});
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 const MUTED_LABEL: React.CSSProperties = {
   fontFamily: "var(--font-sans)",
@@ -53,6 +53,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     initial?.location ?? null,
   );
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [date, setDate] = useState(initial?.date ?? todayStr());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pickedFile, setPickedFile] = useState<File | null>(null);
@@ -66,6 +67,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const today = todayStr();
 
   // Auto-grow textarea on initial render and when content is set externally.
   useEffect(() => {
@@ -84,8 +86,6 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [pickedFile]);
-
-  const dateStr = dateFmt.format(new Date());
 
   const handlePickFile: React.ChangeEventHandler<HTMLInputElement> = (e) => {
     const file = e.target.files?.[0] ?? null;
@@ -141,6 +141,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     fd.set("content", trimmedContent);
     fd.set("location", location ? JSON.stringify(location) : "null");
     fd.set("mood", mood ?? "");
+    fd.set("date", date);
 
     if (pickedFile) {
       fd.set("image", pickedFile);
@@ -256,17 +257,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
           gap: "var(--space-5)",
         }}
       >
-        <p
-          style={{
-            fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-xs)",
-            color: "var(--fg-subtle)",
-            letterSpacing: "var(--tracking-wider)",
-            margin: 0,
-          }}
-        >
-          {dateStr}
-        </p>
+        <DiaryDatePicker value={date} max={today} onChange={setDate} />
 
         <MoodPicker value={mood} onChange={setMood} />
 

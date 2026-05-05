@@ -22,6 +22,14 @@ export type DiaryActionResult =
 
 const KEEP_EXISTING_IMAGE = "__keep__";
 
+function parseDiaryDate(raw: FormDataEntryValue | null): Date {
+  if (typeof raw !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return new Date();
+  const d = new Date(raw + "T12:00:00");
+  if (isNaN(d.getTime())) return new Date();
+  // Reject future dates
+  return d > new Date() ? new Date() : d;
+}
+
 function parseLocation(raw: FormDataEntryValue | null): DiaryLocation | null {
   if (typeof raw !== "string" || raw === "" || raw === "null") return null;
   try {
@@ -75,6 +83,8 @@ export async function createDiaryAction(
   });
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsFromZod(parsed) };
 
+  const diaryDate = parseDiaryDate(formData.get("date"));
+
   const imageInput = await readImageOrError(formData);
   if (imageInput.kind === "error") {
     return { ok: false, fieldErrors: { image: imageInput.message } };
@@ -98,6 +108,7 @@ export async function createDiaryAction(
       images: imageUrl ? [imageUrl] : [],
       location: parsed.data.location ?? Prisma.DbNull,
       mood: parsed.data.mood ?? null,
+      createdAt: diaryDate,
     },
     select: { id: true },
   });
@@ -127,6 +138,8 @@ export async function updateDiaryAction(
     mood: parseMood(formData.get("mood")),
   });
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsFromZod(parsed) };
+
+  const diaryDate = parseDiaryDate(formData.get("date"));
 
   // Image semantics:
   //   - field absent or "__keep__"   → leave existing image untouched
@@ -166,6 +179,7 @@ export async function updateDiaryAction(
       images: nextImages,
       location: parsed.data.location ?? Prisma.DbNull,
       mood: parsed.data.mood ?? null,
+      createdAt: diaryDate,
     },
   });
 

@@ -35,6 +35,8 @@ export default async function DiaryEditPage({ params }: PageProps) {
   const diary = await getDiary(id, session.userId);
   if (!diary) notFound();
 
+  const diaryDate = diary.createdAt.toISOString().slice(0, 10);
+
   return (
     <DiaryForm
       mode="edit"
@@ -45,6 +47,7 @@ export default async function DiaryEditPage({ params }: PageProps) {
         images: diary.images,
         location: parseStoredLocation(diary.location),
         mood: parseStoredMood(diary.mood),
+        date: diaryDate,
       }}
     />
   );
