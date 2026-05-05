@@ -10,8 +10,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // PgBouncer (Supabase pooled URL)는 prepared statement를 못 다루므로
+  // 마이그레이션은 directUrl을 통해 5432 포트 직접 연결로 실행한다.
+  directUrl = env("DIRECT_URL")
 }
 
 // =============================================================================

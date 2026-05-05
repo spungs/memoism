@@ -101,6 +101,9 @@ export function AuthForm({ mode, action }: AuthFormProps) {
     action,
     {},
   );
+  // React 19는 server action 완료 시 form의 uncontrolled 필드를 자동 리셋한다.
+  // email을 controlled로 두면 검증 실패 시 비밀번호만 비워지고 이메일은 보존됨.
+  const [email, setEmail] = useState("");
   const copy = COPY[mode];
 
   return (
@@ -160,6 +163,8 @@ export function AuthForm({ mode, action }: AuthFormProps) {
             inputMode="email"
             required
             placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             aria-invalid={Boolean(state.fieldErrors?.email)}
             aria-describedby={
               state.fieldErrors?.email ? "email-error" : undefined
