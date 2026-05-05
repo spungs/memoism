@@ -1,7 +1,7 @@
 import { SignJWT } from "jose/jwt/sign";
 import { jwtVerify } from "jose/jwt/verify";
 import type { JWTPayload } from "jose";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 const SESSION_COOKIE = "session";
 const SESSION_DURATION_SECONDS = 60 * 60 * 24 * 7; // 7 days
@@ -59,10 +59,13 @@ export async function deleteSession(): Promise<void> {
 }
 
 export async function getSession(): Promise<SessionPayload | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-  return verifySessionToken(token);
+  const headerStore = await headers();
+  const userId = headerStore.get("x-user-id");
+  const email = headerStore.get("x-user-email");
+  if (userId && email) {
+    return { userId, email } as SessionPayload;
+  }
+  return null;
 }
 
 export const SESSION_COOKIE_NAME = SESSION_COOKIE;

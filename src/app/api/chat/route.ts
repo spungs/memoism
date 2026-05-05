@@ -61,7 +61,10 @@ export async function POST(req: NextRequest) {
       select: { title: true, content: true, mood: true, createdAt: true },
     }),
     prisma.chatMessage.findMany({
-      where: { userId: session.userId },
+      where: {
+        userId: session.userId,
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      },
       orderBy: { createdAt: "asc" },
       take: 20,
       select: { role: true, content: true },

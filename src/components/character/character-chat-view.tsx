@@ -349,7 +349,7 @@ export function CharacterChatView({
               fontSize: 'var(--text-sm)',
               lineHeight: 'var(--leading-relaxed)',
               color: 'var(--fg)',
-              backgroundColor: 'var(--bg)',
+              backgroundColor: 'var(--surface-raised)',
               border: '1.5px solid var(--border)',
               borderRadius: 'var(--radius-lg)',
               padding: '10px 14px',

@@ -29,7 +29,16 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  // Forward verified session data as headers so pages skip re-verification.
+  // Strip incoming x-user-* headers first to prevent external injection.
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.delete("x-user-id");
+  requestHeaders.delete("x-user-email");
+  if (session) {
+    requestHeaders.set("x-user-id", session.userId);
+    requestHeaders.set("x-user-email", session.email);
+  }
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = {

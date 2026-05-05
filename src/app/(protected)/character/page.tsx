@@ -15,9 +15,11 @@ export default async function CharacterPage() {
     }),
     prisma.diary.count({ where: { userId: session.userId } }),
     prisma.chatMessage.findMany({
-      where: { userId: session.userId },
+      where: {
+        userId: session.userId,
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      },
       orderBy: { createdAt: 'asc' },
-      take: 50,
     }),
   ])
 
