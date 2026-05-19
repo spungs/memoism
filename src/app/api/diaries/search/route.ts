@@ -29,9 +29,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const hits = await searchDiaries(session.userId, parsed.data.q, {
-    topK: parsed.data.topK ?? 5,
-  });
+  let hits;
+  try {
+    hits = await searchDiaries(session.userId, parsed.data.q, {
+      topK: parsed.data.topK ?? 5,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[search] failed:", msg);
+    return NextResponse.json(
+      { error: `검색 실행 중 오류가 발생했어요: ${msg}` },
+      { status: 500 },
+    );
+  }
 
   if (hits.length === 0) {
     return NextResponse.json({ items: [] });

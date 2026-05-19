@@ -27,28 +27,28 @@ export async function upsertDiaryEmbedding(
   diaryId: string,
   title: string,
   content: string,
-): Promise<{ ok: boolean }> {
+): Promise<{ ok: boolean; error?: string }> {
   try {
     const input = buildEmbeddingInput(title, content);
-    if (!input.trim()) return { ok: false };
+    if (!input.trim()) return { ok: false, error: "빈 텍스트" };
 
     const vector = await embedText(input);
     const literal = toVectorLiteral(vector);
 
+    // pgvector 확장이 public schema에 설치돼 있고 connection search_path=app이라
+    // ::vector 캐스트가 안 보임 → public.vector로 명시.
     await prisma.$executeRaw`
       INSERT INTO app.diary_embeddings (diary_id, vector, updated_at)
-      VALUES (${diaryId}, ${literal}::vector, NOW())
+      VALUES (${diaryId}, ${literal}::public.vector, NOW())
       ON CONFLICT (diary_id) DO UPDATE
         SET vector = EXCLUDED.vector,
             updated_at = NOW();
     `;
     return { ok: true };
   } catch (e) {
-    console.warn(
-      `[embedding] upsert failed for diary ${diaryId}:`,
-      e instanceof Error ? e.message : e,
-    );
-    return { ok: false };
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`[embedding] upsert failed for diary ${diaryId}:`, msg);
+    return { ok: false, error: msg };
   }
 }
 
@@ -57,9 +57,12 @@ export async function upsertDiaryEmbedding(
  *   - dev/staging에서 일회성. V2에선 background queue로 자동.
  *   - 반환: 성공/실패 카운트.
  */
-export async function backfillUserEmbeddings(
-  userId: string,
-): Promise<{ total: number; succeeded: number; failed: number }> {
+export async function backfillUserEmbeddings(userId: string): Promise<{
+  total: number;
+  succeeded: number;
+  failed: number;
+  errors: Array<{ diaryId: string; error: string }>;
+}> {
   const missing = await prisma.diary.findMany({
     where: {
       userId,
@@ -70,10 +73,15 @@ export async function backfillUserEmbeddings(
 
   let succeeded = 0;
   let failed = 0;
+  const errors: Array<{ diaryId: string; error: string }> = [];
   for (const d of missing) {
     const r = await upsertDiaryEmbedding(d.id, d.title, d.content);
-    if (r.ok) succeeded++;
-    else failed++;
+    if (r.ok) {
+      succeeded++;
+    } else {
+      failed++;
+      errors.push({ diaryId: d.id, error: r.error ?? "unknown" });
+    }
   }
-  return { total: missing.length, succeeded, failed };
+  return { total: missing.length, succeeded, failed, errors };
 }

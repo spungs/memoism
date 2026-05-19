@@ -45,11 +45,11 @@ export async function searchDiaries(
   >`
     SELECT
       d.id, d.title, d.content, d.mood, d.source, d.created_at,
-      1 - (e.vector <=> ${literal}::vector) AS similarity
+      1 - (e.vector OPERATOR(public.<=>) ${literal}::public.vector) AS similarity
     FROM app.diary_embeddings e
     JOIN app.diaries d ON d.id = e.diary_id
     WHERE d.user_id = ${userId}
-    ORDER BY e.vector <=> ${literal}::vector ASC
+    ORDER BY e.vector OPERATOR(public.<=>) ${literal}::public.vector ASC
     LIMIT ${topK}
   `;
 
