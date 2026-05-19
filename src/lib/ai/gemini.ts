@@ -214,10 +214,11 @@ export async function generateDiary(
         config: {
           systemInstruction: systemPrompt,
           temperature: 0.6,
-          // Gemini 2.5 Flash thinking 모델: thinking 토큰까지 합산되므로 여유 있게.
-          // 한국어 250자 본문 ~400토큰 + JSON syntax + thinking budget = 안전 1500.
           maxOutputTokens: 1500,
           responseMimeType: "application/json",
+          // Gemini 2.5 Flash thinking 비활성. thinking 모델이 응답 토큰을 다 먹어
+          // JSON 잘림 발생 → thinkingBudget 0으로 비-thinking 모드.
+          thinkingConfig: { thinkingBudget: 0 },
         },
       }),
       TIMEOUT_MS,

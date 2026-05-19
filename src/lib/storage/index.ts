@@ -153,3 +153,28 @@ export async function getSignedUrlsForOwner(
     ),
   );
 }
+
+/**
+ * Storage에서 이미지 다운로드 → base64 (Gemini Vision 재호출용, NEW-7).
+ * 실패 시 null. caller가 빈 사진 케이스 처리.
+ */
+export async function downloadAsBase64(
+  storagePath: string,
+): Promise<{ mimeType: string; base64Data: string } | null> {
+  if (!storagePath || storagePath.includes("..")) return null;
+  const { data, error } = await getClient()
+    .storage.from(BUCKET)
+    .download(storagePath);
+  if (error || !data) {
+    console.warn(
+      `[storage] download failed for ${storagePath}:`,
+      error?.message,
+    );
+    return null;
+  }
+  const buf = Buffer.from(await data.arrayBuffer());
+  return {
+    mimeType: data.type || "image/jpeg",
+    base64Data: buf.toString("base64"),
+  };
+}

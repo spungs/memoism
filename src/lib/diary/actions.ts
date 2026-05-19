@@ -242,6 +242,68 @@ export async function updateDiaryAction(
   return { ok: true, data: { id } };
 }
 
+/**
+ * AI 재생성 후 "되돌리기" — content ↔ previousContent 스왑 (NEW-7).
+ * 재생성 직후 사용자가 "직전 내용이 더 좋았다" 결정 시 단번에 복구.
+ * swap이라 두 번째 호출은 redo 효과.
+ *
+ * 응답에 갱신된 데이터를 포함해 클라이언트가 state lifting으로 동기화 가능.
+ * (window.location.reload 회피)
+ */
+export async function revertDiaryAction(id: string): Promise<
+  | {
+      ok: true;
+      data: {
+        title: string;
+        content: string;
+        hasPreviousContent: boolean;
+        aiGenerationVersion: number;
+      };
+    }
+  | { ok: false; error: string }
+> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "로그인이 필요합니다" };
+
+  const existing = await prisma.diary.findFirst({
+    where: { id, userId: session.userId },
+    select: { id: true, content: true, previousContent: true },
+  });
+  if (!existing) return { ok: false, error: "일기를 찾을 수 없습니다" };
+  if (!existing.previousContent) {
+    return { ok: false, error: "되돌릴 이전 내용이 없어요" };
+  }
+
+  const updated = await prisma.diary.update({
+    where: { id },
+    data: {
+      content: existing.previousContent,
+      previousContent: existing.content,
+      previousChangedAt: new Date(),
+      contentEditedAt: new Date(),
+    },
+    select: {
+      title: true,
+      content: true,
+      previousContent: true,
+      aiGenerationVersion: true,
+    },
+  });
+
+  revalidatePath("/diary");
+  revalidatePath(`/diary/${id}`);
+  revalidatePath("/");
+  return {
+    ok: true,
+    data: {
+      title: updated.title,
+      content: updated.content,
+      hasPreviousContent: updated.previousContent !== null,
+      aiGenerationVersion: updated.aiGenerationVersion,
+    },
+  };
+}
+
 export async function deleteDiaryAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {

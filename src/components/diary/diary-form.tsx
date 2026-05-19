@@ -11,6 +11,7 @@ import {
 import { extractExif, type ExifMeta } from "@/lib/diary/exif";
 import { compressImage } from "@/lib/diary/image-compress";
 import type { DiaryLocation } from "@/lib/diary/schemas";
+import { DiaryAiActions } from "./diary-ai-actions";
 import { DiaryDatePicker } from "./date-picker";
 import { MoodPicker, type MoodKey } from "./mood-picker";
 
@@ -27,6 +28,10 @@ interface DiaryFormProps {
     content: string;
     /** edit 모드용: 기존 사진들의 signed URL. read-only 표시. */
     existingImageUrls?: string[];
+    /** edit 모드용: AI 재생성 직후 백업 존재 여부 — "되돌리기" 노출 분기. */
+    hasPreviousContent?: boolean;
+    /** edit 모드용: 누적 AI 재생성 횟수 (라벨 분기용). */
+    aiGenerationVersion?: number;
     location: DiaryLocation | null;
     mood: MoodKey | null;
     date?: string; // YYYY-MM-DD
@@ -85,15 +90,22 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
   const [aiPending, setAiPending] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
+  // edit 모드 AI 액션 state (재생성·되돌리기 후 부모로 lift된 값 갱신용)
+  const [hasPrev, setHasPrev] = useState(
+    initial?.hasPreviousContent ?? false,
+  );
+  const [aiVer, setAiVer] = useState(initial?.aiGenerationVersion ?? 0);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const today = todayStr();
 
+  // content 변경 시 textarea 높이 자동 조정 (재생성·되돌리기 후도 포함)
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
     ta.style.height = "auto";
     ta.style.height = Math.max(240, ta.scrollHeight) + "px";
-  }, []);
+  }, [content]);
 
   // 미리보기 URL revoke on unmount
   useEffect(() => {
@@ -620,6 +632,22 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
           >
             {submitError}
           </p>
+        )}
+
+        {/* edit 모드: AI로 다시 정리 + 되돌리기 — 기존 DB content 기반.
+            state lifting으로 reload 없이 form 동기화. */}
+        {mode === "edit" && diaryId && (
+          <DiaryAiActions
+            diaryId={diaryId}
+            hasPreviousContent={hasPrev}
+            aiGenerationVersion={aiVer}
+            onUpdated={(data) => {
+              setTitle(data.title);
+              setContent(data.content);
+              setHasPrev(data.hasPreviousContent);
+              setAiVer(data.aiGenerationVersion);
+            }}
+          />
         )}
       </form>
     </div>

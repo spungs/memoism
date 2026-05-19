@@ -56,6 +56,8 @@ export default async function DiaryEditPage({ params }: PageProps) {
         title: diary.title,
         content: diary.content,
         existingImageUrls,
+        hasPreviousContent: diary.previousContent !== null,
+        aiGenerationVersion: diary.aiGenerationVersion,
         location: parseStoredLocation(diary.location),
         mood: parseStoredMood(diary.mood),
         date: diaryDate,
