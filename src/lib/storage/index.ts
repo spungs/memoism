@@ -112,6 +112,31 @@ export async function deleteImage(storagePath: string): Promise<void> {
 }
 
 /**
+ * Best-effort bulk deletion. Filters out legacy/traversal paths and chunks
+ * large lists (Supabase remove() can handle ~1000 paths per call; we cap at
+ * 100 to stay well under any limit).
+ */
+export async function deleteImages(storagePaths: string[]): Promise<void> {
+  const valid = storagePaths.filter(
+    (p) => p && !p.startsWith("/uploads/") && !p.includes(".."),
+  );
+  if (valid.length === 0) return;
+
+  const CHUNK = 100;
+  const client = getClient();
+  for (let i = 0; i < valid.length; i += CHUNK) {
+    const slice = valid.slice(i, i + CHUNK);
+    const { error } = await client.storage.from(BUCKET).remove(slice);
+    if (error) {
+      console.warn(
+        `[storage] deleteImages chunk failed (${slice.length} paths):`,
+        error.message,
+      );
+    }
+  }
+}
+
+/**
  * Issue a short-lived (1h) signed URL for a private storage path.
  * Returns null if URL generation fails (caller should fall back to placeholder).
  */

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { logoutAction, changePasswordAction, type ChangePasswordState } from "@/lib/auth/actions";
 import { updateCharacterName } from "@/lib/character/actions";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
@@ -79,9 +80,15 @@ function getInitials(email: string): string {
 }
 
 export function SettingsView({ email, characterName, bornAt }: SettingsViewProps) {
+  const router = useRouter();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(characterName);
@@ -97,6 +104,48 @@ export function SettingsView({ email, characterName, bornAt }: SettingsViewProps
   const handleLogout = async () => {
     setLogoutLoading(true);
     await logoutAction();
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const res = await fetch("/api/account/export");
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? "내보내기에 실패했어요");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const today = new Date().toISOString().slice(0, 10);
+      a.download = `memoism-export-${today}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : "내보내기에 실패했어요");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleteLoading(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch("/api/account/delete", { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? "탈퇴에 실패했어요");
+      }
+      router.push("/login");
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "탈퇴에 실패했어요");
+      setDeleteLoading(false);
+    }
   };
 
   const handleNameSave = async () => {
@@ -316,6 +365,63 @@ export function SettingsView({ email, characterName, bornAt }: SettingsViewProps
         </div>
       </section>
 
+      <section style={{ marginBottom: "var(--space-6)" }}>
+        <h2 style={SECTION_HEADER_STYLE}>데이터</h2>
+        <div style={CARD_STYLE}>
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={exporting}
+            style={{
+              ...ROW_STYLE,
+              width: "100%",
+              background: "transparent",
+              border: "none",
+              cursor: exporting ? "default" : "pointer",
+              textAlign: "left",
+              opacity: exporting ? 0.6 : 1,
+            }}
+          >
+            <span style={ROW_LABEL_STYLE}>
+              {exporting ? "내보내는 중..." : "데이터 내보내기"}
+            </span>
+            <Chevron />
+          </button>
+          <div style={DIVIDER_STYLE} />
+          <button
+            type="button"
+            onClick={() => setDeleteOpen(true)}
+            style={{
+              ...ROW_STYLE,
+              width: "100%",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+          >
+            <span style={{ ...ROW_LABEL_STYLE, color: "var(--danger)" }}>
+              계정 탈퇴
+            </span>
+            <Chevron />
+          </button>
+        </div>
+        {exportError && (
+          <p
+            role="alert"
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-xs)",
+              color: "var(--danger)",
+              margin: "var(--space-2) 0 0",
+              paddingLeft: "var(--space-2)",
+            }}
+          >
+            {exportError}
+          </p>
+        )}
+      </section>
+
       <section style={{ marginBottom: "var(--space-8)" }}>
         <h2 style={SECTION_HEADER_STYLE}>정보</h2>
         <div style={CARD_STYLE}>
@@ -368,6 +474,20 @@ export function SettingsView({ email, characterName, bornAt }: SettingsViewProps
       <PasswordSheet
         isOpen={passwordOpen}
         onClose={() => setPasswordOpen(false)}
+      />
+
+      <ConfirmSheet
+        isOpen={deleteOpen}
+        onClose={() => !deleteLoading && setDeleteOpen(false)}
+        onConfirm={handleDelete}
+        title="정말 탈퇴할까요?"
+        description={
+          deleteError ??
+          "모든 일기·사진·대화가 즉시 삭제되며 복구할 수 없어요."
+        }
+        confirmLabel="탈퇴하기"
+        confirmVariant="danger"
+        isLoading={deleteLoading}
       />
     </div>
   );
