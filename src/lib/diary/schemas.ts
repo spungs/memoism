@@ -1,10 +1,14 @@
 import { z } from "zod";
 
-export const locationSchema = z.object({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
-  name: z.string().max(200).optional(),
-});
+// strict() — 알 수 없는 추가 키가 있으면 거부. 사용자가 보낸 JSON에
+// 임의 필드가 끼어들지 못하게 함 (QA H-7).
+export const locationSchema = z
+  .object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+    name: z.string().max(200).optional(),
+  })
+  .strict();
 
 export const moodKeySchema = z.enum([
   "joy",

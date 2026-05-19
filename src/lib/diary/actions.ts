@@ -8,6 +8,7 @@ import { deleteImage, saveImage } from "@/lib/storage";
 import { upsertDiaryEmbedding } from "./embedding";
 import {
   diaryInputSchema,
+  locationSchema,
   moodKeySchema,
   type DiaryLocation,
   type MoodKey,
@@ -52,11 +53,14 @@ function parseDiaryDate(raw: FormDataEntryValue | null): Date {
 
 function parseLocation(raw: FormDataEntryValue | null): DiaryLocation | null {
   if (typeof raw !== "string" || raw === "" || raw === "null") return null;
+  let parsed: unknown;
   try {
-    return JSON.parse(raw) as DiaryLocation;
+    parsed = JSON.parse(raw);
   } catch {
     return null;
   }
+  const result = locationSchema.safeParse(parsed);
+  return result.success ? result.data : null;
 }
 
 function parseMood(raw: FormDataEntryValue | null): MoodKey | null {

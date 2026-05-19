@@ -59,6 +59,51 @@ function extensionFor(file: File): string {
 
 export class StorageError extends Error {}
 
+// 파일의 첫 12바이트를 직접 확인해 클라이언트가 보낸 MIME과 실제 내용이
+// 일치하는지 검증한다 (QA H-6). 폴리글롯/위장 업로드 차단.
+// file-type 패키지를 쓰지 않은 이유: HEIC/HEIF·WebP·PNG·JPEG 네 가지만 다루므로
+// 외부 의존 없이 충분히 정확하게 식별 가능.
+function validateMagicBytes(buf: Buffer, mime: string): boolean {
+  if (buf.length < 12) return false;
+  switch (mime) {
+    case "image/jpeg":
+      return buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+    case "image/png":
+      return (
+        buf[0] === 0x89 &&
+        buf[1] === 0x50 &&
+        buf[2] === 0x4e &&
+        buf[3] === 0x47 &&
+        buf[4] === 0x0d &&
+        buf[5] === 0x0a &&
+        buf[6] === 0x1a &&
+        buf[7] === 0x0a
+      );
+    case "image/webp":
+      return (
+        buf.toString("ascii", 0, 4) === "RIFF" &&
+        buf.toString("ascii", 8, 12) === "WEBP"
+      );
+    case "image/heic":
+    case "image/heif": {
+      if (buf.toString("ascii", 4, 8) !== "ftyp") return false;
+      const brand = buf.toString("ascii", 8, 12);
+      return [
+        "heic",
+        "heix",
+        "heim",
+        "heis",
+        "hevc",
+        "hevx",
+        "mif1",
+        "msf1",
+      ].includes(brand);
+    }
+    default:
+      return false;
+  }
+}
+
 /**
  * Upload an image to the private Supabase Storage bucket.
  * Returns the storage path (e.g. "{ownerId}/{uuid}.jpg") for persistence
@@ -78,6 +123,12 @@ export async function saveImage(file: File, ownerId: string): Promise<string> {
 
   const storagePath = `${ownerId}/${randomUUID()}${extensionFor(file)}`;
   const buf = Buffer.from(await file.arrayBuffer());
+
+  if (!validateMagicBytes(buf, file.type)) {
+    throw new StorageError(
+      "이미지 파일이 손상되었거나 형식이 일치하지 않아요.",
+    );
+  }
 
   const { error } = await getClient()
     .storage.from(BUCKET)
