@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { DiaryList } from "@/components/diary/diary-list";
 import { getSession } from "@/lib/auth/session";
-import { getDiaries } from "@/lib/diary/queries";
+import { getDiariesWithThumbnails } from "@/lib/diary/queries";
 
 export const metadata = { title: "일기" };
 
@@ -11,16 +11,16 @@ export default async function DiaryListPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const page = await getDiaries(session.userId, { take: 50 });
+  const page = await getDiariesWithThumbnails(session.userId, { take: 50 });
   const initialData = {
     nextCursor: page.nextCursor,
     items: page.items.map((d) => ({
       id: d.id,
       title: d.title,
       content: d.content,
-      // Phase 3 MIG-3에서 DiaryImage 1:N으로 다중 이미지 표시. 베타 stub은 빈 배열.
-      images: [] as string[],
+      thumbnailUrl: d.thumbnailUrl,
       mood: d.mood,
+      source: d.source,
       createdAt: d.createdAt.toISOString(),
     })),
   };

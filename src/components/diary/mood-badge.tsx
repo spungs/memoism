@@ -1,4 +1,10 @@
-import { MOOD_COLOR, MOOD_EMOJI, MOOD_LABEL, type MoodKey } from "./mood-picker";
+import {
+  KNOWN_MOOD_KEYS,
+  MOOD_COLOR,
+  MOOD_EMOJI,
+  MOOD_LABEL,
+  type MoodKey,
+} from "./mood-data";
 
 interface MoodBadgeProps {
   mood: string;
@@ -6,7 +12,7 @@ interface MoodBadgeProps {
 }
 
 function isMoodKey(key: string): key is MoodKey {
-  return key in MOOD_EMOJI;
+  return KNOWN_MOOD_KEYS.has(key);
 }
 
 export function MoodBadge({ mood, size = "md" }: MoodBadgeProps) {

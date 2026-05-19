@@ -9,8 +9,9 @@ interface DiaryListItem {
   id: string;
   title: string;
   content: string;
-  images: string[];
+  thumbnailUrl: string | null;
   mood: string | null;
+  source: string;
   createdAt: string;
 }
 

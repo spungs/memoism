@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { getSignedUrl } from "@/lib/storage";
 
 const DEFAULT_TAKE = 20;
 
@@ -8,16 +9,22 @@ export interface DiariesPage<T> {
   nextCursor: string | null;
 }
 
-// Phase 3 MIG-3에서 images: { select: { storagePath, exifTakenAt, orderIndex } } 추가 예정.
-// 현재는 다중 이미지 UI/storage 인프라 부재로 select에서 제외.
+// 목록 카드 썸네일용: 첫 사진(orderIndex=0)만 storagePath 가져옴.
+// signed URL은 caller가 발급 (getSignedUrlsForOwner 또는 getSignedUrls).
 const listSelect = {
   id: true,
   title: true,
   content: true,
   location: true,
   mood: true,
+  source: true,
   createdAt: true,
   updatedAt: true,
+  images: {
+    select: { storagePath: true },
+    orderBy: { orderIndex: "asc" },
+    take: 1,
+  },
 } as const;
 
 export type DiaryListItem = Awaited<
@@ -70,4 +77,33 @@ export async function getRecentDiaries(userId: string, take = 3) {
     take,
     select: { id: true, title: true, createdAt: true, content: true },
   });
+}
+
+export type DiaryListItemWithThumbnail = DiaryListItem & {
+  thumbnailUrl: string | null;
+};
+
+/**
+ * getDiaries + 각 item의 첫 이미지 storagePath를 signed URL로 변환.
+ *   - 본인 storagePath만 발급 (cross-account 차단)
+ *   - 이미지 없는 일기는 thumbnailUrl: null
+ *   - 발급 실패도 null
+ */
+export async function getDiariesWithThumbnails(
+  userId: string,
+  opts: { cursor?: string; take?: number } = {},
+): Promise<DiariesPage<DiaryListItemWithThumbnail>> {
+  const page = await getDiaries(userId, opts);
+  const prefix = `${userId}/`;
+  const items = await Promise.all(
+    page.items.map(async (d): Promise<DiaryListItemWithThumbnail> => {
+      const path = d.images[0]?.storagePath;
+      if (!path || !path.startsWith(prefix)) {
+        return { ...d, thumbnailUrl: null };
+      }
+      const url = await getSignedUrl(path);
+      return { ...d, thumbnailUrl: url };
+    }),
+  );
+  return { items, nextCursor: page.nextCursor };
 }

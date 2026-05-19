@@ -1,39 +1,16 @@
 'use client'
 
-export const MOODS = [
-  { key: 'joy',   label: '기쁨', emoji: '😊', color: 'var(--mood-joy)'   },
-  { key: 'calm',  label: '평온', emoji: '😌', color: 'var(--mood-calm)'  },
-  { key: 'sad',   label: '슬픔', emoji: '😢', color: 'var(--mood-sad)'   },
-  { key: 'love',  label: '사랑', emoji: '🥰', color: 'var(--mood-love)'  },
-  { key: 'anger', label: '화남', emoji: '😤', color: 'var(--mood-anger)' },
-  { key: 'tired', label: '피곤', emoji: '😴', color: 'var(--mood-tired)' },
-] as const
-
-export type MoodKey = typeof MOODS[number]['key']
-
-export const MOOD_EMOJI: Record<MoodKey, string> = MOODS.reduce(
-  (acc, m) => {
-    acc[m.key] = m.emoji
-    return acc
-  },
-  {} as Record<MoodKey, string>,
-)
-
-export const MOOD_LABEL: Record<MoodKey, string> = MOODS.reduce(
-  (acc, m) => {
-    acc[m.key] = m.label
-    return acc
-  },
-  {} as Record<MoodKey, string>,
-)
-
-export const MOOD_COLOR: Record<MoodKey, string> = MOODS.reduce(
-  (acc, m) => {
-    acc[m.key] = m.color
-    return acc
-  },
-  {} as Record<MoodKey, string>,
-)
+// 데이터는 mood-data.ts에 분리됨 (server component에서도 import 가능).
+// 기존 import 경로 backward compat 위해 여기서 re-export.
+export {
+  MOODS,
+  MOOD_EMOJI,
+  MOOD_LABEL,
+  MOOD_COLOR,
+  KNOWN_MOOD_KEYS,
+  type MoodKey,
+} from './mood-data'
+import { MOODS, type MoodKey } from './mood-data'
 
 interface MoodPickerProps {
   value: MoodKey | null
@@ -52,12 +29,21 @@ export function MoodPicker({ value, onChange }: MoodPickerProps) {
           fontWeight: 600,
           margin: 0,
           marginBottom: 'var(--space-2)',
-          textTransform: 'uppercase',
         }}
       >
         오늘의 감정
       </p>
-      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 'var(--space-2)',
+          overflowX: 'auto',
+          // hide scrollbar (Webkit + Firefox)
+          scrollbarWidth: 'none',
+          paddingBottom: 4,
+        }}
+        className="hide-scrollbar"
+      >
         {MOODS.map((mood) => {
           const isSelected = value === mood.key
           return (
@@ -72,6 +58,7 @@ export function MoodPicker({ value, onChange }: MoodPickerProps) {
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: 4,
+                flexShrink: 0,
                 padding: '8px 12px',
                 borderRadius: 'var(--radius-md)',
                 border: isSelected

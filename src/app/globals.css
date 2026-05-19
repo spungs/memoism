@@ -379,3 +379,11 @@ html {
   border-radius: var(--radius-sm);
   animation: skeleton-pulse 1.6s ease-in-out infinite;
 }
+
+/* Utility: hide scrollbar but keep scrollability (mood picker, image carousel) */
+.hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Webkit */
+}

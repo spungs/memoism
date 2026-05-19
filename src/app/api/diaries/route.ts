@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { getDiaries } from "@/lib/diary/queries";
+import { getDiariesWithThumbnails } from "@/lib/diary/queries";
 
 // JSON list endpoint used by TanStack Query for client refetch / cache hydration.
 // Mutations go through server actions in src/lib/diary/actions.ts.
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const takeParam = req.nextUrl.searchParams.get("take");
   const take = takeParam ? Number.parseInt(takeParam, 10) : undefined;
 
-  const page = await getDiaries(session.userId, {
+  const page = await getDiariesWithThumbnails(session.userId, {
     cursor,
     take: Number.isFinite(take) ? take : undefined,
   });

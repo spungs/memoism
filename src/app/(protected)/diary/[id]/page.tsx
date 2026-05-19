@@ -139,14 +139,19 @@ export default async function DiaryDetailPage({ params }: PageProps) {
 
         {imageUrls.length > 0 && (
           <div
+            className="hide-scrollbar"
             style={{
-              display: "grid",
-              gridTemplateColumns:
-                imageUrls.length === 1
-                  ? "1fr"
-                  : "repeat(auto-fill, minmax(140px, 1fr))",
+              display: "flex",
               gap: "var(--space-2)",
+              overflowX: "auto",
+              scrollSnapType: "x mandatory",
               marginBottom: "var(--space-5)",
+              // 카드 좌우 여백 살짝 넘기게 (피크) — 화면 끝에 다음 사진 살짝 보임
+              marginLeft: "calc(var(--space-5) * -1)",
+              marginRight: "calc(var(--space-5) * -1)",
+              paddingLeft: "var(--space-5)",
+              paddingRight: "var(--space-5)",
+              WebkitOverflowScrolling: "touch",
             }}
           >
             {imageUrls.map((url, i) =>
@@ -155,18 +160,21 @@ export default async function DiaryDetailPage({ params }: PageProps) {
                   key={diary.images[i].id}
                   style={{
                     position: "relative",
-                    aspectRatio: imageUrls.length === 1 ? "16 / 9" : "1 / 1",
+                    flexShrink: 0,
+                    width: imageUrls.length === 1 ? "100%" : "min(78%, 280px)",
+                    aspectRatio: "1 / 1",
                     overflow: "hidden",
                     borderRadius: "var(--radius-md)",
                     backgroundColor: "var(--surface)",
                     border: "1px solid var(--border)",
+                    scrollSnapAlign: "start",
                   }}
                 >
                   <Image
                     src={url}
                     alt=""
                     fill
-                    sizes="(max-width: 720px) 50vw, 360px"
+                    sizes="(max-width: 720px) 78vw, 280px"
                     style={{ objectFit: "cover" }}
                   />
                 </div>
