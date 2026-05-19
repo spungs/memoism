@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Memoism · IDEATE 1라운드</title>
+<style>
+  :root {
+    --bg: #FAF8F4;
+    --surface: #FFFFFF;
+    --ink: #2A2A2A;
+    --ink-soft: #5A5A5A;
+    --ink-mute: #9A9A9A;
+    --line: #E8E2D7;
+    --accent: #2F3E46;
+    --accent-soft: #354F52;
+    --quick: #16A34A;
+    --quick-bg: #DCFCE7;
+    --quick-line: #86EFAC;
+    --big: #2563EB;
+    --big-bg: #DBEAFE;
+    --big-line: #93C5FD;
+    --v2: #D97706;
+    --v2-bg: #FEF3C7;
+    --v2-line: #FCD34D;
+    --drop: #6B7280;
+    --drop-bg: #F3F4F6;
+    --drop-line: #D1D5DB;
+    --highlight: #FEF9C3;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+                 "Pretendard", "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.6;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 96px; }
+
+  /* Stepper */
+  .stepper {
+    display: flex; gap: 8px; align-items: center;
+    font-size: 12px; color: var(--ink-mute);
+    margin-bottom: 12px; flex-wrap: wrap;
+  }
+  .stepper .step { padding: 4px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); }
+  .stepper .step.done { color: var(--ink-soft); }
+  .stepper .step.active { background: var(--accent); color: white; border-color: var(--accent); font-weight: 600; }
+  .stepper .sep { color: var(--ink-mute); }
+
+  h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--ink-soft); margin: 0 0 32px; }
+
+  h2 { font-size: 20px; margin: 48px 0 16px; letter-spacing: -0.01em; }
+  h3 { font-size: 16px; margin: 24px 0 12px; }
+
+  /* PoV */
+  .pov {
+    background: var(--accent); color: #F5F1E8;
+    padding: 28px 32px; border-radius: 14px;
+    margin: 8px 0 32px;
+    position: relative;
+  }
+  .pov .label { font-size: 11px; letter-spacing: 0.15em; opacity: 0.7; margin-bottom: 8px; }
+  .pov .quote { font-size: 18px; line-height: 1.7; }
+  .pov .quote em {
+    font-style: normal; background: rgba(255,255,255,0.12);
+    padding: 1px 6px; border-radius: 4px;
+  }
+
+  /* HMW 1군 cards */
+  .hmw-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .hmw-card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px;
+  }
+  .hmw-card .num { font-size: 11px; color: var(--ink-mute); letter-spacing: 0.1em; }
+  .hmw-card .title { font-weight: 700; font-size: 15px; margin: 4px 0 8px; }
+  .hmw-card .text { color: var(--ink-soft); font-size: 14px; }
+
+  /* Filter bar */
+  .filterbar {
+    display: flex; gap: 8px; margin: 16px 0 12px; flex-wrap: wrap;
+    position: sticky; top: 0; background: var(--bg); padding: 12px 0; z-index: 10;
+    border-bottom: 1px solid var(--line);
+  }
+  .chip {
+    border: 1px solid var(--line); background: var(--surface);
+    padding: 6px 12px; border-radius: 999px; cursor: pointer;
+    font-size: 13px; color: var(--ink-soft); user-select: none;
+    transition: all 0.15s;
+  }
+  .chip:hover { border-color: var(--ink-mute); }
+  .chip.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .chip .dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 6px; vertical-align: middle;
+  }
+  .dot.quick { background: var(--quick); }
+  .dot.big { background: var(--big); }
+  .dot.v2 { background: var(--v2); }
+  .dot.drop { background: var(--drop); }
+
+  /* HMW Section */
+  .hmw-section { margin-top: 24px; }
+  .hmw-section h3 {
+    display: flex; align-items: baseline; gap: 8px;
+    border-left: 4px solid var(--accent); padding-left: 12px;
+  }
+  .hmw-section .badge {
+    font-size: 11px; background: var(--ink); color: white;
+    padding: 2px 8px; border-radius: 4px; font-weight: 600;
+  }
+
+  .ideas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .idea {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left-width: 4px; border-radius: 8px; padding: 14px 16px;
+    transition: transform 0.1s, box-shadow 0.15s;
+  }
+  .idea:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
+  .idea.quick { border-left-color: var(--quick); }
+  .idea.big { border-left-color: var(--big); }
+  .idea.v2 { border-left-color: var(--v2); }
+  .idea.drop { border-left-color: var(--drop); opacity: 0.65; }
+
+  .idea-head {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 8px; margin-bottom: 4px;
+  }
+  .idea-id { font-size: 11px; color: var(--ink-mute); font-weight: 700; letter-spacing: 0.05em; }
+  .idea-tag {
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px;
+    letter-spacing: 0.05em;
+  }
+  .idea-tag.quick { background: var(--quick-bg); color: var(--quick); }
+  .idea-tag.big { background: var(--big-bg); color: var(--big); }
+  .idea-tag.v2 { background: var(--v2-bg); color: var(--v2); }
+  .idea-tag.drop { background: var(--drop-bg); color: var(--drop); }
+  .idea-title { font-weight: 700; font-size: 15px; margin: 0 0 4px; }
+  .idea-mech { font-size: 13px; color: var(--ink-soft); line-height: 1.55; }
+
+  /* Hidden state */
+  .idea.hidden { display: none; }
+
+  /* 2x2 Matrix */
+  .matrix-wrap { margin-top: 32px; }
+  .matrix {
+    display: grid;
+    grid-template-columns: 24px 1fr 1fr;
+    grid-template-rows: 24px 1fr 1fr 36px;
+    gap: 4px;
+    aspect-ratio: 1.4 / 1;
+    min-height: 480px;
+  }
+  .axis-y {
+    grid-row: 2 / 4; grid-column: 1;
+    writing-mode: vertical-rl; transform: rotate(180deg);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; color: var(--ink-mute); font-weight: 600;
+  }
+  .axis-x {
+    grid-row: 4; grid-column: 2 / 4;
+    display: flex; justify-content: space-between; padding: 0 16px;
+    font-size: 12px; color: var(--ink-mute); font-weight: 600;
+  }
+  .axis-x span { font-weight: 600; }
+  .top-labels {
+    grid-row: 1; grid-column: 2 / 4;
+    display: flex; justify-content: space-between; padding: 0 16px;
+    font-size: 11px; color: var(--ink-mute);
+  }
+  .quad {
+    border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px; position: relative; display: flex; flex-direction: column;
+    background: var(--surface);
+  }
+  .quad-title {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.05em;
+    margin-bottom: 8px; color: var(--ink-soft);
+  }
+  .quad.q1 { background: var(--quick-bg); border-color: var(--quick-line); }
+  .quad.q1 .quad-title { color: var(--quick); }
+  .quad.q2 { background: var(--surface); }
+  .quad.q3 { background: var(--big-bg); border-color: var(--big-line); }
+  .quad.q3 .quad-title { color: var(--big); }
+  .quad.q4 { background: var(--surface); }
+  .quad-list { display: flex; flex-direction: column; gap: 4px; }
+  .quad-item {
+    font-size: 12px; padding: 4px 8px; background: rgba(255,255,255,0.6);
+    border-radius: 4px; cursor: default;
+  }
+  .quad-item strong { font-weight: 700; }
+  .quad-item.starred { background: rgba(255, 215, 0, 0.25); }
+
+  /* Result groups */
+  .result-row {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    margin-top: 16px;
+  }
+  .result-box {
+    background: var(--surface); border: 1px solid var(--line);
+    border-top: 4px solid; border-radius: 10px; padding: 16px;
+  }
+  .result-box.quick { border-top-color: var(--quick); }
+  .result-box.big { border-top-color: var(--big); }
+  .result-box.v2 { border-top-color: var(--v2); }
+  .result-box.drop { border-top-color: var(--drop); }
+  .result-box h4 { margin: 0 0 12px; font-size: 14px; }
+  .result-box ul { margin: 0; padding: 0; list-style: none; }
+  .result-box li {
+    font-size: 13px; padding: 6px 0; border-bottom: 1px dashed var(--line);
+    color: var(--ink-soft);
+  }
+  .result-box li:last-child { border-bottom: none; }
+  .result-box li strong { color: var(--ink); font-weight: 700; }
+  .result-count {
+    display: inline-block; background: var(--ink); color: white;
+    font-size: 11px; padding: 1px 7px; border-radius: 999px;
+    margin-left: 6px; vertical-align: middle;
+  }
+  .result-box.quick .result-count { background: var(--quick); }
+  .result-box.big .result-count { background: var(--big); }
+  .result-box.v2 .result-count { background: var(--v2); }
+  .result-box.drop .result-count { background: var(--drop); }
+
+  /* Summary card */
+  .summary {
+    background: linear-gradient(135deg, #2F3E46 0%, #354F52 100%);
+    color: #F5F1E8; padding: 32px; border-radius: 14px;
+    margin-top: 32px; text-align: center;
+  }
+  .summary .label { font-size: 11px; letter-spacing: 0.15em; opacity: 0.7; margin-bottom: 12px; }
+  .summary .text { font-size: 18px; line-height: 1.7; }
+
+  /* Verify */
+  .verify { margin-top: 48px; }
+  .verify-item {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px 18px; margin-bottom: 12px;
+  }
+  .verify-item .q-num { font-size: 11px; color: var(--accent); font-weight: 700; letter-spacing: 0.1em; }
+  .verify-item .q { font-weight: 700; margin: 4px 0 8px; }
+  .verify-item .q-body { font-size: 13px; color: var(--ink-soft); }
+  .verify-item .options { margin-top: 10px; font-size: 13px; }
+  .verify-item .options li { margin: 4px 0; }
+
+  /* Footer */
+  footer {
+    margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line);
+    color: var(--ink-mute); font-size: 13px;
+  }
+  footer strong { color: var(--ink); }
+
+  /* Responsive */
+  @media (max-width: 760px) {
+    .hmw-row { grid-template-columns: 1fr; }
+    .ideas { grid-template-columns: 1fr; }
+    .result-row { grid-template-columns: 1fr 1fr; }
+    .matrix { aspect-ratio: auto; min-height: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="stepper">
+    <span class="step done">DISCOVER</span>
+    <span class="sep">›</span>
+    <span class="step done">DEFINE</span>
+    <span class="sep">›</span>
+    <span class="step active">IDEATE · 1라운드</span>
+    <span class="sep">›</span>
+    <span class="step">DECISION</span>
+  </div>
+
+  <h1>IDEATE 1라운드 — 아이디어 발산 + 2×2 Multi-Voting</h1>
+  <p class="subtitle">메모이즘 · 1차 베타 MVP를 정제하기 위한 아이디어 분류표</p>
+
+  <!-- PoV -->
+  <div class="pov">
+    <div class="label">CONFIRMED · PoV (Point-of-View)</div>
+    <div class="quote">
+      김정민은 <em>시간이 지난 뒤에도 그날을 다시 만날 수 있는 가벼운 방법</em>을 원합니다.
+      왜냐하면 <em>흘러가는 시간 안에 자기 흔적을 남기고 싶지만, 매일 일기를 쓸 체력·의지는 없기 때문</em>입니다.
+    </div>
+  </div>
+
+  <!-- 1군 HMW -->
+  <h2>1군 HMW (1차 베타 진입의 출구)</h2>
+  <div class="hmw-row">
+    <div class="hmw-card">
+      <div class="num">HMW 1</div>
+      <div class="title">마찰</div>
+      <div class="text">1분 안에 본인 진실로만 일기 한 편 완성</div>
+    </div>
+    <div class="hmw-card">
+      <div class="num">HMW 2</div>
+      <div class="title">정확성</div>
+      <div class="text">AI 환각 0, 사진 5장 → 의미 있는 단서</div>
+    </div>
+    <div class="hmw-card">
+      <div class="num">HMW 5</div>
+      <div class="title">검색·공유</div>
+      <div class="text">3초 안에 추억 꺼내기 + 같이 보는 순간</div>
+    </div>
+  </div>
+
+  <!-- Filter -->
+  <h2>아이디어 발산 (총 22개)</h2>
+  <div class="filterbar" id="filterbar">
+    <span class="chip active" data-filter="all">전체</span>
+    <span class="chip" data-filter="quick"><span class="dot quick"></span>Quick Win</span>
+    <span class="chip" data-filter="big"><span class="dot big"></span>Big Bet (베타 필수)</span>
+    <span class="chip" data-filter="v2"><span class="dot v2"></span>V2 미룸</span>
+    <span class="chip" data-filter="drop"><span class="dot drop"></span>폐기</span>
+  </div>
+
+  <!-- HMW1 Ideas -->
+  <div class="hmw-section">
+    <h3><span class="badge">HMW 1</span> 마찰 · 1분 일기</h3>
+    <div class="ideas">
+
+      <div class="idea quick" data-cat="quick">
+        <div class="idea-head"><span class="idea-id">H1.1</span><span class="idea-tag quick">QUICK WIN</span></div>
+        <div class="idea-title">단일 도발 질문</div>
+        <div class="idea-mech">AI가 사진 5장 분석 후 가장 핵심적인 질문 1개만 생성 → 답변 1줄 → 일기 완성.</div>
+      </div>
+
+      <div class="idea drop" data-cat="drop">
+        <div class="idea-head"><span class="idea-id">H1.2</span><span class="idea-tag drop">고려</span></div>
+        <div class="idea-title">3-tap 일기</div>
+        <div class="idea-mech">사진 업로드 → 감정 1탭 → 한 줄 → 저장. 인터랙션 3번으로 끝.</div>
+      </div>
+
+      <div class="idea drop" data-cat="drop">
+        <div class="idea-head"><span class="idea-id">H1.3</span><span class="idea-tag drop">폐기</span></div>
+        <div class="idea-title">선다형 답변</div>
+        <div class="idea-mech">AI가 4지선다 객관식. T1의 정확성("내 진실") 가치와 충돌.</div>
+      </div>
+
+      <div class="idea v2" data-cat="v2">
+        <div class="idea-head"><span class="idea-id">H1.4</span><span class="idea-tag v2">V2</span></div>
+        <div class="idea-title">음성 1초 답변</div>
+        <div class="idea-mech">마이크 누르고 1~10초 발화 → STT → 자동 저장. 운전·잠자리 시점 fit이 명확하나 (D) 텍스트로 먼저 검증.</div>
+      </div>
+
+      <div class="idea drop" data-cat="drop">
+        <div class="idea-head"><span class="idea-id">H1.5</span><span class="idea-tag drop">폐기</span></div>
+        <div class="idea-title">사진 캡션만</div>
+        <div class="idea-mech">5장 사진에 한 줄씩, 본문 X. USP("회고할 데이터")가 약해짐.</div>
+      </div>
+
+      <div class="idea quick" data-cat="quick">
+        <div class="idea-head"><span class="idea-id">H1.6</span><span class="idea-tag quick">QUICK WIN</span></div>
+        <div class="idea-title">Skip 안전망</div>
+        <div class="idea-mech">Q&amp;A 답변 안 해도 사진만 저장 OK. "회고할 데이터"는 사진만으로도 충족.</div>
+      </div>
+
+      <div class="idea drop" data-cat="drop">
+        <div class="idea-head"><span class="idea-id">H1.7</span><span class="idea-tag drop">폐기</span></div>
+        <div class="idea-title">누적 합성</div>
+        <div class="idea-mech">같은 날 짧게 여러 번 입력 → 자동 합성. 베타엔 복잡.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- HMW2 Ideas -->
+  <div class="hmw-section">
+    <h3><span class="badge">HMW 2</span> 정확성 · 환각 0</h3>
+    <div class="ideas">
+
+      <div class="idea big" data-cat="big">
+        <div class="idea-head"><span class="idea-id">H2.1</span><span class="idea-tag big">⭐ 베타 필수</span></div>
+        <div class="idea-title">AI는 질문만, 본문은 합성</div>
+        <div class="idea-mech">AI가 생성하는 건 질문뿐. 일기 본문 = EXIF 사실 + Vision 명사구 + 사용자 답변. <strong>AI는 생성기가 아니라 합성기.</strong> 베타의 구조적 척추.</div>
+      </div>
+
+      <div class="idea quick" data-cat="quick">
+        <div class="idea-head"><span class="idea-id">H2.2</span><span class="idea-tag quick">QUICK WIN</span></div>
+        <div class="idea-title">Fact/Story 시각 분리</div>
+        <div class="idea-mech">일기 카드에 사실 영역(시간·장소·사진)과 이야기 영역(사용자 답변) 시각 구분.</div>
+      </div>
+
+      <div class="idea quick" data-cat="quick">
+        <div class="idea-head"><span class="idea-id">H2.3</span><span class="idea-tag quick">QUICK WIN</span></div>
+        <div class="idea-title">AI 라벨 (보조)</div>
+        <div class="idea-mech">AI가 쓴 부분에 "✨" 마커. H2.2와 통합 가능.</div>
+      </div>
+
+      <div class="idea big" data-cat="big">
+        <div class="idea-head"><span class="idea-id">H2.4</span><span class="idea-tag big">⭐ 베타 필수</span></div>
+        <div class="idea-title">Vision 응답을 명사구로 제한</div>
+        <div class="idea-mech">"강아지를 쓰다듬는 즐거운 시간" ✗ / "강아지 한 마리, 거실, 낮" ✓. 해석 금지, 사실 명사구만. H2.1과 한 쌍.</div>
+      </div>
+
+      <div class="idea quick" data-cat="quick">
+        <div class="idea-head"><span class="idea-id">H2.5</span><span class="idea-tag quick">QUICK WIN</span></div>
+        <div class="idea-title">사용자 검토 게이트</div>
+        <div class="idea-mech">자동 생성 일기는 반드시 사용자 컨펌 후 저장. 1초의 "이대로 저장" 강제.</div>
+      </div>
+
+      <div class="idea quick" data-cat="quick">
+        <div class="idea-head"><span class="idea-id">H2.6</span><span class="idea-tag quick">QUICK WIN</span></div>
+        <div class="idea-title">EXIF 헤더 우선 표기</div>
+        <div class="idea-mech">일기 상단에 EXIF 시간/장소. "사실이 1순위" 시각 신호.</div>
+      </div>
+
+      <div class="idea drop" data-cat="drop">
+        <div class="idea-head"><span class="idea-id">H2.7</span><span class="idea-tag drop">폐기</span></div>
+        <div class="idea-title">"AI 추측" 토글</div>
+        <div class="idea-mech">디폴트 OFF. H2.1로 구조적 해결, 토글 불필요.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- HMW5 Ideas -->
+  <div class="hmw-section">
+    <h3><span class="badge">HMW 5</span> 검색·공유 · 3초 회상</h3>
+    <div class="ideas">
+
+      <div class="idea big" data-cat="big">
+        <div class="idea-head"><span class="idea-id">H5.1</span><span class="idea-tag big">⭐ 베타 필수</span></div>
+        <div class="idea-title">자연어 검색 (RAG)</div>
+        <div class="idea-mech">"작년 봄 카페" → 임베딩 매칭 top-5 일기. pgvector 인프라 필요.</div>
+      </div>
+
+      <div class="idea drop" data-cat="drop">
+        <div class="idea-head"><span class="idea-id">H5.2</span><span class="idea-tag drop">폐기</span></div>
+        <div class="idea-title">음성 검색</div>
+        <div class="idea-mech">마이크 탭 → 발화 → STT. H1.4와 묶어 V2.</div>
+      </div>
+
+      <div class="idea quick" data-cat="quick">
+        <div class="idea-head"><span class="idea-id">H5.3</span><span class="idea-tag quick">QUICK WIN</span></div>
+        <div class="idea-title">결과 = 사진 그리드</div>
+        <div class="idea-mech">검색 결과를 일기 카드가 아닌 사진 그리드로 표시. 같이 보기 좋게.</div>
+      </div>
+
+      <div class="idea v2" data-cat="v2">
+        <div class="idea-head"><span class="idea-id">H5.4</span><span class="idea-tag v2">V2</span></div>
+        <div class="idea-title">공유 모드 (가림)</div>
+        <div class="idea-mech">"함께 보기" 버튼 → 사진+한줄 풀스크린, 일기 본문(사적)은 자동 가림. GTM 트리거.</div>
+      </div>
+
+      <div class="idea drop" data-cat="drop">
+        <div class="idea-head"><span class="idea-id">H5.5</span><span class="idea-tag drop">폐기</span></div>
+        <div class="idea-title">공유 카드 이미지 생성</div>
+        <div class="idea-mech">일기 → PNG 카드. 디자인·렌더링 비용 큼. OS share만으로 베타 충분.</div>
+      </div>
+
+      <div class="idea drop" data-cat="drop">
+        <div class="idea-head"><span class="idea-id">H5.6</span><span class="idea-tag drop">폐기</span></div>
+        <div class="idea-title">컨텍스트 검색 (캘린더)</div>
+        <div class="idea-mech">캘린더 권한·privacy 이슈. 베타 범위 밖.</div>
+      </div>
+
+      <div class="idea v2" data-cat="v2">
+        <div class="idea-head"><span class="idea-id">H5.7</span><span class="idea-tag v2">V2</span></div>
+        <div class="idea-title">Passive 자동 추천</div>
+        <div class="idea-mech">홈에 "오늘 분위기와 비슷한 과거 일기" 카드. HMW 3(회고)과 함께 v2.</div>
+      </div>
+
+      <div class="idea drop" data-cat="drop">
+        <div class="idea-head"><span class="idea-id">H5.8</span><span class="idea-tag drop">폐기</span></div>
+        <div class="idea-title">타임라인 모드</div>
+        <div class="idea-mech">검색 결과 시간순 가로 스와이프. H5.3 사진 그리드로 충분.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 2x2 Matrix -->
+  <div class="matrix-wrap">
+    <h2>2×2 Multi-Voting · 성과 × 구현 용이성</h2>
+    <div class="matrix">
+      <div class="top-labels">
+        <span></span><span></span>
+      </div>
+
+      <div class="axis-y">← 구현 용이성 ↑ →</div>
+
+      <div class="quad q2">
+        <div class="quad-title">고려 (저성과 · 고용이)</div>
+        <div class="quad-list">
+          <div class="quad-item"><strong>H1.5</strong> 사진 캡션만</div>
+          <div class="quad-item"><strong>H2.7</strong> AI 추측 토글</div>
+        </div>
+      </div>
+
+      <div class="quad q1">
+        <div class="quad-title">⭐ Quick Wins</div>
+        <div class="quad-list">
+          <div class="quad-item"><strong>H1.1</strong> 단일 질문</div>
+          <div class="quad-item"><strong>H1.6</strong> Skip 안전망</div>
+          <div class="quad-item"><strong>H2.2</strong> Fact/Story 분리</div>
+          <div class="quad-item"><strong>H2.3</strong> AI 라벨</div>
+          <div class="quad-item"><strong>H2.5</strong> 검토 게이트</div>
+          <div class="quad-item"><strong>H2.6</strong> EXIF 헤더</div>
+          <div class="quad-item"><strong>H5.3</strong> 사진 그리드</div>
+        </div>
+      </div>
+
+      <div class="quad q4">
+        <div class="quad-title">폐기 (저성과 · 저용이)</div>
+        <div class="quad-list">
+          <div class="quad-item"><strong>H1.3</strong> 선다형</div>
+          <div class="quad-item"><strong>H1.7</strong> 누적 합성</div>
+          <div class="quad-item"><strong>H5.2</strong> 음성 검색</div>
+          <div class="quad-item"><strong>H5.5</strong> 공유 카드</div>
+          <div class="quad-item"><strong>H5.6</strong> 캘린더 통합</div>
+          <div class="quad-item"><strong>H5.8</strong> 타임라인</div>
+        </div>
+      </div>
+
+      <div class="quad q3">
+        <div class="quad-title">💎 Big Bets</div>
+        <div class="quad-list">
+          <div class="quad-item starred"><strong>H2.1</strong> AI는 질문만 (척추)</div>
+          <div class="quad-item starred"><strong>H2.4</strong> Vision 명사구 제한</div>
+          <div class="quad-item starred"><strong>H5.1</strong> 자연어 검색 RAG</div>
+          <div class="quad-item"><strong>H1.4</strong> 음성 답변</div>
+          <div class="quad-item"><strong>H5.4</strong> 공유 모드</div>
+          <div class="quad-item"><strong>H5.7</strong> Passive 추천</div>
+        </div>
+      </div>
+
+      <div class="axis-x">
+        <span>← 성과 낮음</span>
+        <span>성과 높음 →</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result groups -->
+  <h2>정제 결과</h2>
+  <div class="result-row">
+
+    <div class="result-box quick">
+      <h4>⭐ Quick Wins<span class="result-count">7</span></h4>
+      <ul>
+        <li><strong>H1.1</strong> 단일 도발 질문</li>
+        <li><strong>H1.6</strong> Skip 안전망</li>
+        <li><strong>H2.2</strong> Fact/Story 시각 분리</li>
+        <li><strong>H2.3</strong> AI 라벨 (H2.2와 통합)</li>
+        <li><strong>H2.5</strong> 사용자 검토 게이트</li>
+        <li><strong>H2.6</strong> EXIF 헤더 우선</li>
+        <li><strong>H5.3</strong> 결과 사진 그리드</li>
+      </ul>
+    </div>
+
+    <div class="result-box big">
+      <h4>💎 Big Bets 필수<span class="result-count">3</span></h4>
+      <ul>
+        <li><strong>H2.1</strong> AI는 질문만 (척추)</li>
+        <li><strong>H2.4</strong> Vision 명사구 제한</li>
+        <li><strong>H5.1</strong> 자연어 검색 RAG</li>
+      </ul>
+    </div>
+
+    <div class="result-box v2">
+      <h4>⏳ V2 미룸<span class="result-count">3</span></h4>
+      <ul>
+        <li><strong>H1.4</strong> 음성 답변</li>
+        <li><strong>H5.4</strong> 공유 모드</li>
+        <li><strong>H5.7</strong> Passive 추천</li>
+      </ul>
+    </div>
+
+    <div class="result-box drop">
+      <h4>❌ 폐기<span class="result-count">8</span></h4>
+      <ul>
+        <li><strong>H1.2</strong> 3-tap 일기</li>
+        <li><strong>H1.3</strong> 선다형</li>
+        <li><strong>H1.5</strong> 사진 캡션만</li>
+        <li><strong>H1.7</strong> 누적 합성</li>
+        <li><strong>H2.7</strong> AI 추측 토글</li>
+        <li><strong>H5.2</strong> 음성 검색</li>
+        <li><strong>H5.5</strong> 공유 카드</li>
+        <li><strong>H5.6</strong> 캘린더</li>
+        <li><strong>H5.8</strong> 타임라인</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- Summary -->
+  <div class="summary">
+    <div class="label">MVP · 한 줄 요약</div>
+    <div class="text">
+      사진 5장 업로드 → AI가 만든 단일 질문에 답변 →<br>
+      EXIF/Vision 사실 + 본인 답변이 시각적으로 분리된 일기로 저장 →<br>
+      자연어 검색으로 사진 그리드 형태 회상.
+    </div>
+  </div>
+
+  <!-- Verify -->
+  <div class="verify">
+    <h2>검증 요청 (3개)</h2>
+
+    <div class="verify-item">
+      <div class="q-num">Q1</div>
+      <div class="q">MVP 10개 항목 (Quick Wins 7 + Big Bets 3) 전부 동의?</div>
+      <div class="q-body">빼거나 추가하고 싶은 게 있나요?</div>
+    </div>
+
+    <div class="verify-item">
+      <div class="q-num">Q2</div>
+      <div class="q">폐기 결정 8개에 이의 있는지?</div>
+      <div class="q-body">특히 (a) H1.4 음성 답변을 v2가 아닌 v1으로 끌어올릴지 (b) H5.4 공유 모드를 v1으로 올릴지.</div>
+    </div>
+
+    <div class="verify-item">
+      <div class="q-num">Q3</div>
+      <div class="q">H2.1 (AI는 질문만, 본문은 합성) — 추가 결정 필요</div>
+      <div class="q-body">베타의 구조적 척추. 한 가지 결정이 더 필요합니다:</div>
+      <ul class="options">
+        <li><strong>(a)</strong> 일기 본문을 <em>사용자 답변 그대로</em> 보여줄지 — 환각 0% 보장</li>
+        <li><strong>(b)</strong> 아니면 <em>AI가 사용자 답변을 약간 다듬어</em> (오타·문장 정리만, 의미 추가 금지) 보여줄지 — 환각 0.5% 위험 + 가독성 향상</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    <strong>다음 라운드 예고 — DECISION 1라운드</strong><br>
+    데이터 정의 → G.AI Feasibility 검증 → 스토리보드 (4컷) → 4-Block 피드백 → 최종 서비스 기획서 초안
+  </footer>
+
+</div>
+
+<script>
+  // Filter chips
+  const filterbar = document.getElementById('filterbar');
+  const chips = filterbar.querySelectorAll('.chip');
+  const ideas = document.querySelectorAll('.idea');
+
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      chips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      const f = chip.dataset.filter;
+      ideas.forEach(idea => {
+        if (f === 'all') {
+          idea.classList.remove('hidden');
+        } else {
+          idea.classList.toggle('hidden', idea.dataset.cat !== f);
+        }
+      });
+    });
+  });
+</script>
+
+</body>
+</html>

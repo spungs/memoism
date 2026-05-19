@@ -1,0 +1,829 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Memoism · 최종 서비스 기획서 (IDEATE + DECISION 통합본)</title>
+<style>
+  :root {
+    --bg: #FAF8F4;
+    --surface: #FFFFFF;
+    --ink: #2A2A2A;
+    --ink-soft: #5A5A5A;
+    --ink-mute: #9A9A9A;
+    --line: #E8E2D7;
+    --accent: #2F3E46;
+    --accent-soft: #354F52;
+    --quick: #16A34A;
+    --quick-bg: #DCFCE7;
+    --big: #2563EB;
+    --big-bg: #DBEAFE;
+    --v2: #D97706;
+    --v2-bg: #FEF3C7;
+    --drop: #6B7280;
+    --drop-bg: #F3F4F6;
+    --gold: #B45309;
+    --gold-bg: #FEF3C7;
+    --pink: #BE185D;
+    --pink-bg: #FCE7F3;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+                 "Pretendard", "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.6;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 96px; }
+
+  /* TOC */
+  .toc {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 18px; margin: 16px 0 32px;
+    display: flex; flex-wrap: wrap; gap: 12px 16px;
+    font-size: 13px;
+  }
+  .toc a { color: var(--ink-soft); text-decoration: none; }
+  .toc a:hover { color: var(--accent); text-decoration: underline; }
+
+  /* Stepper */
+  .stepper {
+    display: flex; gap: 8px; align-items: center;
+    font-size: 12px; color: var(--ink-mute);
+    margin-bottom: 12px; flex-wrap: wrap;
+  }
+  .stepper .step { padding: 4px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); }
+  .stepper .step.done { color: var(--ink-soft); }
+  .stepper .step.active { background: var(--accent); color: white; border-color: var(--accent); font-weight: 600; }
+  .stepper .sep { color: var(--ink-mute); }
+
+  h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--ink-soft); margin: 0 0 28px; }
+  h2 { font-size: 22px; margin: 56px 0 16px; letter-spacing: -0.01em; border-bottom: 2px solid var(--accent); padding-bottom: 8px; }
+  h3 { font-size: 17px; margin: 28px 0 12px; }
+  h4 { font-size: 14px; margin: 16px 0 8px; color: var(--ink-soft); }
+
+  /* PoV / Quote box */
+  .pov {
+    background: var(--accent); color: #F5F1E8;
+    padding: 24px 28px; border-radius: 12px;
+    margin: 8px 0 24px;
+  }
+  .pov .label { font-size: 11px; letter-spacing: 0.15em; opacity: 0.7; margin-bottom: 8px; }
+  .pov .quote { font-size: 17px; line-height: 1.7; }
+  .pov .quote em {
+    font-style: normal; background: rgba(255,255,255,0.12);
+    padding: 1px 6px; border-radius: 4px;
+  }
+  .pov .usp { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.2); font-size: 14px; opacity: 0.85; }
+  .pov .usp strong { color: #FFD799; }
+
+  /* Two col */
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+  /* Card */
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 18px;
+  }
+  .card h4 { margin-top: 0; }
+  .card .meta { font-size: 11px; color: var(--ink-mute); letter-spacing: 0.05em; }
+
+  /* Table */
+  table {
+    width: 100%; border-collapse: collapse; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+    font-size: 14px;
+  }
+  th { background: #F5EFE3; text-align: left; padding: 10px 14px; font-weight: 700; color: var(--ink); font-size: 13px; }
+  td { padding: 10px 14px; border-top: 1px solid var(--line); vertical-align: top; }
+  td.center, th.center { text-align: center; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td strong { color: var(--ink); }
+
+  /* Pills */
+  .pill {
+    display: inline-block; font-size: 11px; font-weight: 700;
+    padding: 2px 8px; border-radius: 4px; letter-spacing: 0.05em;
+  }
+  .pill.quick { background: var(--quick-bg); color: var(--quick); }
+  .pill.big { background: var(--big-bg); color: var(--big); }
+  .pill.v2 { background: var(--v2-bg); color: var(--v2); }
+  .pill.drop { background: var(--drop-bg); color: var(--drop); }
+  .pill.gold { background: var(--gold-bg); color: var(--gold); }
+  .pill.pink { background: var(--pink-bg); color: var(--pink); }
+  .pill.beta { background: #DCFCE7; color: #166534; }
+
+  /* Feature row */
+  .feat {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 4px solid var(--big); border-radius: 8px;
+    padding: 14px 16px; margin-bottom: 10px;
+  }
+  .feat .head {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 8px; margin-bottom: 6px;
+  }
+  .feat .name { font-weight: 700; font-size: 15px; }
+  .feat .desc { font-size: 13px; color: var(--ink-soft); margin-bottom: 8px; }
+  .feat .meta-row { display: flex; gap: 14px; font-size: 12px; color: var(--ink-mute); flex-wrap: wrap; }
+  .feat .meta-row span strong { color: var(--ink); }
+  .feat.quick { border-left-color: var(--quick); }
+  .feat.big { border-left-color: var(--big); }
+
+  /* Storyboard */
+  .story {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    margin-top: 16px;
+  }
+  .frame {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px; position: relative;
+  }
+  .frame .frame-num {
+    position: absolute; top: -10px; left: 14px;
+    background: var(--accent); color: white;
+    font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px;
+  }
+  .frame .frame-time { font-size: 11px; color: var(--ink-mute); margin-bottom: 8px; }
+  .frame .frame-title { font-weight: 700; font-size: 14px; margin: 4px 0 8px; }
+  .frame .frame-body { font-size: 12.5px; color: var(--ink-soft); line-height: 1.5; }
+
+  /* Tier card */
+  .tier {
+    background: var(--surface); border: 2px solid var(--line);
+    border-radius: 12px; padding: 22px; position: relative;
+  }
+  .tier.featured { border-color: var(--accent); background: linear-gradient(180deg, #FFFFFF 0%, #F5EFE3 100%); }
+  .tier.featured::before {
+    content: "BASIC"; position: absolute; top: -12px; right: 16px;
+    background: var(--accent); color: white;
+    font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 4px;
+    letter-spacing: 0.1em;
+  }
+  .tier-name { font-size: 13px; color: var(--ink-mute); font-weight: 700; letter-spacing: 0.1em; }
+  .tier-price { font-size: 28px; font-weight: 700; margin: 8px 0; letter-spacing: -0.02em; }
+  .tier-price .per { font-size: 14px; color: var(--ink-mute); font-weight: 400; }
+  .tier-desc { font-size: 13px; color: var(--ink-soft); margin-bottom: 14px; min-height: 36px; }
+  .tier-list { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+  .tier-list li { padding: 5px 0; display: flex; align-items: baseline; gap: 6px; }
+  .tier-list li::before { content: "✓"; color: var(--quick); font-weight: 700; }
+  .tier-list li.x::before { content: "✗"; color: var(--ink-mute); }
+  .tier-list li.future::before { content: "↗"; color: var(--v2); }
+
+  /* 4-block */
+  .fourblock {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  }
+  .block {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .block-head {
+    font-weight: 700; font-size: 14px; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .block .symbol {
+    display: inline-block; width: 24px; height: 24px; border-radius: 50%;
+    text-align: center; line-height: 24px; font-weight: 700; font-size: 14px;
+  }
+  .block.plus .symbol { background: var(--quick-bg); color: var(--quick); }
+  .block.minus .symbol { background: #FEE2E2; color: #DC2626; }
+  .block.question .symbol { background: var(--big-bg); color: var(--big); }
+  .block.star .symbol { background: var(--gold-bg); color: var(--gold); }
+  .block ul { margin: 0; padding-left: 16px; font-size: 13px; color: var(--ink-soft); }
+  .block li { margin: 4px 0; }
+
+  /* Scope (in/out) */
+  .scope { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .scope-box { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .scope-box.in { border-top: 4px solid var(--quick); }
+  .scope-box.out { border-top: 4px solid var(--drop); }
+  .scope-box h4 { margin-top: 0; color: var(--ink); }
+  .scope-box ul { margin: 0; padding-left: 16px; font-size: 13px; color: var(--ink-soft); }
+  .scope-box li { margin: 4px 0; }
+
+  /* Architecture */
+  .arch-row { display: grid; grid-template-columns: 60px 1fr; gap: 10px; margin: 8px 0; }
+  .arch-row .arch-tag { background: var(--accent); color: white; font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 4px; text-align: center; }
+  .arch-row .arch-body { font-size: 13px; color: var(--ink-soft); }
+
+  /* Highlight banner */
+  .banner {
+    background: linear-gradient(135deg, #2F3E46 0%, #354F52 100%);
+    color: #F5F1E8; padding: 24px 28px; border-radius: 12px;
+    margin: 24px 0; text-align: center;
+  }
+  .banner .label { font-size: 11px; letter-spacing: 0.15em; opacity: 0.7; margin-bottom: 10px; }
+  .banner .text { font-size: 17px; line-height: 1.7; }
+
+  /* Note */
+  .note {
+    background: #FFFBEB; border-left: 3px solid var(--v2);
+    padding: 10px 14px; border-radius: 4px; margin: 12px 0;
+    font-size: 13px; color: #92400E;
+  }
+
+  /* Footer */
+  footer {
+    margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--line);
+    color: var(--ink-mute); font-size: 13px;
+  }
+  footer strong { color: var(--ink); }
+
+  /* Responsive */
+  @media (max-width: 820px) {
+    .two, .three, .story, .fourblock, .scope { grid-template-columns: 1fr; }
+  }
+
+  /* Anchor jump padding */
+  section { scroll-margin-top: 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="stepper">
+    <span class="step done">DISCOVER</span>
+    <span class="sep">›</span>
+    <span class="step done">DEFINE</span>
+    <span class="sep">›</span>
+    <span class="step done">IDEATE</span>
+    <span class="sep">›</span>
+    <span class="step active">DECISION · 최종 기획서</span>
+  </div>
+
+  <h1>Memoism · 최종 서비스 기획서</h1>
+  <p class="subtitle">IDEATE + DECISION 통합본 · 베타 출시용 · 1차 합의 버전</p>
+
+  <nav class="toc">
+    <a href="#executive">① 한 줄 정의</a>
+    <a href="#persona">② 페르소나</a>
+    <a href="#pov">③ PoV·HMW</a>
+    <a href="#features">④ 핵심 기능 9</a>
+    <a href="#storyboard">⑤ 스토리보드</a>
+    <a href="#feedback">⑥ 4-Block 피드백</a>
+    <a href="#tiers">⑦ 비즈니스 모델</a>
+    <a href="#scope">⑧ 베타 출시 범위</a>
+    <a href="#data">⑨ 데이터 모델</a>
+    <a href="#agent">⑩ Multi-Agent 설계</a>
+    <a href="#policy">⑪ 정책·엣지케이스</a>
+    <a href="#copy">⑫ 마케팅 카피</a>
+    <a href="#decisions">⑬ 결정 추적표</a>
+  </nav>
+
+  <!-- ① -->
+  <section id="executive">
+  <h2>① 한 줄 정의</h2>
+  <div class="banner">
+    <div class="label">PRODUCT IN ONE SENTENCE</div>
+    <div class="text">
+      <strong>"사진과 짧은 메모만 있으면, AI가 정리된 일기를 자동으로 만들어주고<br>
+      1년 뒤에도 그날을 정확하게 다시 만나게 해주는 AI 일기 도우미."</strong>
+    </div>
+  </div>
+  </section>
+
+  <!-- ② -->
+  <section id="persona">
+  <h2>② 페르소나 — 김정민</h2>
+  <div class="two">
+    <div class="card">
+      <h4>프로필</h4>
+      <table>
+        <tr><td><strong>나이/성별</strong></td><td>30대 초반 남성</td></tr>
+        <tr><td><strong>직업</strong></td><td>IT 직군 (개발자 인접)</td></tr>
+        <tr><td><strong>거주</strong></td><td>수도권</td></tr>
+        <tr><td><strong>일기 경험</strong></td><td>한 번도 안 씀</td></tr>
+        <tr><td><strong>핸드폰 사진</strong></td><td>월 100~300장</td></tr>
+        <tr><td><strong>생활 패턴</strong></td><td>주중 야근 잦음, 주말 데이트·약속 1~2건</td></tr>
+        <tr><td><strong>디지털 친밀도</strong></td><td>매우 높음, 새 앱 시도 부담 없음</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h4>본질적 욕구 (3개 모두 동등)</h4>
+      <ol style="margin: 0; padding-left: 20px;">
+        <li>사진은 많은데 다시 안 봄 → <strong>맥락 있는 회상</strong></li>
+        <li>누가 옛날 얘기 꺼내면 멍해짐 → <strong>관계 회복</strong></li>
+        <li>"30대를 그냥 흘려보내고 싶지 않다" → <strong>시간의 흔적</strong></li>
+      </ol>
+      <h4 style="margin-top: 16px;">두려움</h4>
+      <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: var(--ink-soft);">
+        <li>AI가 내 추억을 멋대로 지어내는 것</li>
+        <li>매일 의무처럼 일기 쓰기</li>
+        <li>내 일기가 유출될 가능성</li>
+      </ul>
+      <h4 style="margin-top: 16px;">Wow 트리거</h4>
+      <p style="font-size: 13px; color: var(--ink-soft); margin: 0;">
+        누군가와 함께 있을 때 자연스럽게 앱을 꺼내 과거를 <strong>같이 보는</strong> 순간.
+        혼자 보는 게 아니라 같이 보는 순간이 가치의 정점이자 GTM 트리거.
+      </p>
+    </div>
+  </div>
+  </section>
+
+  <!-- ③ -->
+  <section id="pov">
+  <h2>③ PoV + 1군 HMW</h2>
+  <div class="pov">
+    <div class="label">POINT-OF-VIEW</div>
+    <div class="quote">
+      김정민은 <em>시간이 지난 뒤에도 그날을 다시 만날 수 있는 가벼운 방법</em>을 원합니다.
+      왜냐하면 <em>흘러가는 시간 안에 자기 흔적을 남기고 싶지만, 매일 일기를 쓸 체력·의지는 없기 때문</em>입니다.
+    </div>
+    <div class="usp">
+      <strong>USP:</strong> "회고할 *데이터*가 존재한다" — 사용자가 안 써도 데이터가 쌓이고, 회고 가능한 형태로 정리된다.
+      또한 "오늘 못 써도 사진 있으면 언제든 채울 수 있다."
+    </div>
+  </div>
+
+  <div class="three">
+    <div class="card">
+      <span class="meta">HMW 1</span>
+      <div style="font-weight: 700; margin: 4px 0;">마찰</div>
+      <div style="font-size: 13px; color: var(--ink-soft);">1분 안에 본인 진실로만 일기 한 편 완성</div>
+    </div>
+    <div class="card">
+      <span class="meta">HMW 2</span>
+      <div style="font-weight: 700; margin: 4px 0;">정확성</div>
+      <div style="font-size: 13px; color: var(--ink-soft);">AI 환각 0, 사진 5장 → 의미 있는 단서</div>
+    </div>
+    <div class="card">
+      <span class="meta">HMW 5</span>
+      <div style="font-weight: 700; margin: 4px 0;">검색·공유</div>
+      <div style="font-size: 13px; color: var(--ink-soft);">3초 안에 추억 꺼내기 + 같이 보는 순간</div>
+    </div>
+  </div>
+  </section>
+
+  <!-- ④ -->
+  <section id="features">
+  <h2>④ 핵심 기능 9개 (MVP)</h2>
+
+  <h3>🔥 Big Bets — 베타 척추 3</h3>
+
+  <div class="feat big">
+    <div class="head">
+      <span class="name">F1. AI 본문 자동 생성·정리 (모드 A·B·C)</span>
+      <span class="pill big">SPINE</span>
+    </div>
+    <div class="desc">
+      사진 5장 + EXIF / 사용자 텍스트 / 둘 다 → AI가 1인칭 150~250자 일기 본문 생성·정리.
+      AI는 사진에 없는 사실·사용자가 안 쓴 의미를 추가하지 않음 (환각 0 정책).
+    </div>
+    <div class="meta-row">
+      <span><strong>입력</strong> 사진 1~5장 OR 텍스트</span>
+      <span><strong>출력</strong> 1인칭 150~250자</span>
+      <span><strong>모델</strong> Gemini 2.5 Flash 멀티모달</span>
+      <span><strong>비용</strong> 약 ₩1/회</span>
+    </div>
+  </div>
+
+  <div class="feat big">
+    <div class="head">
+      <span class="name">F2. 사용자 검토 게이트</span>
+      <span class="pill big">SPINE</span>
+    </div>
+    <div class="desc">
+      자동 생성된 일기는 *반드시* 사용자가 검토 후 저장. 수정·승인·재생성 가능.
+      EXIF 시간·장소는 헤더에 고정 표기, AI 생성 본문은 옅은 배경색으로 시각 강조.
+    </div>
+    <div class="meta-row">
+      <span><strong>플로우</strong> 생성 → 검토 → 수정/승인/재생성</span>
+      <span><strong>완료 기준</strong> 사용자 승인 = 저장 트리거</span>
+    </div>
+  </div>
+
+  <div class="feat big">
+    <div class="head">
+      <span class="name">F3. 자연어 검색 (RAG)</span>
+      <span class="pill big">SPINE</span>
+    </div>
+    <div class="desc">
+      "작년 봄 카페" 같은 자연어 → 임베딩 매칭 top-5 일기. Basic+ 사용자는 캐릭터와 채팅 인터페이스.
+      무료 사용자는 키워드 검색만.
+    </div>
+    <div class="meta-row">
+      <span><strong>인프라</strong> pgvector + Gemini text-embedding-004</span>
+      <span><strong>비용</strong> ₩0.1/회 미만</span>
+      <span><strong>접근</strong> Basic+ (무료는 키워드)</span>
+    </div>
+  </div>
+
+  <h3>⭐ Quick Wins 6</h3>
+
+  <div class="feat quick">
+    <div class="head"><span class="name">F4. Skip / 빠른 승인</span><span class="pill quick">QUICK</span></div>
+    <div class="desc">텍스트·사진 없이도 사진만 저장 OK. 검토 없이 즉시 승인도 OK. "회고할 데이터" 명제는 사진만으로도 충족.</div>
+  </div>
+
+  <div class="feat quick">
+    <div class="head"><span class="name">F5. Fact/Story 시각 분리 + AI 라벨</span><span class="pill quick">QUICK</span></div>
+    <div class="desc">일기 카드 = 사실 영역(EXIF 시간·장소·사진) + 이야기 영역(본문). AI 생성 부분에 ✨ 마커.</div>
+  </div>
+
+  <div class="feat quick">
+    <div class="head"><span class="name">F6. EXIF 헤더 우선 표기</span><span class="pill quick">QUICK</span></div>
+    <div class="desc">일기 상단에 촬영 시간·장소 자동 표기. "사실이 1순위" 시각 신호.</div>
+  </div>
+
+  <div class="feat quick">
+    <div class="head"><span class="name">F7. 검색 결과 사진 그리드</span><span class="pill quick">QUICK</span></div>
+    <div class="desc">검색 결과를 일기 카드가 아닌 사진 그리드로 표시. 친구·연인과 같이 보기 좋게.</div>
+  </div>
+
+  <div class="feat quick">
+    <div class="head"><span class="name">F8. 본문 톤·길이 정책</span><span class="pill quick">QUICK</span></div>
+    <div class="desc">1인칭 + 150~250자 (베타 고정). V2에서 페르소나 프리셋·커스텀 추가.</div>
+  </div>
+
+  <div class="feat quick">
+    <div class="head"><span class="name">F9. 트리거 조건</span><span class="pill quick">QUICK</span></div>
+    <div class="desc">AI 호출은 사진 1장+ OR 텍스트 비어있지 않을 때 활성. 둘 다 비면 버튼 비활성.</div>
+  </div>
+  </section>
+
+  <!-- ⑤ -->
+  <section id="storyboard">
+  <h2>⑤ 스토리보드 — 정민의 와우 모먼트</h2>
+  <div class="story">
+    <div class="frame">
+      <div class="frame-num">1컷</div>
+      <div class="frame-time">평일 23:00 · 침대</div>
+      <div class="frame-title">문제 발생</div>
+      <div class="frame-body">
+        야근 후 침대. 갤러리에 오늘 점심·디저트·저녁 사진 4장. 평소 같으면 "내일 보지" 하고 인스타 스크롤. <strong>흘러간다.</strong>
+      </div>
+    </div>
+    <div class="frame">
+      <div class="frame-num">2컷</div>
+      <div class="frame-time">30초 후</div>
+      <div class="frame-title">메모이즘 진입</div>
+      <div class="frame-body">
+        앱 열기 → 「+」 → 사진 4장 던짐 → 「AI 정리」 탭. 15초 로딩.
+      </div>
+    </div>
+    <div class="frame">
+      <div class="frame-num">3컷</div>
+      <div class="frame-time">1분 후</div>
+      <div class="frame-title">일기 완성</div>
+      <div class="frame-body">
+        <em>"오늘 강남에서 점심을 먹었고, 후식으로 카페에 들렀다..."</em>
+        EXIF 시간(12:34/14:02/19:18) 헤더 표기. AI 본문 옅은 노란 배경. "후식"→"디저트" 한 단어 수정. <strong>승인.</strong>
+      </div>
+    </div>
+    <div class="frame">
+      <div class="frame-num">4컷</div>
+      <div class="frame-time">1년 후 · 카페</div>
+      <div class="frame-title">와우</div>
+      <div class="frame-body">
+        친구: "작년 봄 그 카페 어땠지?" 정민이 "작년 봄 카페" 검색 → 사진 그리드 + 일기. <strong>둘이 같이</strong> 사진을 넘기며 그날 얘기를 꺼낸다. 친구: "이거 무슨 앱이야?"
+      </div>
+    </div>
+  </div>
+  <p style="margin-top: 16px; font-size: 13px; color: var(--ink-soft);">
+    → 와우 모먼트 = <strong>"1년 전 기억이 살아 있고, 그걸 같이 본다"</strong>. PoV 충족 + organic referral 트리거 동시.
+  </p>
+  </section>
+
+  <!-- ⑥ -->
+  <section id="feedback">
+  <h2>⑥ 4-Block 피드백 (가상 페르소나 3명)</h2>
+
+  <h3>A. 정민 본인 (T1 · 베타 메인 타깃)</h3>
+  <div class="fourblock">
+    <div class="block plus"><div class="block-head"><span class="symbol">+</span> 좋은 점</div><ul><li>사진만 던지면 일기됨</li><li>검토 부담 적음</li><li>1년 뒤 검색 정확</li></ul></div>
+    <div class="block minus"><div class="block-head"><span class="symbol">−</span> 아쉬운 점</div><ul><li>모드 B 정리가 내 의도와 다르게 다듬어질까 걱정</li></ul></div>
+    <div class="block question"><div class="block-head"><span class="symbol">?</span> 궁금한 점</div><ul><li>cap·비용은 어떻게 보이나?</li></ul></div>
+    <div class="block star"><div class="block-head"><span class="symbol">☆</span> 제안</div><ul><li>자동 생성 톤을 내 선호로 학습 (V2)</li></ul></div>
+  </div>
+
+  <h3>B. 30대 여성, 일기 시도 여러 번 실패 (T2)</h3>
+  <div class="fourblock">
+    <div class="block plus"><div class="block-head"><span class="symbol">+</span> 좋은 점</div><ul><li>"AI 일기 도우미" 정체성 명확</li><li>의무감 줄어듦</li></ul></div>
+    <div class="block minus"><div class="block-head"><span class="symbol">−</span> 아쉬운 점</div><ul><li>자동 생성된 일기가 "내 것" 같지 않을까봐 망설임</li></ul></div>
+    <div class="block question"><div class="block-head"><span class="symbol">?</span> 궁금한 점</div><ul><li>사진 없이 텍스트만으로 시작 가능한지 첫 화면에서 보이나?</li></ul></div>
+    <div class="block star"><div class="block-head"><span class="symbol">☆</span> 제안</div><ul><li>첫 사용 시 "텍스트만 써도 OK" 가이드 카드</li></ul></div>
+  </div>
+
+  <h3>C. 20대 후반 남성, 매일 일기 작성, AI 거부감 (베타 타깃 ❌)</h3>
+  <div class="fourblock">
+    <div class="block plus"><div class="block-head"><span class="symbol">+</span> 좋은 점</div><ul><li>자연어 검색은 매력적</li></ul></div>
+    <div class="block minus"><div class="block-head"><span class="symbol">−</span> 아쉬운 점</div><ul><li>자동 생성 = "내가 쓴 일기가 아니다"</li></ul></div>
+    <div class="block question"><div class="block-head"><span class="symbol">?</span> 궁금한 점</div><ul><li>"AI 정리 안 하기" 토글 있나?</li></ul></div>
+    <div class="block star"><div class="block-head"><span class="symbol">☆</span> 제안</div><ul><li>직접 쓴 일기 그대로 저장 모드 (V2)</li></ul></div>
+  </div>
+
+  <div class="note">
+    <strong>핵심 발견:</strong> 페르소나 C는 베타 타깃 아님 (의도적 제외). 페르소나 B의 "내 것 같지 않다" 우려는 검토 게이트 + 카피 톤 ("AI가 도와줘요, 그래도 내 일기예요")로 해소.
+  </div>
+  </section>
+
+  <!-- ⑦ -->
+  <section id="tiers">
+  <h2>⑦ 비즈니스 모델 (베타)</h2>
+
+  <div class="three">
+    <div class="tier">
+      <div class="tier-name">FREE</div>
+      <div class="tier-price">₩0<span class="per">/월</span></div>
+      <div class="tier-desc">앱 가치 체험 + 가입 시 3일 캐릭터 트라이얼</div>
+      <ul class="tier-list">
+        <li>일기 작성 무제한</li>
+        <li>AI 호출 <strong>일 3회</strong></li>
+        <li>키워드 검색</li>
+        <li>사진 5장 (1024px 압축)</li>
+        <li>3일 캐릭터 트라이얼</li>
+        <li class="x">RAG 자연어 검색</li>
+        <li class="x">캐릭터 상시 활성</li>
+        <li class="future">광고 시청당 +1 AI (V2)</li>
+      </ul>
+    </div>
+    <div class="tier featured">
+      <div class="tier-name">BASIC</div>
+      <div class="tier-price">₩2,900<span class="per">/월</span></div>
+      <div class="tier-desc">베타의 유일한 유료 티어. 일상 사용에 충분.</div>
+      <ul class="tier-list">
+        <li>일기 작성 무제한</li>
+        <li>AI 호출 <strong>일 10회</strong></li>
+        <li>키워드 + RAG 검색</li>
+        <li>캐릭터 친구 상시 활성</li>
+        <li>사진 5장 (1024px 압축)</li>
+        <li class="future">광고 시청당 추가 (V2)</li>
+        <li class="future">연 ₩29,000 할인 (V2)</li>
+      </ul>
+    </div>
+    <div class="tier" style="opacity: 0.6;">
+      <div class="tier-name">PRO (V2)</div>
+      <div class="tier-price">₩4,900<span class="per">/월</span></div>
+      <div class="tier-desc">베타에서는 출시 안 함. V2 광고 도입 후 추가.</div>
+      <ul class="tier-list">
+        <li>AI 호출 <strong>일 100회</strong> (안전 cap)</li>
+        <li>RAG 무제한</li>
+        <li>사진 10장</li>
+        <li>광고 완전 제거</li>
+        <li>페르소나 커스텀 + 캐릭터 스킨</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>마진 시뮬레이션 (Gemini Flash 기준)</h3>
+  <table>
+    <thead><tr><th>Tier</th><th>가격</th><th class="num">1유저 변동비 (정상)</th><th class="num">1유저 변동비 (cap 풀)</th><th class="num">마진 (정상)</th></tr></thead>
+    <tbody>
+      <tr><td>무료</td><td>₩0</td><td class="num">~₩87</td><td class="num">~₩87</td><td class="num">-₩87 (광고로 보전 예정)</td></tr>
+      <tr><td><strong>Basic</strong></td><td>₩2,900</td><td class="num">~₩125</td><td class="num">~₩322</td><td class="num"><strong>₩2,775</strong></td></tr>
+      <tr><td>Pro (V2)</td><td>₩4,900</td><td class="num">~₩122</td><td class="num">~₩2,975</td><td class="num">₩4,778</td></tr>
+    </tbody>
+  </table>
+
+  <h3>UI 정책</h3>
+  <ul style="font-size: 14px; color: var(--ink-soft);">
+    <li><strong>무료:</strong> AI 버튼 옆 "오늘 X/3 회" 상시 표기, 도달 시 "내일 다시" + (V2: "광고 보고 +1")</li>
+    <li><strong>Basic:</strong> "오늘 X/10 회" 상시 표기</li>
+    <li><strong>Pro (V2):</strong> 평소 숨김, 도달 시 안내. 구독 상세에 "비정상 사용 방지를 위해 일 100회 cap" 표기</li>
+  </ul>
+  </section>
+
+  <!-- ⑧ -->
+  <section id="scope">
+  <h2>⑧ 베타 출시 범위 (In · Out)</h2>
+  <div class="scope">
+    <div class="scope-box in">
+      <h4>✅ In-Scope (베타 포함)</h4>
+      <ul>
+        <li>핵심 기능 9개 (F1~F9)</li>
+        <li>무료 / Basic 2-tier (₩2,900)</li>
+        <li>회원가입·로그인·비밀번호 재설정</li>
+        <li>사진 5장, 1024px 자동 압축, 같은 날(B-1.smart)</li>
+        <li>과거 일기 작성 + 날짜 picker (작성/미작성 시각 구분)</li>
+        <li>백업 스왑 (직전 1개 항상 보관)</li>
+        <li>22:00 KST 공감형 리마인드 푸시 (1종)</li>
+        <li>한국어 UI</li>
+        <li>PWA (iOS·Android 홈스크린 설치)</li>
+        <li>데이터 내보내기 (JSON)</li>
+        <li>계정 탈퇴 (Cascade)</li>
+        <li>외부 LLM 동의 체크박스 (가입 시)</li>
+        <li>3중 abuse cap (재생성 5회 / 일 100회 / 이미지 1024px)</li>
+      </ul>
+    </div>
+    <div class="scope-box out">
+      <h4>❌ Out-of-Scope (V2 이후)</h4>
+      <ul>
+        <li>Pro 티어 (₩4,900)</li>
+        <li>광고 보상 모델 (AdMob 등)</li>
+        <li>페르소나 프리셋·커스텀 UI</li>
+        <li>캐릭터 스킨·외형 커스텀</li>
+        <li>음성 입력 (별도 UI — 키보드 STT는 자연 활용)</li>
+        <li>일기 공유 카드 이미지 생성</li>
+        <li>OS share sheet 통합</li>
+        <li>마크다운 렌더링</li>
+        <li>오프라인 캐시·동기화</li>
+        <li>다국어</li>
+        <li>DiaryRevision 1:N (전체 이력)</li>
+        <li>캘린더 통합 검색</li>
+        <li>passive 자동 추천 ("N년 전 오늘")</li>
+        <li>이메일 인증 (출시 직전 추가 가능)</li>
+        <li>약관·개인정보처리방침 정적 페이지 (외부 공개 직전)</li>
+      </ul>
+    </div>
+  </div>
+  </section>
+
+  <!-- ⑨ -->
+  <section id="data">
+  <h2>⑨ 데이터 모델 (베타 진입 시 변경)</h2>
+  <table>
+    <thead><tr><th>엔티티</th><th>핵심 필드</th><th>상태</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>User</strong></td>
+        <td>id, email, hashedPassword, displayName, <strong>trialEndDate</strong>, <strong>externalLLMConsent</strong></td>
+        <td><span class="pill quick">기존 + 2 필드</span></td>
+      </tr>
+      <tr>
+        <td><strong>UserPersona</strong></td>
+        <td>userId(1:1), presetKey="factual", tone, formality, sentenceLength, perspective</td>
+        <td><span class="pill big">신규</span> · 베타엔 기본값만, UI는 V2</td>
+      </tr>
+      <tr>
+        <td><strong>Diary</strong></td>
+        <td>id, userId, date, title, content, <strong>previousContent</strong>, <strong>previousChangedAt</strong>, mood, location, <strong>source</strong>(auto_a/b/c/manual), <strong>aiGenerationVersion</strong>, createdAt, <strong>updatedAt</strong>, <strong>contentEditedAt</strong></td>
+        <td><span class="pill quick">기존 + 다중 필드</span></td>
+      </tr>
+      <tr>
+        <td><strong>DiaryImage</strong></td>
+        <td>id, diaryId, storagePath, exifTakenAt, exifLat, exifLng, orderIndex</td>
+        <td><span class="pill big">신규</span> · 단일 imageUrl → 1:N 마이그레이션</td>
+      </tr>
+      <tr>
+        <td><strong>DiaryEmbedding</strong></td>
+        <td>diaryId, vector(768), updatedAt</td>
+        <td><span class="pill big">신규</span> · pgvector</td>
+      </tr>
+      <tr>
+        <td><strong>UsageLog</strong></td>
+        <td>userId, date, aiCallCount, regenerationCount, tier</td>
+        <td><span class="pill big">신규</span> · 일일 cap 계산용</td>
+      </tr>
+      <tr>
+        <td>~Character, CoinTransaction, CharacterOutfitOwned~</td>
+        <td>—</td>
+        <td><span class="pill drop">베타 미사용</span> · 캐릭터는 친구로 재포지셔닝, 코인·구독 정체성 제거</td>
+      </tr>
+      <tr>
+        <td><strong>ChatMessage</strong> (재활용)</td>
+        <td>userId, role, content, createdAt</td>
+        <td><span class="pill quick">기존</span> · 캐릭터 RAG 채팅 인터페이스용</td>
+      </tr>
+    </tbody>
+  </table>
+  </section>
+
+  <!-- ⑩ -->
+  <section id="agent">
+  <h2>⑩ Multi-Agent 기능 설계</h2>
+  <p style="color: var(--ink-soft); font-size: 14px;">
+    베타는 단일 LLM 호출 + 모드 분기 구조. V2 이후 에이전트 분리 검토.
+  </p>
+
+  <div class="card">
+    <h4>베타 — 단일 엔진, 모드 분기</h4>
+    <div class="arch-row"><div class="arch-tag">입력</div><div class="arch-body">사진(0~5장) + 텍스트(0~?자) + 페르소나(고정)</div></div>
+    <div class="arch-row"><div class="arch-tag">분기</div><div class="arch-body">사진만 → 모드 A / 텍스트만 → 모드 B / 둘 다 → 모드 C</div></div>
+    <div class="arch-row"><div class="arch-tag">처리</div><div class="arch-body">Gemini 2.5 Flash 멀티모달 단일 호출. 모드별 시스템 프롬프트 차이.</div></div>
+    <div class="arch-row"><div class="arch-tag">출력</div><div class="arch-body">JSON { title, content, suggestedMood } → Zod 검증 → 사용자 검토 게이트</div></div>
+    <div class="arch-row"><div class="arch-tag">백그라운드</div><div class="arch-body">저장 후 임베딩 자동 생성 (text-embedding-004)</div></div>
+  </div>
+
+  <h3 style="margin-top: 24px;">V2 — 에이전트 분리 후보</h3>
+  <div class="two">
+    <div class="card">
+      <h4>1. Diary Writer Agent</h4>
+      <p style="font-size: 13px; color: var(--ink-soft); margin: 0;">사진/텍스트 → 일기 본문 생성·정리. 페르소나·톤·길이 적용. 현재 베타의 단일 엔진을 분리.</p>
+    </div>
+    <div class="card">
+      <h4>2. Memory Companion Agent (캐릭터)</h4>
+      <p style="font-size: 13px; color: var(--ink-soft); margin: 0;">RAG 검색 + 대화. 사용자 일기 컨텍스트 유지. Basic+ 한정. 일기를 "다 본 친구" 페르소나.</p>
+    </div>
+  </div>
+  </section>
+
+  <!-- ⑪ -->
+  <section id="policy">
+  <h2>⑪ 정책·엣지케이스</h2>
+
+  <h3>같은 날 사진 — B-1.smart</h3>
+  <ul style="font-size: 14px; color: var(--ink-soft);">
+    <li>EXIF 있는 사진들끼리 = 같은 KST 날짜여야 함 (다르면 reject)</li>
+    <li>EXIF 없는 사진은 "정보 없음" 마커 + 사용자 입력 날짜 사용</li>
+    <li>자정 걸침 (23:55~00:15): 가장 많은 사진이 속한 날짜 자동 선택 + 한 줄 안내</li>
+    <li>해외 사진 timezone 누락: KST로 해석 (V2에서 timezone 처리)</li>
+  </ul>
+
+  <h3>과거 일기 AI 수정 엣지케이스</h3>
+  <table>
+    <thead><tr><th>#</th><th>케이스</th><th>정책</th></tr></thead>
+    <tbody>
+      <tr><td>E1</td><td>과거 일기에 AI 수정</td><td>일일 cap에 포함 (별도 cap 없음)</td></tr>
+      <tr><td>E2</td><td>AI 재작성 후 원본 잃어버림</td><td>백업 스왑 — content↔previousContent 자동 스왑</td></tr>
+      <tr><td>E3</td><td>일괄 재생성 시도</td><td>금지. 한 번에 1개씩만</td></tr>
+      <tr><td>E4</td><td>새 페르소나로 재작성 (V2)</td><td>좌우 비교 미리보기 강제</td></tr>
+      <tr><td>E5</td><td>cap 다 썼는데 또 수정하고 싶음</td><td>수동 타이핑은 무제한, AI 호출만 cap 차감</td></tr>
+      <tr><td>E6</td><td>cap 도달 후 안내 메시지</td><td>"오늘은 다 썼어요. 직접 수정은 가능해요" 명확 카피</td></tr>
+      <tr><td>E7</td><td>오래된 일기에 사진 추가 후 모드 C 재생성</td><td>허용. E4 미리보기로 보호</td></tr>
+      <tr><td>E8</td><td>재작성 중 LLM 실패</td><td>임시 영역에서 진행, 사용자 승인 시에만 실제 update</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3중 Abuse Cap</h3>
+  <ul style="font-size: 14px; color: var(--ink-soft);">
+    <li><strong>재생성:</strong> 일기당 최대 5회 (Basic+)</li>
+    <li><strong>일일 사용자 cap:</strong> 무료 3 / Basic 10 / Pro 100</li>
+    <li><strong>이미지 압축:</strong> 업로드 시 1024px max 자동 리사이즈</li>
+  </ul>
+
+  <h3>프라이버시</h3>
+  <ul style="font-size: 14px; color: var(--ink-soft);">
+    <li>가입 시 외부 LLM 전송 동의 체크박스 필수</li>
+    <li>Gemini Flash 유료 티어 사용 (학습 비활성)</li>
+    <li>사진은 Supabase Storage Private + Signed URL</li>
+    <li>검색 쿼리도 외부 전송됨 — 약관 명시</li>
+  </ul>
+  </section>
+
+  <!-- ⑫ -->
+  <section id="copy">
+  <h2>⑫ 마케팅 카피 (3종)</h2>
+  <div class="three">
+    <div class="card">
+      <h4>앱스토어 한 줄</h4>
+      <p style="font-weight: 700; font-size: 16px; line-height: 1.5; margin: 0;">
+        "사진만 던지면 일기가 됩니다.<br>1년 뒤 그날을 다시 만나세요."
+      </p>
+    </div>
+    <div class="card">
+      <h4>온보딩 첫 화면</h4>
+      <p style="font-weight: 700; font-size: 15px; line-height: 1.6; margin: 0;">
+        "오늘 못 써도 괜찮아요.<br>사진이 있으면 언제든 그날을 채울 수 있으니까."
+      </p>
+    </div>
+    <div class="card">
+      <h4>22:00 푸시</h4>
+      <p style="font-weight: 700; font-size: 15px; line-height: 1.6; margin: 0;">
+        "오늘 하루도 수고했어요.<br>1분만 남겨볼까요?"
+      </p>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top: 24px;">
+    <strong>카피 톤 원칙:</strong> 죄책감·강요 X. 가벼움·따뜻함·여유. "AI가 도와줘요, 그래도 내 일기예요" 메시지를 온보딩·설정·도움말에 반복.
+  </div>
+  </section>
+
+  <!-- ⑬ -->
+  <section id="decisions">
+  <h2>⑬ 결정 추적표 (의사결정 이력)</h2>
+  <table>
+    <thead><tr><th>#</th><th>결정</th><th>대안</th><th>이유</th></tr></thead>
+    <tbody>
+      <tr><td>D01</td><td>코드는 옆에 두고 zero-base 재기획</td><td>기존 코드 보강</td><td>능동적 타성 회피</td></tr>
+      <tr><td>D02</td><td>카테고리 = 일기 앱 (관계 회복은 부수효과)</td><td>관계 자산 관리 도구</td><td>사용자 명시 reject</td></tr>
+      <tr><td>D03</td><td>USP = "회고할 데이터가 존재한다"</td><td>"감성 다이어리"</td><td>일반 일기앱 차별화</td></tr>
+      <tr><td>D04</td><td>1차 베타 페르소나 = T1 (본인)</td><td>T2·T3</td><td>가장 강한 데이터·동기</td></tr>
+      <tr><td>D05</td><td>사후 학습형 (회상 유도)</td><td>실시간 보조/예방형</td><td>가벼움 우선</td></tr>
+      <tr><td>D06</td><td>능동 진입 only (자동 sync X)</td><td>갤러리 자동 sync</td><td>권한·프라이버시</td></tr>
+      <tr><td>D07</td><td>리마인드 푸시 = 공감형, 22:00 KST</td><td>죄책감형/시간형</td><td>PoV 가벼움 정합</td></tr>
+      <tr><td>D08</td><td>사진 5장 / 같은날 B-1.smart</td><td>1·3·10장 / strict</td><td>품질·UX 균형</td></tr>
+      <tr><td>D09</td><td>과거 날짜 일기 작성 OK</td><td>오늘만</td><td>USP 두 번째 축</td></tr>
+      <tr><td>D10</td><td>입력 = 사진 OR 텍스트 OR 둘 다 (모드 A/B/C)</td><td>사진만 / Q&A만</td><td>사용자 reframe</td></tr>
+      <tr><td>D11</td><td>AI는 본문 생성기 (Path A)</td><td>Q&A 합성기</td><td>원래 비전, "쓰지 않아도"</td></tr>
+      <tr><td>D12</td><td>본문 = 1인칭 + 150~250자</td><td>중간/사용자 선택</td><td>마찰 최소</td></tr>
+      <tr><td>D13</td><td>환각 안전망 = 시각 강조만</td><td>신고 버튼/디스클레이머</td><td>베타 단순화</td></tr>
+      <tr><td>D14</td><td>페르소나 엔티티 → 베타는 기본값 고정</td><td>UI 노출</td><td>V2 분리</td></tr>
+      <tr><td>D15</td><td>수정 이력 = 백업 스왑 (직전 1개)</td><td>cron 만료/전체 이력</td><td>사용자 제안, 우아함</td></tr>
+      <tr><td>D16</td><td>캐릭터 = 친구 재포지셔닝, Basic+ 한정</td><td>완전 제거 / 전부 유지</td><td>코어 루프 단순화</td></tr>
+      <tr><td>D17</td><td>RAG = 캐릭터의 기능</td><td>독립 검색 화면</td><td>유료 가치 차별화</td></tr>
+      <tr><td>D18</td><td>구독료 ₩2,900 (Basic)</td><td>₩4,900 / ₩3,900</td><td>일기앱 진입가, 사용자 직관</td></tr>
+      <tr><td>D19</td><td>무료 cap = 일 3회 (V2 광고로 +N)</td><td>5회 / 10회</td><td>비용 통제, 광고 모델과 정합</td></tr>
+      <tr><td>D20</td><td>광고 모델 = (Y) 가치 체험 후 광고</td><td>매번 광고 / 1회후 광고</td><td>retention 우선</td></tr>
+      <tr><td>D21</td><td>3-tier (Free/Basic/Pro) — 베타엔 Basic만</td><td>단일 유료 영구</td><td>제품 검증 단계 집중</td></tr>
+      <tr><td>D22</td><td>트라이얼 3일 (캐릭터)</td><td>없음 / 7일 / 30일</td><td>맛보기 후 욕구 자극</td></tr>
+      <tr><td>D23</td><td>cap UI = 무료/Basic 상시, Pro 도달 시</td><td>모두 상시 / 모두 숨김</td><td>티어별 인식 차이</td></tr>
+    </tbody>
+  </table>
+  </section>
+
+  <footer>
+    <strong>다음 단계:</strong> 본 기획서를 토대로 <strong>Milestone/second_milestone.md</strong> 작성 → Phase별 구현 일정 → 개발 진입.<br>
+    본 문서는 의사결정의 동결된 스냅샷이며, 향후 변경은 Decision 추적표 (⑬)에 추가하는 방식으로 관리.
+  </footer>
+
+</div>
+</body>
+</html>

@@ -63,3 +63,9 @@ next-env.d.ts
 
 # Claude Code (worktrees, local state)
 .claude/
+
+# Obsidian (personal notes)
+.obsidian/
+
+# Supabase CLI local state
+.supabase/
