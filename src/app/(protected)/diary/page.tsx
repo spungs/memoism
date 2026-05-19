@@ -18,7 +18,8 @@ export default async function DiaryListPage() {
       id: d.id,
       title: d.title,
       content: d.content,
-      images: d.images,
+      // Phase 3 MIG-3에서 DiaryImage 1:N으로 다중 이미지 표시. 베타 stub은 빈 배열.
+      images: [] as string[],
       mood: d.mood,
       createdAt: d.createdAt.toISOString(),
     })),

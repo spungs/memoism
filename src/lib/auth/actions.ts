@@ -3,7 +3,6 @@
 import { Prisma, SubscriptionStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { trialEndDate } from "@/lib/character/utils";
 import { hashPassword, verifyPassword } from "./password";
 import { signupSchema, loginSchema } from "./schemas";
 import { createSession, deleteSession, getSession } from "./session";
@@ -34,12 +33,13 @@ export async function signupAction(
   const { email, password } = parsed.data;
   const passwordHash = await hashPassword(password);
 
-  // Create the User and their AI character together so a User never exists
-  // without the 1:1 Character ChatMessage and most app surfaces depend on.
-  // The trial starts now and runs for 30 days (PRD §3.3).
+  // Create the User, their friend Character, and UserPersona row together.
+  //   - User ↔ Character 1:1 invariant (schema.prisma)
+  //   - UserPersona 기본값 row 1개 (D14: 베타엔 UI 미노출, 기본값으로만 동작)
+  //   - 베타 정책: 전원 Basic 자동 부여 (ACTIVE). 트라이얼 개념 자체 폐기.
+  //   - external_llm_consent는 Phase 5 MIG-9에서 가입 폼 체크박스로 받음.
   let user;
   try {
-    const trialStart = new Date();
     user = await prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
         data: { email: email.toLowerCase(), passwordHash },
@@ -48,10 +48,11 @@ export async function signupAction(
       await tx.character.create({
         data: {
           userId: created.id,
-          subscriptionStatus: SubscriptionStatus.TRIAL,
-          trialStartedAt: trialStart,
-          subscriptionExpiresAt: trialEndDate(trialStart),
+          subscriptionStatus: SubscriptionStatus.ACTIVE,
         },
+      });
+      await tx.userPersona.create({
+        data: { userId: created.id },
       });
       return created;
     });

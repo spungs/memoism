@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CharacterCard } from "@/components/character/character-card";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
-import { outfitIdToSkin } from "@/lib/character/skins";
 import { getRecentDiaries } from "@/lib/diary/queries";
 
+// Phase 3 MIG-11에서 AI 작성 진입 CTA + 오늘의 일기 위젯으로 재배치 예정.
+// 현재는 임시 인사 stub.
 export default async function HomePage() {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -13,15 +13,12 @@ export default async function HomePage() {
   const [character, recentDiaries, diaryCount] = await Promise.all([
     prisma.character.findUnique({
       where: { userId: session.userId },
-      include: { equipped: true },
     }),
     getRecentDiaries(session.userId, 3),
     prisma.diary.count({ where: { userId: session.userId } }),
   ]);
 
   if (!character) redirect("/login");
-
-  const skin = outfitIdToSkin(character.equipped?.outfitId);
 
   return (
     <div
@@ -79,7 +76,14 @@ export default async function HomePage() {
           paddingBottom: recentDiaries.length > 0 ? 0 : "var(--space-8)",
         }}
       >
-        <CharacterCard character={character} diaryCount={diaryCount} skin={skin} />
+        <div style={{ textAlign: "center", color: "var(--fg-subtle)" }}>
+          <p style={{ fontFamily: "var(--font-serif)", fontSize: "var(--text-lg)", margin: 0 }}>
+            안녕, {character.name}
+          </p>
+          <p style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", marginTop: "var(--space-2)" }}>
+            일기 {diaryCount}개
+          </p>
+        </div>
       </div>
 
       {/* 최근 일기 */}

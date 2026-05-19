@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -7,6 +6,8 @@ import { DiaryDetailActions } from "@/components/diary/diary-detail-actions";
 import { MoodBadge } from "@/components/diary/mood-badge";
 import { getSession } from "@/lib/auth/session";
 import { getDiary } from "@/lib/diary/queries";
+
+// Phase 3 MIG-3 진입 전까지 다중 이미지 표시(DiaryImage[]) 임시 비활성화.
 
 const dateFmt = new Intl.DateTimeFormat("ko-KR", {
   year: "numeric",
@@ -35,7 +36,6 @@ export default async function DiaryDetailPage({ params }: PageProps) {
   const diary = await getDiary(id, session.userId);
   if (!diary) notFound();
 
-  const cover = diary.images[0];
   const date = diary.createdAt;
 
   return (
@@ -129,29 +129,6 @@ export default async function DiaryDetailPage({ params }: PageProps) {
           >
             {diary.title}
           </h1>
-        )}
-
-        {cover && (
-          <div
-            style={{
-              position: "relative",
-              aspectRatio: "16 / 9",
-              width: "100%",
-              overflow: "hidden",
-              borderRadius: "var(--radius-md)",
-              backgroundColor: "var(--surface)",
-              border: "1px solid var(--border)",
-              marginBottom: "var(--space-5)",
-            }}
-          >
-            <Image
-              src={cover}
-              alt=""
-              fill
-              sizes="(max-width: 720px) 100vw, 720px"
-              style={{ objectFit: "cover" }}
-            />
-          </div>
         )}
 
         <DiaryContent>{diary.content}</DiaryContent>

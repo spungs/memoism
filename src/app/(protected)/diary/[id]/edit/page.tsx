@@ -44,7 +44,8 @@ export default async function DiaryEditPage({ params }: PageProps) {
       initial={{
         title: diary.title,
         content: diary.content,
-        images: diary.images,
+        // Phase 3 MIG-3에서 DiaryImage 1:N으로 다중 이미지 첨부. 베타 stub은 빈 배열.
+        images: [],
         location: parseStoredLocation(diary.location),
         mood: parseStoredMood(diary.mood),
         date: diaryDate,

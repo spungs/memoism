@@ -4,13 +4,15 @@ import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
-import { deleteImage, saveImage, StorageError } from "@/lib/storage";
 import {
   diaryInputSchema,
   moodKeySchema,
   type DiaryLocation,
   type MoodKey,
 } from "./schemas";
+
+// Phase 3 MIG-3 진입 전까지 이미지 처리(saveImage/DiaryImage 1:N)는 임시 비활성화.
+// 현재 일기 텍스트만 저장·수정·삭제 가능. 다중 이미지 첨부는 Phase 3 이후.
 
 export type DiaryActionResult =
   | { ok: true; data: { id: string } }
@@ -20,13 +22,10 @@ export type DiaryActionResult =
       fieldErrors?: Partial<Record<"title" | "content" | "image" | "location", string>>;
     };
 
-const KEEP_EXISTING_IMAGE = "__keep__";
-
 function parseDiaryDate(raw: FormDataEntryValue | null): Date {
   if (typeof raw !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return new Date();
   const d = new Date(raw + "T12:00:00");
   if (isNaN(d.getTime())) return new Date();
-  // Reject future dates
   return d > new Date() ? new Date() : d;
 }
 
@@ -57,18 +56,6 @@ function fieldErrorsFromZod(
   return out;
 }
 
-async function readImageOrError(
-  formData: FormData,
-): Promise<
-  | { kind: "none" }
-  | { kind: "file"; file: File }
-  | { kind: "error"; message: string }
-> {
-  const raw = formData.get("image");
-  if (!(raw instanceof File) || raw.size === 0) return { kind: "none" };
-  return { kind: "file", file: raw };
-}
-
 export async function createDiaryAction(
   formData: FormData,
 ): Promise<DiaryActionResult> {
@@ -85,27 +72,11 @@ export async function createDiaryAction(
 
   const diaryDate = parseDiaryDate(formData.get("date"));
 
-  const imageInput = await readImageOrError(formData);
-  if (imageInput.kind === "error") {
-    return { ok: false, fieldErrors: { image: imageInput.message } };
-  }
-
-  let imageUrl: string | null = null;
-  if (imageInput.kind === "file") {
-    try {
-      imageUrl = await saveImage(imageInput.file, session.userId);
-    } catch (e) {
-      const msg = e instanceof StorageError ? e.message : "이미지 업로드에 실패했습니다";
-      return { ok: false, fieldErrors: { image: msg } };
-    }
-  }
-
   const diary = await prisma.diary.create({
     data: {
       userId: session.userId,
       title: parsed.data.title,
       content: parsed.data.content,
-      images: imageUrl ? [imageUrl] : [],
       location: parsed.data.location ?? Prisma.DbNull,
       mood: parsed.data.mood ?? null,
       createdAt: diaryDate,
@@ -127,7 +98,7 @@ export async function updateDiaryAction(
 
   const existing = await prisma.diary.findFirst({
     where: { id, userId: session.userId },
-    select: { id: true, images: true },
+    select: { id: true },
   });
   if (!existing) return { ok: false, error: "일기를 찾을 수 없습니다" };
 
@@ -141,49 +112,16 @@ export async function updateDiaryAction(
 
   const diaryDate = parseDiaryDate(formData.get("date"));
 
-  // Image semantics:
-  //   - field absent or "__keep__"   → leave existing image untouched
-  //   - empty file (size 0) and "remove" flag → drop existing
-  //   - new file                     → replace (delete old after success)
-  const imageMode = formData.get("imageMode");
-  const imageInput = await readImageOrError(formData);
-  if (imageInput.kind === "error") {
-    return { ok: false, fieldErrors: { image: imageInput.message } };
-  }
-
-  let nextImages = existing.images;
-  let imageToDelete: string | null = null;
-
-  if (imageInput.kind === "file") {
-    let uploaded: string;
-    try {
-      uploaded = await saveImage(imageInput.file, session.userId);
-    } catch (e) {
-      const msg = e instanceof StorageError ? e.message : "이미지 업로드에 실패했습니다";
-      return { ok: false, fieldErrors: { image: msg } };
-    }
-    nextImages = [uploaded];
-    if (existing.images[0]) imageToDelete = existing.images[0];
-  } else if (imageMode === "remove") {
-    nextImages = [];
-    if (existing.images[0]) imageToDelete = existing.images[0];
-  } else if (imageMode !== KEEP_EXISTING_IMAGE && imageMode !== null) {
-    // Unknown mode → ignore; treat as keep.
-  }
-
   await prisma.diary.update({
     where: { id },
     data: {
       title: parsed.data.title,
       content: parsed.data.content,
-      images: nextImages,
       location: parsed.data.location ?? Prisma.DbNull,
       mood: parsed.data.mood ?? null,
       createdAt: diaryDate,
     },
   });
-
-  if (imageToDelete) await deleteImage(imageToDelete);
 
   revalidatePath("/diary");
   revalidatePath(`/diary/${id}`);
@@ -199,12 +137,11 @@ export async function deleteDiaryAction(
 
   const existing = await prisma.diary.findFirst({
     where: { id, userId: session.userId },
-    select: { id: true, images: true },
+    select: { id: true },
   });
   if (!existing) return { ok: false, error: "일기를 찾을 수 없습니다" };
 
   await prisma.diary.delete({ where: { id } });
-  await Promise.all(existing.images.map((url) => deleteImage(url)));
 
   revalidatePath("/diary");
   revalidatePath("/");

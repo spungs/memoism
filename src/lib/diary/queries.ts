@@ -8,11 +8,12 @@ export interface DiariesPage<T> {
   nextCursor: string | null;
 }
 
+// Phase 3 MIG-3에서 images: { select: { storagePath, exifTakenAt, orderIndex } } 추가 예정.
+// 현재는 다중 이미지 UI/storage 인프라 부재로 select에서 제외.
 const listSelect = {
   id: true,
   title: true,
   content: true,
-  images: true,
   location: true,
   mood: true,
   createdAt: true,
