@@ -210,6 +210,55 @@ export function AuthForm({ mode, action }: AuthFormProps) {
           ) : null}
         </div>
 
+        {mode === "signup" && (
+          <div>
+            <label
+              htmlFor="consent"
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "var(--space-3)",
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                color: "var(--fg)",
+                lineHeight: "var(--leading-relaxed)",
+                cursor: "pointer",
+              }}
+            >
+              <input
+                id="consent"
+                name="consent"
+                type="checkbox"
+                required
+                aria-invalid={Boolean(state.fieldErrors?.consent)}
+                aria-describedby={
+                  state.fieldErrors?.consent ? "consent-error" : undefined
+                }
+                style={{
+                  marginTop: 3,
+                  width: 18,
+                  height: 18,
+                  accentColor: "var(--accent-rose)",
+                  flexShrink: 0,
+                }}
+              />
+              <span>
+                사진·텍스트가 일기 생성·검색을 위해 Google Gemini로 전송되는
+                것에 동의해요. <span style={{ color: "var(--danger)" }}>(필수)</span>
+              </span>
+            </label>
+            {state.fieldErrors?.consent && (
+              <p
+                id="consent-error"
+                role="alert"
+                style={{ ...ERROR_STYLE, marginLeft: 30 }}
+              >
+                {state.fieldErrors.consent}
+              </p>
+            )}
+          </div>
+        )}
+
         {state.error && (
           <p
             role="alert"

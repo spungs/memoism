@@ -9,7 +9,7 @@ import { createSession, deleteSession, getSession } from "./session";
 
 export type AuthFormState = {
   error?: string;
-  fieldErrors?: Partial<Record<"email" | "password", string>>;
+  fieldErrors?: Partial<Record<"email" | "password" | "consent", string>>;
 };
 
 export async function signupAction(
@@ -19,12 +19,17 @@ export async function signupAction(
   const parsed = signupSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
+    consent: formData.get("consent"),
   });
 
   if (!parsed.success) {
     const fieldErrors: AuthFormState["fieldErrors"] = {};
     for (const issue of parsed.error.issues) {
-      const path = issue.path[0] as "email" | "password" | undefined;
+      const path = issue.path[0] as
+        | "email"
+        | "password"
+        | "consent"
+        | undefined;
       if (path && !fieldErrors[path]) fieldErrors[path] = issue.message;
     }
     return { fieldErrors };
@@ -37,12 +42,16 @@ export async function signupAction(
   //   - User ↔ Character 1:1 invariant (schema.prisma)
   //   - UserPersona 기본값 row 1개 (D14: 베타엔 UI 미노출, 기본값으로만 동작)
   //   - 베타 정책: 전원 Basic 자동 부여 (ACTIVE). 트라이얼 개념 자체 폐기.
-  //   - external_llm_consent는 Phase 5 MIG-9에서 가입 폼 체크박스로 받음.
+  //   - externalLLMConsent: signup 폼 필수 체크박스로 받음 (MIG-9).
   let user;
   try {
     user = await prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
-        data: { email: email.toLowerCase(), passwordHash },
+        data: {
+          email: email.toLowerCase(),
+          passwordHash,
+          externalLLMConsent: true,
+        },
         select: { id: true, email: true },
       });
       await tx.character.create({
