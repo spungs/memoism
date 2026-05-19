@@ -1,13 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifySessionToken } from "@/lib/auth/session";
 
-const PUBLIC_PATHS = ["/login", "/signup"];
+// Exact-match whitelist. Adding a sub-route under /login or /signup later requires
+// updating this list explicitly — preferred over prefix matching to avoid auth
+// bypass via unintended sub-routes (QA L-1).
+const PUBLIC_PATHS = new Set(["/login", "/signup"]);
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const isPublic = PUBLIC_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`),
-  );
+  const isPublic = PUBLIC_PATHS.has(pathname);
   const isApi = pathname.startsWith("/api/");
 
   const token = req.cookies.get("session")?.value;

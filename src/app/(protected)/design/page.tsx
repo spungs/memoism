@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 
+// Dev-only token preview. Hidden in production builds (QA P2-6).
 export default function DesignPreviewPage() {
+  if (process.env.NODE_ENV === "production") notFound();
   return (
     <main style={{ padding: "var(--space-6)" }}>
       <h1
