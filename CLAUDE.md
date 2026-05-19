@@ -82,4 +82,13 @@ Current domains: `auth`, `diary`, `character`, `storage` (image upload helpers).
 
 `@/*` → `src/*` (see `tsconfig.json`). Use it consistently — mixed relative/aliased imports for the same target are a code-review smell here.
 
+### Design system
+
+프로젝트 루트의 [`DESIGN.md`](./DESIGN.md)가 디자인 시스템의 **단일 진실 출처**다. [Google `DESIGN.md` spec](https://github.com/google-labs-code/design.md) (Apache 2.0) 포맷을 따른다 — YAML 프론트매터(기계 판독 토큰) + 마크다운 8섹션(Overview / Colors / Typography / Layout / Elevation / Shapes / Components / Do's and Don'ts).
+
+- **새 컴포넌트·화면을 만들거나 기존 UI를 손보기 전에 `DESIGN.md`를 먼저 확인**한다. 토큰·프리셋·컴포넌트 규약과 brand do/don't 가이드가 정리되어 있다.
+- YAML 토큰은 `src/app/globals.css`의 CSS variables와 **1:1 매핑**된다. 색·간격·radius·typography preset을 추가/변경할 때는 두 곳을 함께 업데이트해야 drift가 안 생긴다 (자동 동기화 스크립트는 V2 검토).
+- `designer` / `developer` subagent를 호출할 때 prompt에 `DESIGN.md`를 명시적으로 컨텍스트로 넣으면 메모이즘 톤(종이·잉크·따뜻한 sepia)을 즉시 반영한다.
+- 토큰 참조 문법은 `{colors.paper.0}` / `{typography.fonts.serif}` / `{spacing.4}` / `{rounded.md}` 등 점 표기.
+
 ---
