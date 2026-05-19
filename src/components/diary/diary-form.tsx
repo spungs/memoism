@@ -8,9 +8,14 @@ import {
   updateDiaryAction,
   type DiaryActionResult,
 } from "@/lib/diary/actions";
+import { extractExif, type ExifMeta } from "@/lib/diary/exif";
+import { compressImage } from "@/lib/diary/image-compress";
 import type { DiaryLocation } from "@/lib/diary/schemas";
 import { DiaryDatePicker } from "./date-picker";
 import { MoodPicker, type MoodKey } from "./mood-picker";
+
+const MAX_IMAGES = 5;
+const PENDING_DRAFT_KEY = "memoism:pendingDraft";
 
 type Mode = "create" | "edit";
 
@@ -27,9 +32,23 @@ interface DiaryFormProps {
   };
 }
 
+type PickedImage = {
+  id: string;
+  file: File;
+  previewUrl: string;
+};
+
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function exifToWire(e: ExifMeta) {
+  return {
+    takenAt: e.takenAt ? e.takenAt.toISOString() : null,
+    lat: e.lat,
+    lng: e.lng,
+  };
 }
 
 const MUTED_LABEL: React.CSSProperties = {
@@ -56,20 +75,18 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
   const [date, setDate] = useState(initial?.date ?? todayStr());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [pickedFile, setPickedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [keepExisting, setKeepExisting] = useState(
-    Boolean(initial?.images?.[0]),
-  );
+  const [pickedImages, setPickedImages] = useState<PickedImage[]>([]);
 
   const [titleError, setTitleError] = useState<string | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const [aiPending, setAiPending] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const today = todayStr();
 
-  // Auto-grow textarea on initial render and when content is set externally.
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -77,26 +94,32 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     ta.style.height = Math.max(240, ta.scrollHeight) + "px";
   }, []);
 
+  // 미리보기 URL revoke on unmount
   useEffect(() => {
-    if (!pickedFile) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(pickedFile);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [pickedFile]);
+    return () => {
+      for (const img of pickedImages) URL.revokeObjectURL(img.previewUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const handlePickFile: React.ChangeEventHandler<HTMLInputElement> = (e) => {
-    const file = e.target.files?.[0] ?? null;
-    setPickedFile(file);
-    if (file) setKeepExisting(false);
+  const handlePickFiles: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    const files = Array.from(e.target.files ?? []);
+    const slotsLeft = MAX_IMAGES - pickedImages.length;
+    const newPicks: PickedImage[] = files.slice(0, slotsLeft).map((f) => ({
+      id: crypto.randomUUID(),
+      file: f,
+      previewUrl: URL.createObjectURL(f),
+    }));
+    setPickedImages((prev) => [...prev, ...newPicks]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleRemoveImage = () => {
-    setPickedFile(null);
-    setKeepExisting(false);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  const removePickedImage = (id: string) => {
+    setPickedImages((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((p) => p.id !== id);
+    });
   };
 
   const handleAttachLocation = () => {
@@ -106,17 +129,32 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     }
     setLocationError(null);
     navigator.geolocation.getCurrentPosition(
-      (pos) =>
-        setLocation({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        }),
+      (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       () => setLocationError("위치 권한이 거부되었습니다"),
       { timeout: 10000 },
     );
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const buildExifsAndCompress = async () => {
+    const compressed: File[] = [];
+    const exifs: ExifMeta[] = [];
+    for (const img of pickedImages) {
+      // EXIF는 원본에서, 압축은 별개
+      try {
+        exifs.push(await extractExif(img.file));
+      } catch {
+        exifs.push({ takenAt: null, lat: null, lng: null });
+      }
+      try {
+        compressed.push(await compressImage(img.file));
+      } catch {
+        compressed.push(img.file);
+      }
+    }
+    return { compressed, exifs };
+  };
+
+  const handleManualSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setTitleError(null);
     setContentError(null);
@@ -130,27 +168,22 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
       return;
     }
 
-    // Title is required by the schema; auto-derive from first line if empty.
     const effectiveTitle =
-      trimmedTitle ||
-      trimmedContent.split("\n")[0]?.slice(0, 60) ||
-      "일기";
-
-    const fd = new FormData();
-    fd.set("title", effectiveTitle);
-    fd.set("content", trimmedContent);
-    fd.set("location", location ? JSON.stringify(location) : "null");
-    fd.set("mood", mood ?? "");
-    fd.set("date", date);
-
-    if (pickedFile) {
-      fd.set("image", pickedFile);
-      fd.set("imageMode", "replace");
-    } else if (mode === "edit") {
-      fd.set("imageMode", keepExisting ? "__keep__" : "remove");
-    }
+      trimmedTitle || trimmedContent.split("\n")[0]?.slice(0, 60) || "일기";
 
     startTransition(async () => {
+      const { compressed, exifs } = await buildExifsAndCompress();
+
+      const fd = new FormData();
+      fd.set("title", effectiveTitle);
+      fd.set("content", trimmedContent);
+      fd.set("source", "manual");
+      fd.set("location", location ? JSON.stringify(location) : "null");
+      fd.set("mood", mood ?? "");
+      fd.set("date", date);
+      for (const f of compressed) fd.append("image", f);
+      fd.set("exifs", JSON.stringify(exifs.map(exifToWire)));
+
       const result: DiaryActionResult =
         mode === "create"
           ? await createDiaryAction(fd)
@@ -173,9 +206,56 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     });
   };
 
-  const showExistingImage = mode === "edit" && keepExisting && !pickedFile;
-  const existingImage = initial?.images?.[0];
-  const canSubmit = content.trim().length > 0 && !pending;
+  const handleAiGenerate = async () => {
+    if (aiPending || pending) return;
+    setAiPending(true);
+    setAiError(null);
+    try {
+      const { compressed, exifs } = await buildExifsAndCompress();
+
+      const fd = new FormData();
+      for (const f of compressed) fd.append("photo", f);
+      fd.set("exifs", JSON.stringify(exifs.map(exifToWire)));
+      if (content.trim()) fd.set("text", content.trim());
+
+      const res = await fetch("/api/diaries/auto-generate", {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setAiError(data?.error ?? "AI 생성에 실패했어요");
+        return;
+      }
+
+      // sessionStorage에 draft + 입력 컨텍스트 저장 → /diary/review가 읽음
+      sessionStorage.setItem(
+        PENDING_DRAFT_KEY,
+        JSON.stringify({
+          draft: data.draft,
+          storagePaths: data.storagePaths,
+          exifs: data.exifs,
+          mode: data.mode,
+          date,
+          location,
+          createdAt: Date.now(),
+        }),
+      );
+      router.push("/diary/review");
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "AI 생성 실패");
+    } finally {
+      setAiPending(false);
+    }
+  };
+
+  const canManualSave = content.trim().length > 0 && !pending && !aiPending;
+  const canAiGenerate =
+    mode === "create" &&
+    !pending &&
+    !aiPending &&
+    (pickedImages.length > 0 || content.trim().length > 0);
 
   return (
     <div
@@ -202,7 +282,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
         <button
           type="button"
           onClick={() => router.back()}
-          disabled={pending}
+          disabled={pending || aiPending}
           style={{
             background: "none",
             border: "none",
@@ -229,12 +309,12 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
         <button
           form="diary-form"
           type="submit"
-          disabled={!canSubmit}
+          disabled={!canManualSave}
           style={{
             background: "none",
             border: "none",
-            cursor: canSubmit ? "pointer" : "default",
-            color: canSubmit ? "var(--accent-rose)" : "var(--fg-subtle)",
+            cursor: canManualSave ? "pointer" : "default",
+            color: canManualSave ? "var(--accent-rose)" : "var(--fg-subtle)",
             fontFamily: "var(--font-sans)",
             fontSize: "var(--text-sm)",
             fontWeight: 600,
@@ -247,7 +327,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
 
       <form
         id="diary-form"
-        onSubmit={handleSubmit}
+        onSubmit={handleManualSubmit}
         noValidate
         style={{
           flex: 1,
@@ -285,15 +365,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
             }}
           />
           {titleError && (
-            <p
-              role="alert"
-              style={{
-                fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-sm)",
-                color: "var(--danger)",
-                marginTop: 4,
-              }}
-            >
+            <p role="alert" style={errorStyle}>
               {titleError}
             </p>
           )}
@@ -309,7 +381,11 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
               el.style.height = "auto";
               el.style.height = Math.max(240, el.scrollHeight) + "px";
             }}
-            placeholder="오늘 하루를 기록해요..."
+            placeholder={
+              mode === "create"
+                ? "오늘 하루를 기록해요. (사진만 첨부해서 AI로 정리할 수도 있어요)"
+                : "오늘 하루를 기록해요..."
+            }
             autoFocus={mode === "create"}
             aria-invalid={Boolean(contentError)}
             style={{
@@ -327,15 +403,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
             }}
           />
           {contentError && (
-            <p
-              role="alert"
-              style={{
-                fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-sm)",
-                color: "var(--danger)",
-                marginTop: 4,
-              }}
-            >
+            <p role="alert" style={errorStyle}>
               {contentError}
             </p>
           )}
@@ -343,31 +411,66 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
 
         <div style={{ height: 1, backgroundColor: "var(--border)" }} />
 
+        {/* 사진 (최대 5장) */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          <p style={MUTED_LABEL}>이미지</p>
-          {(showExistingImage && existingImage) || previewUrl ? (
+          <p style={MUTED_LABEL}>사진 ({pickedImages.length}/{MAX_IMAGES})</p>
+          {pickedImages.length > 0 && (
             <div
               style={{
-                position: "relative",
-                width: "100%",
-                aspectRatio: "16 / 9",
-                overflow: "hidden",
-                borderRadius: "var(--radius-md)",
-                backgroundColor: "var(--surface)",
-                border: "1px solid var(--border)",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))",
+                gap: "var(--space-2)",
               }}
             >
-              <Image
-                src={previewUrl ?? existingImage!}
-                alt={previewUrl ? "선택한 이미지 미리보기" : "현재 첨부된 이미지"}
-                fill
-                sizes="(max-width: 430px) 100vw, 430px"
-                style={{ objectFit: "cover" }}
-                unoptimized={Boolean(previewUrl)}
-              />
+              {pickedImages.map((img) => (
+                <div
+                  key={img.id}
+                  style={{
+                    position: "relative",
+                    aspectRatio: "1 / 1",
+                    overflow: "hidden",
+                    borderRadius: "var(--radius-md)",
+                    backgroundColor: "var(--surface)",
+                    border: "1px solid var(--border)",
+                  }}
+                >
+                  <Image
+                    src={img.previewUrl}
+                    alt=""
+                    fill
+                    sizes="120px"
+                    style={{ objectFit: "cover" }}
+                    unoptimized
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removePickedImage(img.id)}
+                    aria-label="제거"
+                    style={{
+                      position: "absolute",
+                      top: 4,
+                      right: 4,
+                      width: 22,
+                      height: 22,
+                      borderRadius: "50%",
+                      backgroundColor: "rgba(0,0,0,0.6)",
+                      color: "white",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: 14,
+                      lineHeight: 1,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
             </div>
-          ) : null}
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
+          )}
+          {pickedImages.length < MAX_IMAGES && (
             <label
               style={{
                 fontFamily: "var(--font-sans)",
@@ -378,36 +481,54 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
                 border: "1px solid var(--border)",
                 backgroundColor: "var(--surface)",
                 cursor: "pointer",
+                alignSelf: "flex-start",
               }}
             >
-              {previewUrl || showExistingImage ? "다른 사진 선택" : "사진 추가"}
+              + 사진 추가
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                onChange={handlePickFile}
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                multiple
+                onChange={handlePickFiles}
                 style={{ display: "none" }}
               />
             </label>
-            {(showExistingImage || previewUrl) && (
-              <button
-                type="button"
-                onClick={handleRemoveImage}
-                style={{
-                  fontFamily: "var(--font-sans)",
-                  fontSize: "var(--text-sm)",
-                  color: "var(--danger)",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: "6px 8px",
-                }}
-              >
-                제거
-              </button>
+          )}
+        </div>
+
+        {/* AI 정리 — 베타 척추 (create 모드만) */}
+        {mode === "create" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            <button
+              type="button"
+              onClick={handleAiGenerate}
+              disabled={!canAiGenerate}
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-md)",
+                fontWeight: 600,
+                color: canAiGenerate ? "var(--bg)" : "var(--fg-subtle)",
+                backgroundColor: canAiGenerate ? "var(--fg)" : "var(--surface)",
+                border: "1px solid " + (canAiGenerate ? "var(--fg)" : "var(--border)"),
+                borderRadius: "var(--radius-md)",
+                padding: "12px 16px",
+                cursor: canAiGenerate ? "pointer" : "default",
+                transition: "background-color 120ms",
+              }}
+            >
+              {aiPending ? "AI가 정리 중..." : "✨ AI로 정리하기"}
+            </button>
+            <p style={{ ...MUTED_LABEL, textTransform: "none", letterSpacing: "normal" }}>
+              사진만 있어도, 텍스트만 있어도, 둘 다 있어도 OK.
+            </p>
+            {aiError && (
+              <p role="alert" style={errorStyle}>
+                {aiError}
+              </p>
             )}
           </div>
-        </div>
+        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           <p style={MUTED_LABEL}>위치</p>
@@ -415,16 +536,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
             <button
               type="button"
               onClick={handleAttachLocation}
-              style={{
-                fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-sm)",
-                color: "var(--fg-muted)",
-                padding: "6px 12px",
-                borderRadius: "var(--radius-md)",
-                border: "1px solid var(--border)",
-                backgroundColor: "var(--surface)",
-                cursor: "pointer",
-              }}
+              style={pillButtonStyle}
             >
               {location ? "현재 위치로 갱신" : "현재 위치 사용"}
             </button>
@@ -442,15 +554,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
                 <button
                   type="button"
                   onClick={() => setLocation(null)}
-                  style={{
-                    fontFamily: "var(--font-sans)",
-                    fontSize: "var(--text-sm)",
-                    color: "var(--fg-subtle)",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: "6px 8px",
-                  }}
+                  style={subtleButtonStyle}
                 >
                   제거
                 </button>
@@ -458,16 +562,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
             )}
           </div>
           {locationError && (
-            <p
-              style={{
-                fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-sm)",
-                color: "var(--danger)",
-                margin: 0,
-              }}
-            >
-              {locationError}
-            </p>
+            <p style={errorStyle}>{locationError}</p>
           )}
         </div>
 
@@ -475,13 +570,10 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
           <p
             role="alert"
             style={{
-              fontFamily: "var(--font-sans)",
-              fontSize: "var(--text-sm)",
-              color: "var(--danger)",
+              ...errorStyle,
               backgroundColor: "color-mix(in srgb, var(--danger) 10%, transparent)",
               padding: "var(--space-2) var(--space-3)",
               borderRadius: "var(--radius-md)",
-              margin: 0,
             }}
           >
             {submitError}
@@ -491,3 +583,32 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     </div>
   );
 }
+
+const errorStyle: React.CSSProperties = {
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  color: "var(--danger)",
+  margin: 0,
+  marginTop: 4,
+};
+
+const pillButtonStyle: React.CSSProperties = {
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-muted)",
+  padding: "6px 12px",
+  borderRadius: "var(--radius-md)",
+  border: "1px solid var(--border)",
+  backgroundColor: "var(--surface)",
+  cursor: "pointer",
+};
+
+const subtleButtonStyle: React.CSSProperties = {
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-subtle)",
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  padding: "6px 8px",
+};

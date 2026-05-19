@@ -214,7 +214,9 @@ export async function generateDiary(
         config: {
           systemInstruction: systemPrompt,
           temperature: 0.6,
-          maxOutputTokens: 600,
+          // Gemini 2.5 Flash thinking 모델: thinking 토큰까지 합산되므로 여유 있게.
+          // 한국어 250자 본문 ~400토큰 + JSON syntax + thinking budget = 안전 1500.
+          maxOutputTokens: 1500,
           responseMimeType: "application/json",
         },
       }),
@@ -253,7 +255,8 @@ export async function generateDiary(
 const EMBEDDING_MODEL =
   process.env.GEMINI_EMBEDDING_MODEL ?? "text-embedding-004";
 
-export async function embedText(_text: string): Promise<number[]> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function embedText(text: string): Promise<number[]> {
   throw new GeminiError(
     `embedText는 Phase 4 NEW-6에서 본격 구현됩니다 (모델: ${EMBEDDING_MODEL}).`,
   );
