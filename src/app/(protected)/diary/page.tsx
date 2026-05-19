@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Pencil } from "lucide-react";
-import { DiaryList } from "@/components/diary/diary-list";
+import { DiaryListWithSearch } from "@/components/diary/diary-list-with-search";
 import { getSession } from "@/lib/auth/session";
 import { getDiariesWithThumbnails } from "@/lib/diary/queries";
 
@@ -92,7 +92,7 @@ export default async function DiaryListPage() {
         </Link>
       </header>
 
-      <DiaryList initialData={initialData} />
+      <DiaryListWithSearch initialData={initialData} />
     </main>
   );
 }
