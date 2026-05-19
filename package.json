@@ -17,8 +17,10 @@
   "dependencies": {
     "@base-ui/react": "^1.4.1",
     "@ducanh2912/next-pwa": "^10.2.9",
+    "@google/genai": "^2.4.0",
     "@hookform/resolvers": "^5.2.2",
     "@prisma/client": "^6.19.3",
+    "@supabase/supabase-js": "^2.106.0",
     "@tanstack/react-query": "^5.100.9",
     "@tanstack/react-query-devtools": "^5.100.9",
     "bcryptjs": "^3.0.3",

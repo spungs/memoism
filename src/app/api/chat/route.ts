@@ -1,9 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { z } from "zod";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
+import { chat } from "@/lib/ai/gemini";
+import { checkAndIncrement } from "@/lib/ai/usage";
 
-const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://localhost:11434";
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "gemma4:e2b";
+const messageSchema = z.object({
+  message: z
+    .string()
+    .trim()
+    .min(1, "메시지를 입력해주세요")
+    .max(2000, "메시지는 2000자 이내여야 합니다"),
+});
 
 function buildSystemPrompt(
   characterName: string,
@@ -47,13 +55,20 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
-  const userMessage: string = body?.message?.trim() ?? "";
-  if (!userMessage) {
-    return NextResponse.json({ error: "메시지를 입력해주세요" }, { status: 400 });
+  const parsed = messageSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "잘못된 요청" },
+      { status: 400 },
+    );
   }
+  const userMessage = parsed.data.message;
 
   const [character, recentDiaries, recentHistory] = await Promise.all([
-    prisma.character.findUnique({ where: { userId: session.userId } }),
+    prisma.character.findUnique({
+      where: { userId: session.userId },
+      select: { id: true, name: true, subscriptionStatus: true },
+    }),
     prisma.diary.findMany({
       where: { userId: session.userId },
       orderBy: { createdAt: "desc" },
@@ -75,49 +90,63 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "캐릭터를 찾을 수 없어요" }, { status: 404 });
   }
 
-  const systemPrompt = buildSystemPrompt(character.name, recentDiaries);
-
-  const historyMessages = recentHistory
-    .filter((m) => m.role !== "SYSTEM")
-    .map((m) => ({
-      role: m.role === "USER" ? "user" : "assistant",
-      content: m.content,
-    }));
-
-  const ollamaRes = await fetch(`${OLLAMA_URL}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      stream: false,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...historyMessages,
-        { role: "user", content: userMessage },
-      ],
-    }),
-  });
-
-  if (!ollamaRes.ok) {
-    const err = await ollamaRes.text().catch(() => "unknown");
-    console.error("Ollama error:", err);
-    return NextResponse.json({ error: "AI 응답 생성에 실패했어요" }, { status: 502 });
+  // Cap 검증·증분 (베타 ACTIVE → BASIC 10회/일). 호출 전 차감 → 실패해도 cap 카운트.
+  // 정상 사용자 영향은 미미(Gemini 99%+ 가용). V2에서 정교화 고려.
+  const cap = await checkAndIncrement(session.userId, character.subscriptionStatus);
+  if (!cap.allowed) {
+    return NextResponse.json(
+      {
+        error: "오늘 AI 사용 횟수를 모두 사용했어요. 내일 다시 만나요.",
+        capExhausted: true,
+      },
+      { status: 429 },
+    );
   }
 
-  const ollamaData = await ollamaRes.json();
-  const assistantText: string = ollamaData?.message?.content ?? "";
-  if (!assistantText) {
-    return NextResponse.json({ error: "AI 응답이 비어있어요" }, { status: 502 });
+  const systemPrompt = buildSystemPrompt(character.name, recentDiaries);
+  const history = recentHistory
+    .filter((m) => m.role !== "SYSTEM")
+    .map((m) => ({
+      role: (m.role === "USER" ? "user" : "model") as "user" | "model",
+      text: m.content,
+    }));
+
+  let assistantText: string;
+  try {
+    assistantText = await chat({
+      systemPrompt,
+      history,
+      query: userMessage,
+    });
+  } catch (e) {
+    console.error("[chat] Gemini error:", e instanceof Error ? e.message : e);
+    return NextResponse.json(
+      { error: "잠시 후 다시 시도해주세요. (AI 응답 실패)" },
+      { status: 502 },
+    );
   }
 
   await prisma.$transaction([
     prisma.chatMessage.create({
-      data: { userId: session.userId, characterId: character.id, role: "USER", content: userMessage },
+      data: {
+        userId: session.userId,
+        characterId: character.id,
+        role: "USER",
+        content: userMessage,
+      },
     }),
     prisma.chatMessage.create({
-      data: { userId: session.userId, characterId: character.id, role: "ASSISTANT", content: assistantText },
+      data: {
+        userId: session.userId,
+        characterId: character.id,
+        role: "ASSISTANT",
+        content: assistantText,
+      },
     }),
   ]);
 
-  return NextResponse.json({ message: assistantText });
+  return NextResponse.json({
+    message: assistantText,
+    capRemaining: cap.remaining,
+  });
 }

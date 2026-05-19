@@ -1,20 +1,42 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-// Single image upload limit per PRD §3.1.
+// 사진 1장당 최대 크기. Phase 3에서 클라이언트 측 1024px 압축 도입 시 통상 200KB 미만.
+// 베타엔 안전 마진으로 10MB 유지 (Supabase 버킷 정책과 일치).
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
+// 허용 MIME — Supabase Storage 버킷의 allowed_mime_types와 일치.
+// SVG는 폴리글롯 공격 방어로 의도적 제외 (QA H-6).
 export const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
-  "image/gif",
+  "image/heic",
+  "image/heif",
 ] as const;
 
-const UPLOAD_PUBLIC_PREFIX = "/uploads";
-const UPLOAD_FS_ROOT = path.join(process.cwd(), "public", "uploads");
+const BUCKET = process.env.SUPABASE_STORAGE_BUCKET ?? "diary-images";
+const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1h
+
+let _client: SupabaseClient | null = null;
+
+function getClient(): SupabaseClient {
+  if (_client) return _client;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) {
+    throw new StorageError(
+      "Supabase Storage 환경변수가 설정되지 않았습니다. " +
+        "NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY를 .env.local에 등록하세요.",
+    );
+  }
+  _client = createClient(url, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  return _client;
+}
 
 function extensionFor(file: File): string {
   const fromName = path.extname(file.name).toLowerCase();
@@ -26,8 +48,10 @@ function extensionFor(file: File): string {
       return ".png";
     case "image/webp":
       return ".webp";
-    case "image/gif":
-      return ".gif";
+    case "image/heic":
+      return ".heic";
+    case "image/heif":
+      return ".heif";
     default:
       return ".bin";
   }
@@ -36,42 +60,79 @@ function extensionFor(file: File): string {
 export class StorageError extends Error {}
 
 /**
- * Persist an uploaded image and return a web-relative URL.
- *
- * Local FS implementation today; swap for Supabase Storage / S3 later by
- * keeping the same contract: `(file, ownerId) → public URL string`.
+ * Upload an image to the private Supabase Storage bucket.
+ * Returns the storage path (e.g. "{ownerId}/{uuid}.jpg") for persistence
+ * in DiaryImage.storagePath. Public URLs are issued via {@link getSignedUrl}.
  */
 export async function saveImage(file: File, ownerId: string): Promise<string> {
-  if (!ALLOWED_IMAGE_TYPES.includes(file.type as (typeof ALLOWED_IMAGE_TYPES)[number])) {
+  if (
+    !ALLOWED_IMAGE_TYPES.includes(
+      file.type as (typeof ALLOWED_IMAGE_TYPES)[number],
+    )
+  ) {
     throw new StorageError(`지원하지 않는 이미지 형식입니다: ${file.type}`);
   }
   if (file.size > MAX_IMAGE_BYTES) {
     throw new StorageError("이미지는 10MB 이하만 업로드할 수 있습니다.");
   }
 
-  const dir = path.join(UPLOAD_FS_ROOT, ownerId);
-  await mkdir(dir, { recursive: true });
-
-  const filename = `${randomUUID()}${extensionFor(file)}`;
+  const storagePath = `${ownerId}/${randomUUID()}${extensionFor(file)}`;
   const buf = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(dir, filename), buf);
 
-  return `${UPLOAD_PUBLIC_PREFIX}/${ownerId}/${filename}`;
+  const { error } = await getClient()
+    .storage.from(BUCKET)
+    .upload(storagePath, buf, {
+      contentType: file.type,
+      cacheControl: "3600",
+      upsert: false,
+    });
+
+  if (error) {
+    throw new StorageError(`이미지 업로드 실패: ${error.message}`);
+  }
+
+  return storagePath;
 }
 
 /**
- * Best-effort image deletion. No-op for URLs that aren't ours (e.g. legacy
- * Supabase URLs or external links from a future feature).
+ * Best-effort deletion from the bucket. Silently ignores legacy "/uploads/..."
+ * URLs (from pre-Phase 2 local FS) and paths with traversal sequences.
  */
-export async function deleteImage(url: string): Promise<void> {
-  if (!url.startsWith(`${UPLOAD_PUBLIC_PREFIX}/`)) return;
-  const rel = url.slice(UPLOAD_PUBLIC_PREFIX.length + 1); // strip "/uploads/"
-  const target = path.join(UPLOAD_FS_ROOT, rel);
-  // Defence-in-depth: refuse paths that climb out of the upload root.
-  if (!target.startsWith(UPLOAD_FS_ROOT + path.sep)) return;
-  try {
-    await unlink(target);
-  } catch {
-    // Already gone — fine.
+export async function deleteImage(storagePath: string): Promise<void> {
+  if (!storagePath || storagePath.startsWith("/uploads/")) return;
+  if (storagePath.includes("..")) return;
+
+  const { error } = await getClient()
+    .storage.from(BUCKET)
+    .remove([storagePath]);
+  if (error) {
+    // Cleanup path — log only.
+    console.warn(`[storage] deleteImage failed for ${storagePath}:`, error.message);
   }
+}
+
+/**
+ * Issue a short-lived (1h) signed URL for a private storage path.
+ * Returns null if URL generation fails (caller should fall back to placeholder).
+ */
+export async function getSignedUrl(storagePath: string): Promise<string | null> {
+  if (!storagePath) return null;
+  const { data, error } = await getClient()
+    .storage.from(BUCKET)
+    .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
+  if (error || !data?.signedUrl) {
+    console.warn(`[storage] getSignedUrl failed for ${storagePath}:`, error?.message);
+    return null;
+  }
+  return data.signedUrl;
+}
+
+/**
+ * Issue signed URLs for multiple paths in parallel.
+ * Preserves order; null entries indicate per-path failures.
+ */
+export async function getSignedUrls(
+  storagePaths: string[],
+): Promise<(string | null)[]> {
+  return Promise.all(storagePaths.map(getSignedUrl));
 }
