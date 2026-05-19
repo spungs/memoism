@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { deleteImage, saveImage } from "@/lib/storage";
+import { upsertDiaryEmbedding } from "./embedding";
 import {
   diaryInputSchema,
   moodKeySchema,
@@ -184,6 +185,9 @@ export async function createDiaryAction(
       select: { id: true },
     });
 
+    // 임베딩 best-effort (실패해도 저장 결과엔 영향 없음)
+    await upsertDiaryEmbedding(diary.id, parsed.data.title, parsed.data.content);
+
     revalidatePath("/diary");
     revalidatePath("/");
     return { ok: true, data: diary };
@@ -235,6 +239,9 @@ export async function updateDiaryAction(
       contentEditedAt: new Date(),
     },
   });
+
+  // 임베딩 재갱신 (content 변경 가능성)
+  await upsertDiaryEmbedding(id, parsed.data.title, parsed.data.content);
 
   revalidatePath("/diary");
   revalidatePath(`/diary/${id}`);
@@ -289,6 +296,9 @@ export async function revertDiaryAction(id: string): Promise<
       aiGenerationVersion: true,
     },
   });
+
+  // 스왑 후 content가 바뀌었으므로 재임베딩
+  await upsertDiaryEmbedding(id, updated.title, updated.content);
 
   revalidatePath("/diary");
   revalidatePath(`/diary/${id}`);

@@ -250,15 +250,37 @@ export async function generateDiary(
 }
 
 // =============================================================================
-// 임베딩 — Phase 4 NEW-6 RAG 검색용. 현재는 스텁.
+// 임베딩 — Phase 4 NEW-6 RAG 검색용.
+//   - Gemini text-embedding-004 (기본 768d, schema의 vector(768)과 일치)
+//   - pgvector cosine 유사도 검색에 사용
 // =============================================================================
 
 const EMBEDDING_MODEL =
   process.env.GEMINI_EMBEDDING_MODEL ?? "text-embedding-004";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const EMBEDDING_DIM = 768;
+
 export async function embedText(text: string): Promise<number[]> {
-  throw new GeminiError(
-    `embedText는 Phase 4 NEW-6에서 본격 구현됩니다 (모델: ${EMBEDDING_MODEL}).`,
+  const trimmed = text.trim();
+  if (!trimmed) {
+    throw new GeminiError("임베딩 대상 텍스트가 비어있습니다");
+  }
+
+  const response = await callWithRetry(() =>
+    withTimeout(
+      getClient().models.embedContent({
+        model: EMBEDDING_MODEL,
+        contents: trimmed,
+      }),
+      TIMEOUT_MS,
+    ),
   );
+
+  const values = response.embeddings?.[0]?.values;
+  if (!values || values.length !== EMBEDDING_DIM) {
+    throw new GeminiError(
+      `임베딩 응답 형식 오류 (dim: ${values?.length ?? "undefined"})`,
+    );
+  }
+  return values;
 }

@@ -7,6 +7,7 @@ import {
   type DiaryGenerationOutput,
 } from "@/lib/ai/gemini";
 import { checkAndIncrement } from "@/lib/ai/usage";
+import { upsertDiaryEmbedding } from "./embedding";
 
 // 일기당 재생성 cap은 제거됨 (사용자 결정). 일일 cap이 비용·abuse 차단.
 // aiGenerationVersion 컬럼은 통계·로깅용으로만 카운트.
@@ -165,6 +166,9 @@ export async function regenerateDiary(
       aiGenerationVersion: true,
     },
   });
+
+  // 새 본문으로 재임베딩
+  await upsertDiaryEmbedding(updated.id, updated.title, updated.content);
 
   return { ok: true, diary: updated };
 }
