@@ -136,3 +136,20 @@ export async function getSignedUrls(
 ): Promise<(string | null)[]> {
   return Promise.all(storagePaths.map(getSignedUrl));
 }
+
+/**
+ * Owner-scoped signed URL 발급. storagePath가 `{ownerId}/`로 시작하는지 검증해
+ * 다른 사용자의 storagePath에 대한 cross-account 접근을 차단한다.
+ * 검증 실패한 path는 null로 반환 (순서 보존).
+ */
+export async function getSignedUrlsForOwner(
+  storagePaths: string[],
+  ownerId: string,
+): Promise<(string | null)[]> {
+  const prefix = `${ownerId}/`;
+  return Promise.all(
+    storagePaths.map((path) =>
+      path.startsWith(prefix) ? getSignedUrl(path) : Promise.resolve(null),
+    ),
+  );
+}

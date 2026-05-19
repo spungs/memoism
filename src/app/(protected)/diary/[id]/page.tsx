@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -6,8 +7,7 @@ import { DiaryDetailActions } from "@/components/diary/diary-detail-actions";
 import { MoodBadge } from "@/components/diary/mood-badge";
 import { getSession } from "@/lib/auth/session";
 import { getDiary } from "@/lib/diary/queries";
-
-// Phase 3 MIG-3 진입 전까지 다중 이미지 표시(DiaryImage[]) 임시 비활성화.
+import { getSignedUrls } from "@/lib/storage";
 
 const dateFmt = new Intl.DateTimeFormat("ko-KR", {
   year: "numeric",
@@ -37,6 +37,12 @@ export default async function DiaryDetailPage({ params }: PageProps) {
   if (!diary) notFound();
 
   const date = diary.createdAt;
+  const isAiSource = diary.source?.startsWith("auto_") ?? false;
+
+  // DiaryImage signed URL 일괄 발급 (1h TTL). 실패한 항목은 null.
+  const imagePaths = diary.images.map((img) => img.storagePath);
+  const imageUrls =
+    imagePaths.length > 0 ? await getSignedUrls(imagePaths) : [];
 
   return (
     <main
@@ -129,6 +135,64 @@ export default async function DiaryDetailPage({ params }: PageProps) {
           >
             {diary.title}
           </h1>
+        )}
+
+        {imageUrls.length > 0 && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                imageUrls.length === 1
+                  ? "1fr"
+                  : "repeat(auto-fill, minmax(140px, 1fr))",
+              gap: "var(--space-2)",
+              marginBottom: "var(--space-5)",
+            }}
+          >
+            {imageUrls.map((url, i) =>
+              url ? (
+                <div
+                  key={diary.images[i].id}
+                  style={{
+                    position: "relative",
+                    aspectRatio: imageUrls.length === 1 ? "16 / 9" : "1 / 1",
+                    overflow: "hidden",
+                    borderRadius: "var(--radius-md)",
+                    backgroundColor: "var(--surface)",
+                    border: "1px solid var(--border)",
+                  }}
+                >
+                  <Image
+                    src={url}
+                    alt=""
+                    fill
+                    sizes="(max-width: 720px) 50vw, 360px"
+                    style={{ objectFit: "cover" }}
+                  />
+                </div>
+              ) : null,
+            )}
+          </div>
+        )}
+
+        {/* F5 ✨ AI 마커 — auto_* source일 때만 본문 위 배지 표시 */}
+        {isAiSource && (
+          <p
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-xs)",
+              color: "var(--fg-subtle)",
+              backgroundColor:
+                "color-mix(in srgb, #FFF4CC 35%, transparent)",
+              padding: "4px 8px",
+              borderRadius: "var(--radius-sm)",
+              display: "inline-block",
+              marginBottom: "var(--space-3)",
+              letterSpacing: "var(--tracking-wide)",
+            }}
+          >
+            ✨ AI가 정리한 일기
+          </p>
         )}
 
         <DiaryContent>{diary.content}</DiaryContent>

@@ -25,7 +25,8 @@ interface DiaryFormProps {
   initial?: {
     title: string;
     content: string;
-    images: string[];
+    /** edit 모드용: 기존 사진들의 signed URL. read-only 표시. */
+    existingImageUrls?: string[];
     location: DiaryLocation | null;
     mood: MoodKey | null;
     date?: string; // YYYY-MM-DD
@@ -411,7 +412,8 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
 
         <div style={{ height: 1, backgroundColor: "var(--border)" }} />
 
-        {/* 사진 (최대 5장) */}
+        {/* 사진 (최대 5장) — create 모드만 픽커. edit 모드는 read-only. */}
+        {mode === "create" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           <p style={MUTED_LABEL}>사진 ({pickedImages.length}/{MAX_IMAGES})</p>
           {pickedImages.length > 0 && (
@@ -496,6 +498,46 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
             </label>
           )}
         </div>
+        )}
+
+        {/* edit 모드: 기존 사진 read-only 표시. 사진 변경은 Phase 3c-4/NEW-7에서 본격 지원. */}
+        {mode === "edit" && (initial?.existingImageUrls?.length ?? 0) > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            <p style={MUTED_LABEL}>사진 ({initial?.existingImageUrls?.length}장)</p>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))",
+                gap: "var(--space-2)",
+              }}
+            >
+              {initial?.existingImageUrls?.map((url, i) => (
+                <div
+                  key={i}
+                  style={{
+                    position: "relative",
+                    aspectRatio: "1 / 1",
+                    overflow: "hidden",
+                    borderRadius: "var(--radius-md)",
+                    backgroundColor: "var(--surface)",
+                    border: "1px solid var(--border)",
+                  }}
+                >
+                  <Image
+                    src={url}
+                    alt=""
+                    fill
+                    sizes="120px"
+                    style={{ objectFit: "cover" }}
+                  />
+                </div>
+              ))}
+            </div>
+            <p style={{ ...MUTED_LABEL, textTransform: "none", letterSpacing: "normal", color: "var(--fg-subtle)" }}>
+              사진 변경은 다음 업데이트에서 지원될 예정이에요.
+            </p>
+          </div>
+        )}
 
         {/* AI 정리 — 베타 척추 (create 모드만) */}
         {mode === "create" && (

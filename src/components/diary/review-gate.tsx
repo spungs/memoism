@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createDiaryAction } from "@/lib/diary/actions";
 import type { DiaryLocation } from "@/lib/diary/schemas";
+import { getDiaryImageSignedUrls } from "@/lib/storage/actions";
 
 const PENDING_DRAFT_KEY = "memoism:pendingDraft";
 const DRAFT_TTL_MS = 5 * 60 * 1000; // 5분 만료 — 사용자가 너무 오래 자리비울 때 보호
@@ -61,7 +63,21 @@ export function ReviewGate() {
   const [editedTitle, setEditedTitle] = useState("");
   const [editedContent, setEditedContent] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [signedUrls, setSignedUrls] = useState<(string | null)[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // storagePaths가 있으면 signed URL 일괄 발급 (1h TTL).
+  useEffect(() => {
+    if (!draftState || draftState.storagePaths.length === 0) return;
+    let cancelled = false;
+    getDiaryImageSignedUrls(draftState.storagePaths).then((result) => {
+      if (cancelled) return;
+      if (result.ok) setSignedUrls(result.urls);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [draftState]);
 
   // sessionStorage 로드 + TTL 검증
   useEffect(() => {
@@ -306,6 +322,43 @@ export function ReviewGate() {
               날짜 · {draftState.date}
             </li>
           </ul>
+          {signedUrls.length > 0 && (
+            <div
+              style={{
+                marginTop: "var(--space-3)",
+                display: "grid",
+                gridTemplateColumns:
+                  signedUrls.length === 1
+                    ? "1fr"
+                    : "repeat(auto-fill, minmax(80px, 1fr))",
+                gap: "var(--space-2)",
+              }}
+            >
+              {signedUrls.map((url, i) =>
+                url ? (
+                  <div
+                    key={draftState.storagePaths[i] ?? i}
+                    style={{
+                      position: "relative",
+                      aspectRatio: signedUrls.length === 1 ? "16 / 9" : "1 / 1",
+                      overflow: "hidden",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--border)",
+                      backgroundColor: "var(--bg)",
+                    }}
+                  >
+                    <Image
+                      src={url}
+                      alt=""
+                      fill
+                      sizes="(max-width: 720px) 50vw, 200px"
+                      style={{ objectFit: "cover" }}
+                    />
+                  </div>
+                ) : null,
+              )}
+            </div>
+          )}
         </section>
 
         {/* Story 영역 — AI 생성 본문 (수정 가능) */}
