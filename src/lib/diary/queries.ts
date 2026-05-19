@@ -84,6 +84,51 @@ export type DiaryListItemWithThumbnail = DiaryListItem & {
 };
 
 /**
+ * 오늘(KST 자정 기준) 작성된 일기 1개 조회. 첫 이미지 signed URL 포함.
+ * 없으면 null — 홈 "오늘 첫 줄 시작해볼까?" CTA 분기에 사용.
+ */
+export async function getTodayDiary(userId: string) {
+  const now = new Date();
+  const kstOffsetMs = 9 * 60 * 60 * 1000;
+  const kstNow = new Date(now.getTime() + kstOffsetMs);
+  const startUtcMs =
+    Date.UTC(
+      kstNow.getUTCFullYear(),
+      kstNow.getUTCMonth(),
+      kstNow.getUTCDate(),
+    ) - kstOffsetMs;
+  const startUtc = new Date(startUtcMs);
+  const endUtc = new Date(startUtcMs + 24 * 60 * 60 * 1000);
+
+  const diary = await prisma.diary.findFirst({
+    where: {
+      userId,
+      createdAt: { gte: startUtc, lt: endUtc },
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      content: true,
+      mood: true,
+      source: true,
+      createdAt: true,
+      images: {
+        select: { storagePath: true },
+        orderBy: { orderIndex: "asc" },
+        take: 1,
+      },
+    },
+  });
+  if (!diary) return null;
+
+  const path = diary.images[0]?.storagePath;
+  const thumbnailUrl =
+    path && path.startsWith(`${userId}/`) ? await getSignedUrl(path) : null;
+  return { ...diary, thumbnailUrl };
+}
+
+/**
  * getDiaries + 각 item의 첫 이미지 storagePath를 signed URL로 변환.
  *   - 본인 storagePath만 발급 (cross-account 차단)
  *   - 이미지 없는 일기는 thumbnailUrl: null

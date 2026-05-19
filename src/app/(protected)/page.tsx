@@ -1,24 +1,39 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
-import { prisma } from "@/lib/db";
-import { getRecentDiaries } from "@/lib/diary/queries";
+import { getRecentDiaries, getTodayDiary } from "@/lib/diary/queries";
 
-// Phase 3 MIG-11에서 AI 작성 진입 CTA + 오늘의 일기 위젯으로 재배치 예정.
-// 현재는 임시 인사 stub.
+// MIG-11 홈 재배치. 베타 베어 본본:
+//   - 상단 헤더 (메모이즘 + 오늘 날짜)
+//   - AI 작성 진입 CTA 카드
+//   - "오늘의 일기" 위젯 (있으면 카드, 없으면 "오늘 첫 줄 시작해볼까?" CTA)
+//   - 최근 일기 3개
+
+const todayLabelFmt = new Intl.DateTimeFormat("ko-KR", {
+  month: "long",
+  day: "numeric",
+  weekday: "short",
+});
+
+function snippet(content: string, n = 80): string {
+  const plain = content.replace(/\s+/g, " ").trim();
+  return plain.length > n ? `${plain.slice(0, n)}…` : plain;
+}
+
 export default async function HomePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [character, recentDiaries, diaryCount] = await Promise.all([
-    prisma.character.findUnique({
-      where: { userId: session.userId },
-    }),
+  const [todayDiary, recentDiaries] = await Promise.all([
+    getTodayDiary(session.userId),
     getRecentDiaries(session.userId, 3),
-    prisma.diary.count({ where: { userId: session.userId } }),
   ]);
 
-  if (!character) redirect("/login");
+  // 최근 일기에서 오늘 일기는 중복 제거
+  const otherRecent = todayDiary
+    ? recentDiaries.filter((d) => d.id !== todayDiary.id)
+    : recentDiaries;
 
   return (
     <div
@@ -29,7 +44,7 @@ export default async function HomePage() {
         backgroundColor: "var(--bg)",
       }}
     >
-      {/* 상단 헤더 */}
+      {/* 헤더 */}
       <header
         style={{
           display: "flex",
@@ -57,128 +72,252 @@ export default async function HomePage() {
             color: "var(--fg-subtle)",
           }}
         >
-          {new Date().toLocaleDateString("ko-KR", {
-            month: "long",
-            day: "numeric",
-            weekday: "short",
-          })}
+          {todayLabelFmt.format(new Date())}
         </span>
       </header>
 
-      {/* 캐릭터 섹션 — 헤더와 (있다면) 최근 일기 사이를 채워 세로 중앙 정렬 */}
       <div
         style={{
-          flex: 1,
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          paddingBottom: recentDiaries.length > 0 ? 0 : "var(--space-8)",
+          gap: "var(--space-5)",
+          padding: "var(--space-2) var(--space-5) var(--space-8)",
         }}
       >
-        <div style={{ textAlign: "center", color: "var(--fg-subtle)" }}>
-          <p style={{ fontFamily: "var(--font-serif)", fontSize: "var(--text-lg)", margin: 0 }}>
-            안녕, {character.name}
-          </p>
-          <p style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", marginTop: "var(--space-2)" }}>
-            일기 {diaryCount}개
-          </p>
-        </div>
-      </div>
-
-      {/* 최근 일기 */}
-      {recentDiaries.length > 0 && (
-        <section style={{ padding: "0 var(--space-5) var(--space-4)" }}>
-          <div
+        {/* 오늘의 일기 위젯 */}
+        {todayDiary ? (
+          <Link
+            href={`/diary/${todayDiary.id}`}
             style={{
               display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "var(--space-3)",
+              gap: "var(--space-4)",
+              alignItems: "stretch",
+              padding: "var(--space-4) var(--space-5)",
+              backgroundColor: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              boxShadow: "var(--shadow-xs)",
+              textDecoration: "none",
+              color: "inherit",
             }}
           >
-            <h2
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-xs)",
+                  color: "var(--accent-rose-deep)",
+                  letterSpacing: "var(--tracking-wider)",
+                  fontWeight: 700,
+                  margin: 0,
+                  marginBottom: 4,
+                  textTransform: "uppercase",
+                }}
+              >
+                오늘의 일기
+              </p>
+              <p
+                style={{
+                  fontFamily: "var(--font-serif)",
+                  fontSize: "var(--text-base)",
+                  fontWeight: 600,
+                  margin: 0,
+                  color: "var(--fg)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {todayDiary.title || "(제목 없음)"}
+              </p>
+              <p
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-sm)",
+                  color: "var(--fg-subtle)",
+                  margin: "4px 0 0 0",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                  lineHeight: "var(--leading-snug)",
+                }}
+              >
+                {snippet(todayDiary.content)}
+              </p>
+            </div>
+            {todayDiary.thumbnailUrl && (
+              <div
+                aria-hidden
+                style={{
+                  position: "relative",
+                  width: 72,
+                  height: 72,
+                  flexShrink: 0,
+                  overflow: "hidden",
+                  borderRadius: "var(--radius-md)",
+                  alignSelf: "center",
+                }}
+              >
+                <Image
+                  src={todayDiary.thumbnailUrl}
+                  alt=""
+                  fill
+                  sizes="72px"
+                  style={{ objectFit: "cover" }}
+                />
+              </div>
+            )}
+          </Link>
+        ) : (
+          <Link
+            href="/diary/new"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "var(--space-2)",
+              padding: "var(--space-6) var(--space-5)",
+              backgroundColor: "var(--surface)",
+              border: "1px dashed var(--border)",
+              borderRadius: "var(--radius-lg)",
+              textDecoration: "none",
+              color: "inherit",
+              textAlign: "center",
+            }}
+          >
+            <p
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-xs)",
+                color: "var(--fg-subtle)",
+                letterSpacing: "var(--tracking-wider)",
+                fontWeight: 600,
+                textTransform: "uppercase",
+                margin: 0,
+              }}
+            >
+              오늘의 일기
+            </p>
+            <p
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontSize: "var(--text-lg)",
+                color: "var(--fg)",
+                margin: 0,
+              }}
+            >
+              오늘 첫 줄, 시작해볼까?
+            </p>
+            <p
               style={{
                 fontFamily: "var(--font-sans)",
                 fontSize: "var(--text-sm)",
                 color: "var(--fg-subtle)",
-                fontWeight: 600,
-                letterSpacing: "var(--tracking-wider)",
                 margin: 0,
               }}
             >
-              최근 일기
-            </h2>
-            <Link
-              href="/diary"
+              사진만 있어도, 텍스트만 있어도 AI가 정리해줘요.
+            </p>
+          </Link>
+        )}
+
+        {/* 최근 일기 */}
+        {otherRecent.length > 0 && (
+          <section>
+            <div
               style={{
-                fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-xs)",
-                color: "var(--accent-rose)",
-                textDecoration: "none",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "var(--space-3)",
               }}
             >
-              전체 보기
-            </Link>
-          </div>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "var(--space-2)",
-            }}
-          >
-            {recentDiaries.map((diary) => {
-              const previewTitle =
-                diary.title?.trim() ||
-                diary.content.split("\n")[0].slice(0, 40) ||
-                "(제목 없음)";
-              return (
-                <Link
-                  key={diary.id}
-                  href={`/diary/${diary.id}`}
-                  style={{
-                    display: "block",
-                    padding: "var(--space-3) var(--space-4)",
-                    backgroundColor: "var(--surface)",
-                    borderRadius: "var(--radius-md)",
-                    border: "1px solid var(--border)",
-                    textDecoration: "none",
-                    boxShadow: "var(--shadow-xs)",
-                  }}
-                >
-                  <p
+              <h2
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-xs)",
+                  color: "var(--fg-subtle)",
+                  fontWeight: 700,
+                  letterSpacing: "var(--tracking-wider)",
+                  textTransform: "uppercase",
+                  margin: 0,
+                }}
+              >
+                최근 일기
+              </h2>
+              <Link
+                href="/diary"
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-xs)",
+                  color: "var(--accent-rose)",
+                  textDecoration: "none",
+                  fontWeight: 600,
+                }}
+              >
+                전체 보기 →
+              </Link>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--space-2)",
+              }}
+            >
+              {otherRecent.map((diary) => {
+                const previewTitle =
+                  diary.title?.trim() ||
+                  diary.content.split("\n")[0].slice(0, 40) ||
+                  "(제목 없음)";
+                return (
+                  <Link
+                    key={diary.id}
+                    href={`/diary/${diary.id}`}
                     style={{
-                      fontFamily: "var(--font-serif)",
-                      fontSize: "var(--text-sm)",
-                      color: "var(--fg)",
-                      margin: 0,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
+                      display: "block",
+                      padding: "var(--space-3) var(--space-4)",
+                      backgroundColor: "var(--surface)",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--border)",
+                      textDecoration: "none",
+                      boxShadow: "var(--shadow-xs)",
                     }}
                   >
-                    {previewTitle}
-                  </p>
-                  <p
-                    style={{
-                      fontFamily: "var(--font-sans)",
-                      fontSize: "var(--text-xs)",
-                      color: "var(--fg-subtle)",
-                      margin: "2px 0 0",
-                    }}
-                  >
-                    {new Date(diary.createdAt).toLocaleDateString("ko-KR", {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </p>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      )}
+                    <p
+                      style={{
+                        fontFamily: "var(--font-serif)",
+                        fontSize: "var(--text-sm)",
+                        color: "var(--fg)",
+                        margin: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {previewTitle}
+                    </p>
+                    <p
+                      style={{
+                        fontFamily: "var(--font-sans)",
+                        fontSize: "var(--text-xs)",
+                        color: "var(--fg-subtle)",
+                        margin: "2px 0 0",
+                      }}
+                    >
+                      {new Date(diary.createdAt).toLocaleDateString("ko-KR", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </p>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   );
 }
