@@ -1,51 +1,43 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
+import { CharacterChat } from "@/components/character/character-chat";
 
-// Phase 4 MIG-8에서 친구 페르소나 + RAG 채팅 인터페이스로 재작성 예정.
-// 현재는 placeholder.
+export const metadata = { title: "친구" };
+
 export default async function CharacterPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const character = await prisma.character.findUnique({
-    where: { userId: session.userId },
-  });
+  const [character, recentChat] = await Promise.all([
+    prisma.character.findUnique({
+      where: { userId: session.userId },
+      select: { name: true },
+    }),
+    prisma.chatMessage.findMany({
+      where: {
+        userId: session.userId,
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        role: { in: ["USER", "ASSISTANT"] },
+      },
+      orderBy: { createdAt: "asc" },
+      take: 40,
+      select: { id: true, role: true, content: true },
+    }),
+  ]);
 
   if (!character) redirect("/login");
 
+  const initialMessages = recentChat.map((m) => ({
+    id: m.id,
+    role: (m.role === "USER" ? "user" : "assistant") as "user" | "assistant",
+    content: m.content,
+  }));
+
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "calc(100svh - 56px)",
-        padding: "var(--space-8)",
-        textAlign: "center",
-        color: "var(--fg-subtle)",
-      }}
-    >
-      <p
-        style={{
-          fontFamily: "var(--font-serif)",
-          fontSize: "var(--text-xl)",
-          color: "var(--fg)",
-          margin: 0,
-        }}
-      >
-        {character.name}
-      </p>
-      <p
-        style={{
-          fontFamily: "var(--font-sans)",
-          fontSize: "var(--text-sm)",
-          marginTop: "var(--space-2)",
-        }}
-      >
-        준비 중이에요
-      </p>
-    </div>
+    <CharacterChat
+      characterName={character.name}
+      initialMessages={initialMessages}
+    />
   );
 }
