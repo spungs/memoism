@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { chat } from "@/lib/ai/gemini";
+import { searchDiaries, type RagSearchHit } from "@/lib/ai/rag";
 import { checkAndIncrement } from "@/lib/ai/usage";
 
 const messageSchema = z.object({
@@ -13,37 +14,105 @@ const messageSchema = z.object({
     .max(2000, "메시지는 2000자 이내여야 합니다"),
 });
 
-function buildSystemPrompt(
-  characterName: string,
+type Persona = {
+  tone: string;
+  formality: string;
+  sentenceLength: string;
+};
+
+const TONE_MAP: Record<string, string> = {
+  warm: "다정하고 따뜻한",
+  cheerful: "밝고 활기찬",
+  calm: "차분하고 안정된",
+  witty: "재치있고 가벼운",
+};
+const FORMALITY_MAP: Record<string, string> = {
+  casual: "친구처럼 편한",
+  polite: "예의 바른 존댓말",
+};
+const LENGTH_MAP: Record<string, string> = {
+  short: "1~2문장",
+  medium: "1~3문장",
+  long: "2~4문장",
+};
+
+function personaStyle(persona: Persona | null): string {
+  const tone = TONE_MAP[persona?.tone ?? "warm"] ?? TONE_MAP.warm;
+  const formality =
+    FORMALITY_MAP[persona?.formality ?? "casual"] ?? FORMALITY_MAP.casual;
+  const length = LENGTH_MAP[persona?.sentenceLength ?? "medium"] ?? LENGTH_MAP.medium;
+  return `${tone} 말투 · ${formality} 표현 · ${length}으로 응답`;
+}
+
+function formatRecent(
   diaries: { title: string; content: string; mood: string | null; createdAt: Date }[],
 ): string {
-  const diaryContext =
-    diaries.length === 0
-      ? "아직 작성된 일기가 없어요."
-      : diaries
-          .map((d) => {
-            const date = d.createdAt.toLocaleDateString("ko-KR", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            });
-            const mood = d.mood ? ` [기분: ${d.mood}]` : "";
-            const preview = d.content.slice(0, 200) + (d.content.length > 200 ? "…" : "");
-            return `[${date}${mood}] ${d.title}: ${preview}`;
-          })
-          .join("\n");
+  if (diaries.length === 0) return "아직 작성된 일기가 없어요.";
+  return diaries
+    .map((d) => {
+      const date = d.createdAt.toLocaleDateString("ko-KR", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      const mood = d.mood ? ` [기분: ${d.mood}]` : "";
+      const preview = d.content.slice(0, 200) + (d.content.length > 200 ? "…" : "");
+      return `[${date}${mood}] ${d.title}: ${preview}`;
+    })
+    .join("\n");
+}
 
-  return `너는 "${characterName}"이야. 사용자의 일기를 함께 기억하는 따뜻한 AI 친구야.
+function formatRelated(hits: RagSearchHit[], excludeIds: Set<string>): string {
+  const filtered = hits.filter((h) => !excludeIds.has(h.id));
+  if (filtered.length === 0) return "";
+  return filtered
+    .map((h) => {
+      const date = h.createdAt.toLocaleDateString("ko-KR", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      const mood = h.mood ? ` [기분: ${h.mood}]` : "";
+      const preview = h.content.slice(0, 200) + (h.content.length > 200 ? "…" : "");
+      const score = h.similarity.toFixed(2);
+      return `[${date}${mood} · 유사도 ${score}] ${h.title}: ${preview}`;
+    })
+    .join("\n");
+}
 
-## 사용자의 최근 일기 기록 (현재 기준 최신 데이터):
-${diaryContext}
+function buildSystemPrompt(args: {
+  characterName: string;
+  persona: Persona | null;
+  recentDiaries: {
+    id: string;
+    title: string;
+    content: string;
+    mood: string | null;
+    createdAt: Date;
+  }[];
+  relatedHits: RagSearchHit[];
+}): string {
+  const { characterName, persona, recentDiaries, relatedHits } = args;
+  const recentSection = formatRecent(recentDiaries);
+  const recentIds = new Set(recentDiaries.map((d) => d.id));
+  const relatedSection = formatRelated(relatedHits, recentIds);
+  const style = personaStyle(persona);
 
-중요: 위 일기 목록은 지금 이 순간의 실제 데이터야. 이전 대화에서 일기가 없다고 말했더라도, 위 목록에 일기가 있으면 그게 사실이야. 항상 위 목록을 기준으로 대답해.
+  return `너는 "${characterName}"이야. 사용자의 일기를 함께 기억하는 AI 친구야.
 
-## 대화 규칙:
-- 1~3문장으로 짧고 따뜻하게 공감해줘.
-- 사용자가 한 말에 공감하고, 필요하면 관련 일기 내용을 자연스럽게 언급해.
-- 일기에 없는 내용을 꾸며내거나 단정 짓지 마.
+## 사용자의 최근 일기 (현재 기준 최신):
+${recentSection}
+${
+  relatedSection
+    ? `\n## 사용자의 메시지와 의미적으로 가까운 과거 일기:\n${relatedSection}\n`
+    : ""
+}
+중요: 위 일기 목록은 지금 이 순간의 실제 데이터야. 이전 대화에서 일기가 없다고 말했더라도, 위 목록에 있으면 그게 사실이야. 항상 위 목록을 기준으로 대답해.
+
+## 응답 스타일:
+- ${style}.
+- 사용자의 말에 먼저 공감하고, 위 일기 중 직접 관련 있는 것만 자연스럽게 언급해 (억지 연결 금지).
+- 일기에 없는 사실은 단정하거나 꾸며내지 마.
 - 한국어로만 대화해.
 - 이모지는 1개 이내로 자연스럽게.`;
 }
@@ -64,34 +133,51 @@ export async function POST(req: NextRequest) {
   }
   const userMessage = parsed.data.message;
 
-  const [character, recentDiaries, recentHistory] = await Promise.all([
-    prisma.character.findUnique({
-      where: { userId: session.userId },
-      select: { id: true, name: true, subscriptionStatus: true },
-    }),
-    prisma.diary.findMany({
-      where: { userId: session.userId },
-      orderBy: { createdAt: "desc" },
-      take: 30,
-      select: { title: true, content: true, mood: true, createdAt: true },
-    }),
-    prisma.chatMessage.findMany({
-      where: {
-        userId: session.userId,
-        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-      },
-      orderBy: { createdAt: "asc" },
-      take: 20,
-      select: { role: true, content: true },
-    }),
-  ]);
+  const [character, recentDiaries, recentHistory, persona, relatedHits] =
+    await Promise.all([
+      prisma.character.findUnique({
+        where: { userId: session.userId },
+        select: { id: true, name: true, subscriptionStatus: true },
+      }),
+      prisma.diary.findMany({
+        where: { userId: session.userId },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          mood: true,
+          createdAt: true,
+        },
+      }),
+      prisma.chatMessage.findMany({
+        where: {
+          userId: session.userId,
+          createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        },
+        orderBy: { createdAt: "asc" },
+        take: 20,
+        select: { role: true, content: true },
+      }),
+      prisma.userPersona.findUnique({
+        where: { userId: session.userId },
+        select: { tone: true, formality: true, sentenceLength: true },
+      }),
+      // RAG는 실패해도 chat 전체를 막지 않는다 (best-effort).
+      searchDiaries(session.userId, userMessage, { topK: 5 }).catch((e) => {
+        console.warn(
+          "[chat] RAG search failed:",
+          e instanceof Error ? e.message : e,
+        );
+        return [] as RagSearchHit[];
+      }),
+    ]);
 
   if (!character) {
     return NextResponse.json({ error: "캐릭터를 찾을 수 없어요" }, { status: 404 });
   }
 
-  // Cap 검증·증분 (베타 ACTIVE → BASIC 10회/일). 호출 전 차감 → 실패해도 cap 카운트.
-  // 정상 사용자 영향은 미미(Gemini 99%+ 가용). V2에서 정교화 고려.
   const cap = await checkAndIncrement(session.userId, character.subscriptionStatus);
   if (!cap.allowed) {
     return NextResponse.json(
@@ -103,7 +189,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const systemPrompt = buildSystemPrompt(character.name, recentDiaries);
+  const systemPrompt = buildSystemPrompt({
+    characterName: character.name,
+    persona,
+    recentDiaries,
+    relatedHits,
+  });
   const history = recentHistory
     .filter((m) => m.role !== "SYSTEM")
     .map((m) => ({

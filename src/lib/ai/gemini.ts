@@ -4,7 +4,9 @@ import { z } from "zod";
 
 const MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
 const TIMEOUT_MS = 20_000;
-const DEFAULT_MAX_OUTPUT_TOKENS = 600;
+// 한국어는 토큰당 글자 수가 영어의 1/2 정도라 영어 기준 300토큰 ≒ 한국어 600토큰.
+// "1~3문장" 응답 + 자연스러운 종결 보장을 위해 여유 있게 1000.
+const DEFAULT_MAX_OUTPUT_TOKENS = 1000;
 
 export class GeminiError extends Error {}
 
@@ -74,6 +76,8 @@ export async function chat(input: ChatInput): Promise<string> {
           systemInstruction: input.systemPrompt,
           temperature: 0.7,
           maxOutputTokens: input.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+          // gemini-2.5 thinking 모델에서 출력 토큰이 내부 사고에 잠식되지 않게.
+          thinkingConfig: { thinkingBudget: 0 },
         },
       }),
       TIMEOUT_MS,
