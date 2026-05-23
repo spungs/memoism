@@ -149,15 +149,38 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
   };
 
   const buildExifsAndCompress = async () => {
+    // 1) 원본에서 EXIF 추출 (압축하면 메타데이터가 날아가므로 압축 전에).
+    const withExif = await Promise.all(
+      pickedImages.map(async (img) => {
+        let exif: ExifMeta;
+        try {
+          exif = await extractExif(img.file);
+        } catch {
+          exif = { takenAt: null, lat: null, lng: null };
+        }
+        return { img, exif };
+      }),
+    );
+
+    // 2) 촬영시각(takenAt) 오름차순 정렬. 사용자가 시간순이 아니게 추가해도
+    //    EXIF가 있으면 하루의 시간 흐름대로 재배열된다. EXIF 없는 사진은
+    //    원래 순서를 유지하며 뒤로 보낸다 (stable).
+    const ordered = withExif
+      .map((item, idx) => ({ ...item, idx }))
+      .sort((a, b) => {
+        const ta = a.exif.takenAt?.getTime() ?? null;
+        const tb = b.exif.takenAt?.getTime() ?? null;
+        if (ta != null && tb != null) return ta - tb;
+        if (ta != null) return -1;
+        if (tb != null) return 1;
+        return a.idx - b.idx;
+      });
+
+    // 3) 정렬된 순서로 압축. exifs와 compressed의 인덱스가 1:1로 맞는다.
     const compressed: File[] = [];
     const exifs: ExifMeta[] = [];
-    for (const img of pickedImages) {
-      // EXIF는 원본에서, 압축은 별개
-      try {
-        exifs.push(await extractExif(img.file));
-      } catch {
-        exifs.push({ takenAt: null, lat: null, lng: null });
-      }
+    for (const { img, exif } of ordered) {
+      exifs.push(exif);
       try {
         compressed.push(await compressImage(img.file));
       } catch {
