@@ -4,7 +4,6 @@ import Image from "next/image";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createDiaryAction } from "@/lib/diary/actions";
-import type { DiaryLocation } from "@/lib/diary/schemas";
 import { getDiaryImageSignedUrls } from "@/lib/storage/actions";
 
 const PENDING_DRAFT_KEY = "memoism:pendingDraft";
@@ -24,7 +23,6 @@ type PendingDraft = {
   }>;
   mode: "A" | "B" | "C";
   date: string;
-  location: DiaryLocation | null;
   createdAt: number;
 };
 
@@ -160,10 +158,6 @@ export function ReviewGate() {
       fd.set("source", `auto_${draftState.mode.toLowerCase()}`);
       fd.set("storagePaths", JSON.stringify(draftState.storagePaths));
       fd.set("exifs", JSON.stringify(draftState.exifs));
-      fd.set(
-        "location",
-        draftState.location ? JSON.stringify(draftState.location) : "null",
-      );
       fd.set("mood", draftState.draft.suggestedMood ?? "");
       fd.set("date", draftState.date);
 

@@ -15,7 +15,6 @@ const listSelect = {
   id: true,
   title: true,
   content: true,
-  location: true,
   mood: true,
   source: true,
   createdAt: true,

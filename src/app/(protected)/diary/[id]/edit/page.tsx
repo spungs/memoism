@@ -2,24 +2,13 @@ import { notFound, redirect } from "next/navigation";
 import { DiaryForm } from "@/components/diary/diary-form";
 import { getSession } from "@/lib/auth/session";
 import { getDiary } from "@/lib/diary/queries";
-import {
-  locationSchema,
-  moodKeySchema,
-  type DiaryLocation,
-  type MoodKey,
-} from "@/lib/diary/schemas";
+import { moodKeySchema, type MoodKey } from "@/lib/diary/schemas";
 import { getSignedUrls } from "@/lib/storage";
 
 export const metadata = { title: "일기 수정" };
 
 interface PageProps {
   params: Promise<{ id: string }>;
-}
-
-function parseStoredLocation(value: unknown): DiaryLocation | null {
-  if (!value || typeof value !== "object") return null;
-  const parsed = locationSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
 }
 
 function parseStoredMood(value: unknown): MoodKey | null {
@@ -57,7 +46,6 @@ export default async function DiaryEditPage({ params }: PageProps) {
         existingImages,
         hasPreviousContent: diary.previousContent !== null,
         aiGenerationVersion: diary.aiGenerationVersion,
-        location: parseStoredLocation(diary.location),
         mood: parseStoredMood(diary.mood),
         date: diaryDate,
       }}

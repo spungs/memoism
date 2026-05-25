@@ -1,6 +1,5 @@
 "use server";
 
-import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
@@ -8,9 +7,7 @@ import { deleteImage, saveImage } from "@/lib/storage";
 import { upsertDiaryEmbedding } from "./embedding";
 import {
   diaryInputSchema,
-  locationSchema,
   moodKeySchema,
-  type DiaryLocation,
   type MoodKey,
 } from "./schemas";
 
@@ -29,7 +26,7 @@ export type DiaryActionResult =
       ok: false;
       error?: string;
       fieldErrors?: Partial<
-        Record<"title" | "content" | "image" | "location", string>
+        Record<"title" | "content" | "image", string>
       >;
     };
 
@@ -49,18 +46,6 @@ function parseDiaryDate(raw: FormDataEntryValue | null): Date {
   const d = new Date(raw + "T12:00:00");
   if (isNaN(d.getTime())) return new Date();
   return d > new Date() ? new Date() : d;
-}
-
-function parseLocation(raw: FormDataEntryValue | null): DiaryLocation | null {
-  if (typeof raw !== "string" || raw === "" || raw === "null") return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  const result = locationSchema.safeParse(parsed);
-  return result.success ? result.data : null;
 }
 
 function parseMood(raw: FormDataEntryValue | null): MoodKey | null {
@@ -138,7 +123,6 @@ export async function createDiaryAction(
   const parsed = diaryInputSchema.safeParse({
     title: formData.get("title"),
     content: formData.get("content"),
-    location: parseLocation(formData.get("location")),
     mood: parseMood(formData.get("mood")),
   });
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsFromZod(parsed) };
@@ -193,7 +177,6 @@ export async function createDiaryAction(
         title: parsed.data.title,
         content: parsed.data.content,
         source,
-        location: parsed.data.location ?? Prisma.DbNull,
         mood: parsed.data.mood ?? null,
         createdAt: diaryDate,
         images:
@@ -238,7 +221,6 @@ export async function updateDiaryAction(
   const parsed = diaryInputSchema.safeParse({
     title: formData.get("title"),
     content: formData.get("content"),
-    location: parseLocation(formData.get("location")),
     mood: parseMood(formData.get("mood")),
   });
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsFromZod(parsed) };
@@ -250,7 +232,6 @@ export async function updateDiaryAction(
     data: {
       title: parsed.data.title,
       content: parsed.data.content,
-      location: parsed.data.location ?? Prisma.DbNull,
       mood: parsed.data.mood ?? null,
       createdAt: diaryDate,
       contentEditedAt: new Date(),

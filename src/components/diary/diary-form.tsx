@@ -14,7 +14,6 @@ import {
   type ExifMeta,
 } from "@/lib/diary/exif";
 import { compressImage } from "@/lib/diary/image-compress";
-import type { DiaryLocation } from "@/lib/diary/schemas";
 import { DiaryAiActions } from "./diary-ai-actions";
 import { DiaryDatePicker } from "./date-picker";
 import { MoodPicker, type MoodKey } from "./mood-picker";
@@ -36,7 +35,6 @@ interface DiaryFormProps {
     hasPreviousContent?: boolean;
     /** edit 모드용: 누적 AI 재생성 횟수 (라벨 분기용). */
     aiGenerationVersion?: number;
-    location: DiaryLocation | null;
     mood: MoodKey | null;
     date?: string; // YYYY-MM-DD
   };
@@ -108,10 +106,6 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [content, setContent] = useState(initial?.content ?? "");
   const [mood, setMood] = useState<MoodKey | null>(initial?.mood ?? null);
-  const [location, setLocation] = useState<DiaryLocation | null>(
-    initial?.location ?? null,
-  );
-  const [locationError, setLocationError] = useState<string | null>(null);
   const [date, setDate] = useState(initial?.date ?? todayStr());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -197,19 +191,6 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     });
   };
 
-  const handleAttachLocation = () => {
-    if (!("geolocation" in navigator)) {
-      setLocationError("이 기기는 위치 정보를 지원하지 않습니다");
-      return;
-    }
-    setLocationError(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setLocationError("위치 권한이 거부되었습니다"),
-      { timeout: 10000 },
-    );
-  };
-
   const buildExifsAndCompress = async () => {
     // pickedImages는 handlePickFiles에서 이미 EXIF 추출 + 촬영시각 순으로 정렬됨.
     // 여기선 그 순서를 신뢰하고 압축만 한다 (exifs와 compressed 인덱스 1:1).
@@ -250,7 +231,6 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
       fd.set("title", effectiveTitle);
       fd.set("content", trimmedContent);
       fd.set("source", "manual");
-      fd.set("location", location ? JSON.stringify(location) : "null");
       fd.set("mood", mood ?? "");
       fd.set("date", date);
       for (const f of compressed) fd.append("image", f);
@@ -324,7 +304,6 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
           exifs: data.exifs,
           mode: data.mode,
           date,
-          location,
           createdAt: Date.now(),
         }),
       );
@@ -742,42 +721,6 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
           </div>
         )}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          <p style={MUTED_LABEL}>위치</p>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={handleAttachLocation}
-              style={pillButtonStyle}
-            >
-              {location ? "현재 위치로 갱신" : "현재 위치 사용"}
-            </button>
-            {location && (
-              <>
-                <span
-                  style={{
-                    fontFamily: "var(--font-sans)",
-                    fontSize: "var(--text-xs)",
-                    color: "var(--fg-subtle)",
-                  }}
-                >
-                  {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setLocation(null)}
-                  style={subtleButtonStyle}
-                >
-                  제거
-                </button>
-              </>
-            )}
-          </div>
-          {locationError && (
-            <p style={errorStyle}>{locationError}</p>
-          )}
-        </div>
-
         {submitError && (
           <p
             role="alert"
@@ -818,25 +761,4 @@ const errorStyle: React.CSSProperties = {
   color: "var(--danger)",
   margin: 0,
   marginTop: 4,
-};
-
-const pillButtonStyle: React.CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-muted)",
-  padding: "6px 12px",
-  borderRadius: "var(--radius-md)",
-  border: "1px solid var(--border)",
-  backgroundColor: "var(--surface)",
-  cursor: "pointer",
-};
-
-const subtleButtonStyle: React.CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-subtle)",
-  background: "none",
-  border: "none",
-  cursor: "pointer",
-  padding: "6px 8px",
 };
