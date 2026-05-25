@@ -69,11 +69,14 @@ function formatTakenTime(d: Date | null): string | null {
   return d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 }
 
-// "5/23 13:08" — 여러 날짜 사진이 섞였을 때 썸네일 배지용.
+// "26/05/23 13:08" — 썸네일 배지: 촬영 날짜(yy/mm/dd) + 시각.
 function formatTakenDateTime(d: Date | null): string | null {
   if (!d) return null;
   const time = formatTakenTime(d);
-  return `${d.getMonth() + 1}/${d.getDate()} ${time}`;
+  const yy = String(d.getFullYear()).slice(-2);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yy}/${mm}/${dd} ${time}`;
 }
 
 // "2026-05-23" → "5/23" — 경고 배너에 날짜를 짧게 나열.
@@ -593,11 +596,7 @@ export function DiaryForm({
                 <PhotoThumb
                   key={img.id}
                   src={img.url}
-                  badge={
-                    isMultiDate
-                      ? formatTakenDateTime(img.exifTakenAt)
-                      : formatTakenTime(img.exifTakenAt)
-                  }
+                  badge={formatTakenDateTime(img.exifTakenAt)}
                   onRemove={() =>
                     setRemovedImageIds((prev) => [...prev, img.id])
                   }
@@ -608,11 +607,7 @@ export function DiaryForm({
                   key={img.id}
                   src={img.previewUrl}
                   unoptimized
-                  badge={
-                    isMultiDate
-                      ? formatTakenDateTime(img.exif.takenAt)
-                      : formatTakenTime(img.exif.takenAt)
-                  }
+                  badge={formatTakenDateTime(img.exif.takenAt)}
                   onRemove={() => removePickedImage(img.id)}
                 />
               ))}
