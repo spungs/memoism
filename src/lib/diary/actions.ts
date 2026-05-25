@@ -17,7 +17,7 @@ import {
 //   - 두 가지 입력 경로:
 //     A) "직접 작성" — formData.image[] = File[] → 서버에서 saveImage 호출
 //     B) "AI 검토 후 저장" — formData.storagePaths = JSON 배열 → 이미 업로드된 경로 재사용
-//   - updateDiaryAction은 텍스트 위주(이미지 수정은 Phase 3c-2/3d/NEW-7에서).
+//   - updateDiaryAction: 텍스트·메타데이터 수정 + 사진 추가/제거.
 //   - 백업 스왑 로직은 NEW-7 재생성 API에서 본격.
 
 export type DiaryActionResult =
@@ -208,7 +208,7 @@ export async function updateDiaryAction(
   id: string,
   formData: FormData,
 ): Promise<DiaryActionResult> {
-  // Phase 3c-1: 텍스트·메타데이터만 수정. 이미지 수정·재생성은 Phase 3c-2/3d (NEW-7 백업 스왑).
+  // 텍스트·메타데이터 수정 + 사진 추가/제거. AI 재생성·백업 스왑은 별도(NEW-7).
   const session = await getSession();
   if (!session) return { ok: false, error: "로그인이 필요합니다" };
 
@@ -252,6 +252,54 @@ export async function updateDiaryAction(
       });
       // Storage 정리는 best-effort (실패해도 DB는 이미 삭제됨)
       await Promise.all(toRemove.map((img) => deleteImage(img.storagePath)));
+    }
+  }
+
+  // 새로 추가된 사진 저장 — createDiaryAction과 동일한 File→saveImage 경로.
+  // 제거 반영 후 남은 장수를 기준으로 전체 5장 상한을 지키고,
+  // orderIndex는 기존 최대값 다음부터 이어 붙인다(기존 사진 순서 보존).
+  const newFiles = formData
+    .getAll("image")
+    .filter((f): f is File => f instanceof File && f.size > 0);
+  if (newFiles.length > 0) {
+    const currentCount = await prisma.diaryImage.count({
+      where: { diaryId: id },
+    });
+    const slots = MAX_IMAGES - currentCount;
+    if (slots > 0) {
+      const accepted = newFiles.slice(0, slots);
+      const exifs = parseExifs(formData.get("exifs"));
+      const agg = await prisma.diaryImage.aggregate({
+        where: { diaryId: id },
+        _max: { orderIndex: true },
+      });
+      let nextOrder = (agg._max.orderIndex ?? -1) + 1;
+      const uploaded: string[] = [];
+      try {
+        for (let i = 0; i < accepted.length; i++) {
+          const path = await saveImage(accepted[i], session.userId);
+          uploaded.push(path);
+          await prisma.diaryImage.create({
+            data: {
+              diaryId: id,
+              storagePath: path,
+              exifTakenAt: exifs[i]?.takenAt ? new Date(exifs[i].takenAt!) : null,
+              exifLat: exifs[i]?.lat ?? null,
+              exifLng: exifs[i]?.lng ?? null,
+              orderIndex: nextOrder++,
+            },
+          });
+        }
+      } catch (e) {
+        // 부분 실패: 업로드된 파일 정리 후 에러 반환 (DB row는 위 루프에서 함께 생성)
+        await Promise.all(uploaded.map((p) => deleteImage(p)));
+        return {
+          ok: false,
+          fieldErrors: {
+            image: e instanceof Error ? e.message : "이미지 업로드 실패",
+          },
+        };
+      }
     }
   }
 

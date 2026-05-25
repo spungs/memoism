@@ -29,8 +29,8 @@ interface DiaryFormProps {
   initial?: {
     title: string;
     content: string;
-    /** edit 모드용: 기존 사진들 (id + signed URL). 개별 제거 가능. */
-    existingImages?: { id: string; url: string }[];
+    /** edit 모드용: 기존 사진들 (id + signed URL + 촬영시각). 개별 제거 가능. */
+    existingImages?: { id: string; url: string; exifTakenAt: Date | null }[];
     /** edit 모드용: AI 재생성 직후 백업 존재 여부 — "되돌리기" 노출 분기. */
     hasPreviousContent?: boolean;
     /** edit 모드용: 누적 AI 재생성 횟수 (라벨 분기용). */
@@ -99,6 +99,85 @@ const MUTED_LABEL: React.CSSProperties = {
   margin: 0,
 };
 
+// 사진 썸네일 — 작성·수정 공용. 이미지 + 제거 버튼 + (있으면) 촬영시각 배지.
+function PhotoThumb({
+  src,
+  unoptimized,
+  badge,
+  onRemove,
+}: {
+  src: string;
+  unoptimized?: boolean;
+  badge: string | null;
+  onRemove: () => void;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        flexShrink: 0,
+        width: 96,
+        aspectRatio: "1 / 1",
+        overflow: "hidden",
+        borderRadius: "var(--radius-md)",
+        backgroundColor: "var(--surface)",
+        border: "1px solid var(--border)",
+      }}
+    >
+      <Image
+        src={src}
+        alt=""
+        fill
+        sizes="96px"
+        style={{ objectFit: "cover" }}
+        unoptimized={unoptimized}
+      />
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label="제거"
+        style={{
+          position: "absolute",
+          top: 4,
+          right: 4,
+          width: 22,
+          height: 22,
+          borderRadius: "50%",
+          backgroundColor: "rgba(0,0,0,0.6)",
+          color: "white",
+          border: "none",
+          cursor: "pointer",
+          fontSize: 14,
+          lineHeight: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        ×
+      </button>
+      {badge && (
+        <span
+          style={{
+            position: "absolute",
+            bottom: 4,
+            left: 4,
+            fontFamily: "var(--font-sans)",
+            fontSize: 10,
+            lineHeight: 1.4,
+            color: "white",
+            backgroundColor: "rgba(0,0,0,0.6)",
+            padding: "1px 5px",
+            borderRadius: "var(--radius-sm)",
+          }}
+        >
+          {badge}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -114,10 +193,26 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
   // edit 모드: 사용자가 제거한 기존 사진 id 목록 (저장 시 서버로 전달).
   const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
 
-  // 선택된 사진들이 걸쳐 있는 서로 다른 KST 날짜 (촬영시각 있는 것만).
-  // 2개 이상이면 "이틀 이상 섞임" → 배지에 날짜 표기 + 경고 배너 + 생성 전 확인.
-  const pickedDateKeys = uniqueKstDateKeys(pickedImages.map((p) => p.exif));
-  const isMultiDate = pickedDateKeys.length >= 2;
+  // edit 모드: 아직 제거되지 않은 기존 사진들.
+  const visibleExisting = (initial?.existingImages ?? []).filter(
+    (img) => !removedImageIds.includes(img.id),
+  );
+
+  // 기존 사진 + 새로 고른 사진을 합쳐 날짜/장수를 계산.
+  // (create 모드는 기존 사진이 없어 picked만 반영 → 동작 동일)
+  const existingExif: ExifMeta[] = visibleExisting.map((img) => ({
+    takenAt: img.exifTakenAt,
+    lat: null,
+    lng: null,
+  }));
+  const dateKeys = uniqueKstDateKeys([
+    ...existingExif,
+    ...pickedImages.map((p) => p.exif),
+  ]);
+  // 사진이 2일 이상에 걸치면 → 배지에 날짜 표기 + 경고 배너 + 생성 전 확인.
+  const isMultiDate = dateKeys.length >= 2;
+  const totalImageCount = visibleExisting.length + pickedImages.length;
+  const slotsLeft = MAX_IMAGES - totalImageCount;
 
   const [titleError, setTitleError] = useState<string | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
@@ -156,7 +251,6 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
   ) => {
     const files = Array.from(e.target.files ?? []);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    const slotsLeft = MAX_IMAGES - pickedImages.length;
     const accepted = files.slice(0, slotsLeft);
 
     // 첨부 즉시 EXIF를 추출해 화면 미리보기를 촬영시각 순으로 정렬한다.
@@ -267,7 +361,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
 
     // 이틀 이상 사진이 섞여 있으면 하나의 일기로 묶기 전 명시적 확인.
     if (isMultiDate) {
-      const dates = pickedDateKeys.map(shortDateLabel).join("·");
+      const dates = dateKeys.map(shortDateLabel).join("·");
       const proceed = window.confirm(
         `이틀(${dates}) 사진이 섞여 있어요. 이대로 하나의 일기로 정리할까요?`,
       );
@@ -476,85 +570,45 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
 
         <div style={{ height: 1, backgroundColor: "var(--border)" }} />
 
-        {/* 사진 (최대 5장) — create 모드만 픽커. edit 모드는 read-only. */}
-        {mode === "create" && (
+        {/* 사진 (최대 5장) — 작성·수정 공용. 가로 스크롤(개행 X). */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          <p style={MUTED_LABEL}>사진 ({pickedImages.length}/{MAX_IMAGES})</p>
-          {pickedImages.length > 0 && (
+          <p style={MUTED_LABEL}>사진 ({totalImageCount}/{MAX_IMAGES})</p>
+          {totalImageCount > 0 && (
             <div
+              className="hide-scrollbar"
               style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))",
+                display: "flex",
                 gap: "var(--space-2)",
+                overflowX: "auto",
+                WebkitOverflowScrolling: "touch",
               }}
             >
-              {pickedImages.map((img) => (
-                <div
+              {visibleExisting.map((img) => (
+                <PhotoThumb
                   key={img.id}
-                  style={{
-                    position: "relative",
-                    aspectRatio: "1 / 1",
-                    overflow: "hidden",
-                    borderRadius: "var(--radius-md)",
-                    backgroundColor: "var(--surface)",
-                    border: "1px solid var(--border)",
-                  }}
-                >
-                  <Image
-                    src={img.previewUrl}
-                    alt=""
-                    fill
-                    sizes="120px"
-                    style={{ objectFit: "cover" }}
-                    unoptimized
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removePickedImage(img.id)}
-                    aria-label="제거"
-                    style={{
-                      position: "absolute",
-                      top: 4,
-                      right: 4,
-                      width: 22,
-                      height: 22,
-                      borderRadius: "50%",
-                      backgroundColor: "rgba(0,0,0,0.6)",
-                      color: "white",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: 14,
-                      lineHeight: 1,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    ×
-                  </button>
-                  {(isMultiDate
-                    ? formatTakenDateTime(img.exif.takenAt)
-                    : formatTakenTime(img.exif.takenAt)) && (
-                    <span
-                      style={{
-                        position: "absolute",
-                        bottom: 4,
-                        left: 4,
-                        fontFamily: "var(--font-sans)",
-                        fontSize: 10,
-                        lineHeight: 1.4,
-                        color: "white",
-                        backgroundColor: "rgba(0,0,0,0.6)",
-                        padding: "1px 5px",
-                        borderRadius: "var(--radius-sm)",
-                      }}
-                    >
-                      {isMultiDate
-                        ? formatTakenDateTime(img.exif.takenAt)
-                        : formatTakenTime(img.exif.takenAt)}
-                    </span>
-                  )}
-                </div>
+                  src={img.url}
+                  badge={
+                    isMultiDate
+                      ? formatTakenDateTime(img.exifTakenAt)
+                      : formatTakenTime(img.exifTakenAt)
+                  }
+                  onRemove={() =>
+                    setRemovedImageIds((prev) => [...prev, img.id])
+                  }
+                />
+              ))}
+              {pickedImages.map((img) => (
+                <PhotoThumb
+                  key={img.id}
+                  src={img.previewUrl}
+                  unoptimized
+                  badge={
+                    isMultiDate
+                      ? formatTakenDateTime(img.exif.takenAt)
+                      : formatTakenTime(img.exif.takenAt)
+                  }
+                  onRemove={() => removePickedImage(img.id)}
+                />
               ))}
             </div>
           )}
@@ -573,8 +627,8 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
                 margin: 0,
               }}
             >
-              📷 {pickedDateKeys.map(shortDateLabel).join("·")}{" "}
-              {pickedDateKeys.length}일 사진이 섞여 있어요. 일기는 하루 단위라 한
+              📷 {dateKeys.map(shortDateLabel).join("·")}{" "}
+              {dateKeys.length}일 사진이 섞여 있어요. 일기는 하루 단위라 한
               날 사진만 두길 권해요.
             </p>
           ) : (
@@ -591,7 +645,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
               </p>
             )
           )}
-          {pickedImages.length < MAX_IMAGES && (
+          {slotsLeft > 0 && (
             <label
               style={{
                 fontFamily: "var(--font-sans)",
@@ -617,76 +671,6 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
             </label>
           )}
         </div>
-        )}
-
-        {/* edit 모드: 기존 사진 표시 + 개별 제거. removedImageIds로 추적, 저장 시 서버 전달. */}
-        {mode === "edit" &&
-          (() => {
-            const visibleImages = (initial?.existingImages ?? []).filter(
-              (img) => !removedImageIds.includes(img.id),
-            );
-            if (visibleImages.length === 0) return null;
-            return (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                <p style={MUTED_LABEL}>사진 ({visibleImages.length}장)</p>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))",
-                    gap: "var(--space-2)",
-                  }}
-                >
-                  {visibleImages.map((img) => (
-                    <div
-                      key={img.id}
-                      style={{
-                        position: "relative",
-                        aspectRatio: "1 / 1",
-                        overflow: "hidden",
-                        borderRadius: "var(--radius-md)",
-                        backgroundColor: "var(--surface)",
-                        border: "1px solid var(--border)",
-                      }}
-                    >
-                      <Image
-                        src={img.url}
-                        alt=""
-                        fill
-                        sizes="120px"
-                        style={{ objectFit: "cover" }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setRemovedImageIds((prev) => [...prev, img.id])
-                        }
-                        aria-label="제거"
-                        style={{
-                          position: "absolute",
-                          top: 4,
-                          right: 4,
-                          width: 22,
-                          height: 22,
-                          borderRadius: "50%",
-                          backgroundColor: "rgba(0,0,0,0.6)",
-                          color: "white",
-                          border: "none",
-                          cursor: "pointer",
-                          fontSize: 14,
-                          lineHeight: 1,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
 
         {/* AI 정리 — 베타 척추 (create 모드만) */}
         {mode === "create" && (

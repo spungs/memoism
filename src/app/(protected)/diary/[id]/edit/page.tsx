@@ -33,8 +33,15 @@ export default async function DiaryEditPage({ params }: PageProps) {
   const signedUrls =
     imagePaths.length > 0 ? await getSignedUrls(imagePaths) : [];
   const existingImages = diary.images
-    .map((img, i) => ({ id: img.id, url: signedUrls[i] }))
-    .filter((entry): entry is { id: string; url: string } => entry.url !== null);
+    .map((img, i) => ({
+      id: img.id,
+      url: signedUrls[i],
+      exifTakenAt: img.exifTakenAt,
+    }))
+    .filter(
+      (entry): entry is { id: string; url: string; exifTakenAt: Date | null } =>
+        entry.url !== null,
+    );
 
   return (
     <DiaryForm
