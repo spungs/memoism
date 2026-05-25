@@ -144,7 +144,7 @@ export function DiaryAiActions({
         }}
       >
         {aiGenerationVersion > 0
-          ? `AI 재정리 ${aiGenerationVersion}회 · 사진과 메모로 다시 만들어요.`
+          ? "사진과 메모를 기반으로 AI가 다시 정리해줘요."
           : "사진과 본문을 기반으로 AI가 1인칭 일기로 정리해줘요."}
       </p>
 

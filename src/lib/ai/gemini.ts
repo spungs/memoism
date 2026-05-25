@@ -31,18 +31,46 @@ async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   ]);
 }
 
-async function callWithRetry<T>(fn: () => Promise<T>, retries = 1): Promise<T> {
+// 일시적 장애(503 과부하 / 429 한도 / 5xx)는 재시도 가치가 있다.
+function isTransient(e: unknown): boolean {
+  const raw = e instanceof Error ? e.message : String(e);
+  return /\b(503|500|502|504|429)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand|overloaded|deadline/i.test(
+    raw,
+  );
+}
+
+// SDK가 던지는 raw JSON 에러를 사용자에게 노출하지 않고 친근한 한국어로 정규화.
+function friendlyGeminiError(e: unknown): GeminiError {
+  // 이미 우리가 만든 GeminiError(타임아웃·스키마 등)는 그대로 통과.
+  if (e instanceof GeminiError) return e;
+  const raw = e instanceof Error ? e.message : String(e);
+  if (/\b(503|500|502|504)\b|UNAVAILABLE|high demand|overloaded/i.test(raw)) {
+    return new GeminiError(
+      "AI 서버가 잠시 혼잡해요. 잠시 후 다시 시도해주세요.",
+    );
+  }
+  if (/\b429\b|RESOURCE_EXHAUSTED|quota/i.test(raw)) {
+    return new GeminiError(
+      "지금 AI 사용량이 많아요. 잠시 후 다시 시도해주세요.",
+    );
+  }
+  return new GeminiError("AI 처리 중 문제가 생겼어요. 잠시 후 다시 시도해주세요.");
+}
+
+async function callWithRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
   let lastErr: unknown;
   for (let i = 0; i <= retries; i++) {
     try {
       return await fn();
     } catch (e) {
       lastErr = e;
+      // 일시적 장애가 아니거나 마지막 시도면 중단.
+      if (!isTransient(e) || i === retries) break;
+      // 지수 backoff (0.6s, 1.2s) — 과부하가 가라앉을 시간을 준다.
+      await new Promise((r) => setTimeout(r, 600 * (i + 1)));
     }
   }
-  throw lastErr instanceof Error
-    ? lastErr
-    : new GeminiError(String(lastErr ?? "unknown error"));
+  throw friendlyGeminiError(lastErr);
 }
 
 // =============================================================================
