@@ -146,10 +146,14 @@ export function ReviewGate() {
     ta.style.height = Math.max(240, ta.scrollHeight) + "px";
   }, [editedContent]);
 
-  // 페이지 떠날 때 확인
+  // 저장·취소 같은 "의도적 이탈" 중엔 미저장 경고를 띄우지 않기 위한 플래그.
+  const leavingRef = useRef(false);
+
+  // 페이지 떠날 때 확인 (탭 닫기·새로고침 등 비의도 이탈만)
   useEffect(() => {
     if (!draftState) return;
     const handler = (e: BeforeUnloadEvent) => {
+      if (leavingRef.current) return;
       e.preventDefault();
       e.returnValue = "";
     };
@@ -184,6 +188,7 @@ export function ReviewGate() {
         return;
       }
 
+      leavingRef.current = true;
       sessionStorage.removeItem(PENDING_DRAFT_KEY);
       router.push(`/diary/${result.data.id}`);
       router.refresh();
@@ -264,6 +269,7 @@ export function ReviewGate() {
     ) {
       return;
     }
+    leavingRef.current = true;
     sessionStorage.removeItem(PENDING_DRAFT_KEY);
     // V2: storagePaths를 garbage collector cron이 정리. 베타엔 그대로 두고 사용자가 다시 시도하면 신규 업로드.
     router.push("/diary/new");
