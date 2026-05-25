@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { CharacterChat } from "@/components/character/character-chat";
 import { CHARACTER_NAME } from "@/lib/character/utils";
 
-export const metadata = { title: "친구" };
+export const metadata = { title: "메이" };
 
 export default async function CharacterPage() {
   const session = await getSession();

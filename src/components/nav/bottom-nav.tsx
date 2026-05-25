@@ -53,7 +53,7 @@ const navItems: NavItem[] = [
 ]
 
 const rightNavItems: NavItem[] = [
-  { href: '/character', label: '캐릭터', icon: <CharacterIcon /> },
+  { href: '/character', label: '메이', icon: <CharacterIcon /> },
   { href: '/settings', label: '설정', icon: <SettingsIcon /> },
 ]
 
