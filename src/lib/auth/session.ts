@@ -1,48 +1,25 @@
-import { SignJWT } from "jose/jwt/sign";
-import { jwtVerify } from "jose/jwt/verify";
-import type { JWTPayload } from "jose";
+import { cache } from "react";
 import { cookies, headers } from "next/headers";
+import { prisma } from "@/lib/db";
+import {
+  signSession,
+  verifySessionToken,
+  SESSION_DURATION_SECONDS,
+  type SessionPayload,
+} from "./jwt";
 
 const SESSION_COOKIE = "session";
-const SESSION_DURATION_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
-export interface SessionPayload extends JWTPayload {
-  userId: string;
-  email: string;
-}
+// Re-export the Edge-safe jose helpers so existing import sites keep working.
+export { signSession, verifySessionToken };
+export type { SessionPayload };
 
-function getSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error("JWT_SECRET is not set. Add it to .env.local.");
-  }
-  return new TextEncoder().encode(secret);
-}
-
-export async function signSession(payload: {
-  userId: string;
-  email: string;
-}): Promise<string> {
-  return new SignJWT(payload)
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime(`${SESSION_DURATION_SECONDS}s`)
-    .sign(getSecret());
-}
-
-export async function verifySessionToken(
-  token: string,
-): Promise<SessionPayload | null> {
-  try {
-    const { payload } = await jwtVerify<SessionPayload>(token, getSecret());
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
-export async function createSession(userId: string, email: string): Promise<void> {
-  const token = await signSession({ userId, email });
+export async function createSession(
+  userId: string,
+  email: string,
+  tokenVersion: number,
+): Promise<void> {
+  const token = await signSession({ userId, email, tokenVersion });
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
@@ -58,14 +35,28 @@ export async function deleteSession(): Promise<void> {
   cookieStore.delete(SESSION_COOKIE);
 }
 
-export async function getSession(): Promise<SessionPayload | null> {
-  const headerStore = await headers();
-  const userId = headerStore.get("x-user-id");
-  const email = headerStore.get("x-user-email");
-  if (userId && email) {
-    return { userId, email } as SessionPayload;
-  }
-  return null;
-}
+// Reads the session forwarded by middleware (x-user-* headers) and then
+// validates it against the DB: a session whose tokenVersion no longer matches
+// the user's current tokenVersion is treated as invalidated (e.g. after a
+// password change on another device — QA M-10). cache() dedupes the DB read
+// across multiple getSession() calls within a single request.
+export const getSession = cache(
+  async (): Promise<SessionPayload | null> => {
+    const headerStore = await headers();
+    const userId = headerStore.get("x-user-id");
+    const email = headerStore.get("x-user-email");
+    const headerTokenVersion = headerStore.get("x-user-token-version");
+    if (!userId || !email) return null;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { tokenVersion: true },
+    });
+    if (!user) return null;
+    if (user.tokenVersion !== Number(headerTokenVersion)) return null;
+
+    return { userId, email, tokenVersion: user.tokenVersion };
+  },
+);
 
 export const SESSION_COOKIE_NAME = SESSION_COOKIE;

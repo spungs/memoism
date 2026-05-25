@@ -43,14 +43,18 @@ model User {
   email              String   @unique
   passwordHash       String   @map("password_hash")
   externalLLMConsent Boolean  @default(false) @map("external_llm_consent")
+  // tokenVersion — 세션 무효화 카운터 (QA M-10). JWT payload에 담고 getSession에서
+  // DB 값과 비교. 비밀번호 변경 시 increment → 발급된 기존 토큰 전부 무효.
+  tokenVersion       Int      @default(0) @map("token_version")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
-  character    Character?
-  persona      UserPersona?
-  diaries      Diary[]
-  chatMessages ChatMessage[]
-  usageLogs    UsageLog[]
+  character         Character?
+  persona           UserPersona?
+  diaries           Diary[]
+  chatMessages      ChatMessage[]
+  usageLogs         UsageLog[]
+  pushSubscriptions PushSubscription[]
 
   @@map("users")
 }
@@ -196,4 +200,22 @@ model ChatMessage {
   @@index([characterId, createdAt])
   @@index([userId, createdAt])
   @@map("chat_messages")
+}
+
+// PushSubscription — Web Push 구독 (22:00 KST 리마인드, NEW-15).
+//   - 한 사용자가 여러 기기 구독 가능 (endpoint별 1행).
+//   - endpoint 고유: 같은 기기 재구독 시 upsert로 갱신.
+//   - iOS는 PWA 설치 + iOS 16.4+ 에서만 Web Push 수신 가능.
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }

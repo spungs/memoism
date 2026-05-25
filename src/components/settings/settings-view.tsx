@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { logoutAction, changePasswordAction, type ChangePasswordState } from "@/lib/auth/actions";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { PushToggle } from "@/components/settings/push-toggle";
 
 const APP_VERSION = "v0.1.0";
 
@@ -214,6 +215,13 @@ export function SettingsView({ email }: SettingsViewProps) {
             <span style={ROW_LABEL_STYLE}>비밀번호 변경</span>
             <Chevron />
           </button>
+        </div>
+      </section>
+
+      <section style={{ marginBottom: "var(--space-6)" }}>
+        <h2 style={SECTION_HEADER_STYLE}>알림</h2>
+        <div style={CARD_STYLE}>
+          <PushToggle />
         </div>
       </section>
 

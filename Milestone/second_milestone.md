@@ -485,6 +485,37 @@ async function unlockRagOnce(userId: string): Promise<boolean>;
 
 ---
 
+## 11.1 진행 현황 (2026-05-25, 코드 실측 기준)
+
+> 문서 추적이 비어 있어 코드베이스를 직접 감사해 작성. "코드 완료"는 타입체크·lint·prod 빌드 통과를 의미하며, DB 반영·env 등록·배포 후 동작 확인은 별도 표기.
+
+| Phase | 상태 | 메모 |
+|---|---|---|
+| **0** 인프라 | ✅ 완료 | Supabase Storage 이관, magic-byte 검증, SVG 차단 |
+| **1** 데이터 모델 | ✅ 완료 | DiaryImage 1:N, DiaryEmbedding, UserPersona, source 컬럼 |
+| **2** Storage·LLM | ✅ 완료 | Gemini 2.5 Flash 전환 (Ollama 제거) |
+| **3** 자동 생성 척추 | ✅ 완료 | EXIF→Vision→모드 A/B/C→검토 게이트→재생성·되돌리기 |
+| **4** RAG + 캐릭터 | ✅ 완료 | pgvector 검색, 채팅 RAG, 일기 그리드 검색, 메이 첫 인사 |
+| **5** 비즈니스/정책 | 🟡 거의 | 동의 체크박스·데이터 내보내기·계정 탈퇴·자동 Basic ✅ / **22:00 리마인드 푸시 → 2026-05-25 코드 완료**(DB·env·배포 대기) |
+| **6** 안정성 | 🟡 거의 | Zod 검증·미들웨어 정확 매칭·보상 트랜잭션 ✅ / **tokenVersion 세션 무효화 → 2026-05-25 코드 완료**(db:push 대기) / parseLocation strict·/design dev게이트 미확인(경미) |
+
+### 2026-05-25 작업 (Phase 5·6 마감)
+- **22:00 KST 리마인드 푸시 (NEW-15)** — Web Push. `PushSubscription` 모델, `src/lib/push/`, `/api/push/{subscribe,unsubscribe}`, `worker/index.ts`(custom SW), 설정 토글, `/api/cron/reminder` + `vercel.json` cron(`0 13 * * *`=22:00 KST). 발송은 `web-push` lib, Vercel Cron이 `CRON_SECRET`으로 호출. 만료 구독 자동 prune.
+  - 결정: 기획서의 "pg_cron 발송"은 Postgres가 VAPID 서명·HTTP 발송을 못 하므로 **Vercel Cron + web-push로 대체**(기존 24h 정리용 pg_cron은 순수 SQL이라 유지).
+- **tokenVersion 세션 무효화 (QA M-10)** — `User.tokenVersion` + JWT payload 포함. 비번 변경 시 increment(본인 기기는 쿠키 재발급으로 유지). **Edge 미들웨어에 Prisma가 끌려오지 않도록** jose 검증을 `src/lib/auth/jwt.ts`로 분리, DB 버전 비교는 `getSession()`(Node)에서 수행.
+- 검증: `tsc --noEmit`·`eslint`·`next build` 모두 통과. custom worker가 `public/worker-*.js`로 컴파일 확인.
+
+### 배포 전 필수 액션 (사용자)
+1. `pnpm db:push` — `token_version` 컬럼 + `push_subscriptions` 테이블 반영. ⚠️ 배포 시 **기존 발급 토큰 전부 무효화**(전원 재로그인) — JWT_SECRET 회전과 동일한 1회성 동작, 의도됨.
+2. env 등록 (`.env.local` + Vercel): `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET`.
+3. prod 배포 후: 설정에서 푸시 구독 → 22:00(또는 cron 수동 트리거)에 알림 수신, 비번 변경 후 다른 기기 즉시 차단 확인.
+
+### 베타 DoD 잔여 점검
+- DoD #8 "무료 사용자 광고 RAG 모의 언락" — `usage.ts`는 일일 cap만 구현, 모의 광고 언락 플로우 **미확인**(별도 결정 필요).
+- 나머지 DoD(#1~#7, #9~#13)는 코드상 충족, env·DB·배포 후 E2E 재검증 권장.
+
+---
+
 ## 12. 결정 의존성 (변경 시 마일스톤 재검토 필요)
 
 본 마일스톤이 *암묵적으로 가정*하는 결정들. 바뀌면 본 마일스톤도 갱신해야:

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { verifySessionToken } from "@/lib/auth/session";
+import { verifySessionToken } from "@/lib/auth/jwt";
 
 // Exact-match whitelist. Adding a sub-route under /login or /signup later requires
 // updating this list explicitly — preferred over prefix matching to avoid auth
@@ -10,6 +10,12 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const isPublic = PUBLIC_PATHS.has(pathname);
   const isApi = pathname.startsWith("/api/");
+
+  // Vercel Cron 등 비대화형 엔드포인트는 세션 쿠키가 없다. /api/cron/* 는
+  // 미들웨어 인증을 우회하고 라우트 자체의 CRON_SECRET 검증에 맡긴다.
+  if (pathname.startsWith("/api/cron/")) {
+    return NextResponse.next();
+  }
 
   const token = req.cookies.get("session")?.value;
   const session = token ? await verifySessionToken(token) : null;
@@ -35,9 +41,11 @@ export async function middleware(req: NextRequest) {
   const requestHeaders = new Headers(req.headers);
   requestHeaders.delete("x-user-id");
   requestHeaders.delete("x-user-email");
+  requestHeaders.delete("x-user-token-version");
   if (session) {
     requestHeaders.set("x-user-id", session.userId);
     requestHeaders.set("x-user-email", session.email);
+    requestHeaders.set("x-user-token-version", String(session.tokenVersion));
   }
   return NextResponse.next({ request: { headers: requestHeaders } });
 }
@@ -45,6 +53,6 @@ export async function middleware(req: NextRequest) {
 export const config = {
   // Run on every route except Next.js internals, static assets, and the PWA SW.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icons/|manifest.json|sw.js|workbox-.*|swe-worker-.*).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icons/|manifest.json|sw.js|workbox-.*|swe-worker-.*|worker-.*).*)",
   ],
 };

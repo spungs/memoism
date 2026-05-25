@@ -75,7 +75,8 @@ export async function signupAction(
     throw e;
   }
 
-  await createSession(user.id, user.email);
+  // New users start at tokenVersion 0 (DB default).
+  await createSession(user.id, user.email, 0);
   redirect("/");
 }
 
@@ -100,7 +101,7 @@ export async function loginAction(
   const { email, password } = parsed.data;
   const user = await prisma.user.findUnique({
     where: { email: email.toLowerCase() },
-    select: { id: true, email: true, passwordHash: true },
+    select: { id: true, email: true, passwordHash: true, tokenVersion: true },
   });
 
   // Constant-ish time: still run bcrypt even if user is missing to avoid leaking
@@ -113,7 +114,7 @@ export async function loginAction(
     return { error: "이메일 또는 비밀번호가 올바르지 않습니다" };
   }
 
-  await createSession(user.id, user.email);
+  await createSession(user.id, user.email, user.tokenVersion);
   redirect("/");
 }
 
@@ -160,10 +161,15 @@ export async function changePasswordAction(
   }
 
   const newHash = await hashPassword(newPassword);
-  await prisma.user.update({
+  // Bump tokenVersion to invalidate sessions issued before this change (QA M-10).
+  // Re-issue this device's cookie with the new tokenVersion so the current user
+  // stays logged in; only *other* devices get invalidated by getSession().
+  const updated = await prisma.user.update({
     where: { id: session.userId },
-    data: { passwordHash: newHash },
+    data: { passwordHash: newHash, tokenVersion: { increment: 1 } },
+    select: { tokenVersion: true },
   });
+  await createSession(session.userId, session.email, updated.tokenVersion);
 
   return { ok: true };
 }
