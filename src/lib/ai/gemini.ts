@@ -162,12 +162,19 @@ function buildDiarySystemPrompt(
   persona: DiaryGenerationPersona | undefined,
   exifSummary: string | undefined,
 ): string {
+  // 베타 기본 preset은 "factual" — 담백한 사실 중심 평서문('~했다'체).
+  // (UserPersona UI는 V2 노출 예정. 그때 다른 preset에서 tone/formality 기반으로 확장.)
   const tone = persona?.tone ?? "warm";
   const formality = persona?.formality === "formal" ? "존댓말" : "반말";
+  const styleLines =
+    !persona || persona.presetKey === "factual"
+      ? `- 담백한 사실 중심으로 서술한다. 종결어미는 평서문('~했다/~였다/~았다·었다')으로 통일한다.
+- 일어난 일을 시간 순서대로 간결히 적는다. 구어체 말투('~했어/~했지/~네')·느낌표·과장된 감탄은 쓰지 않는다. 느낀 점도 담백한 평서문으로 적는다('아쉬웠다'처럼).`
+      : `- ${formality}, ${tone} 톤.`;
 
   const common = `## 출력 규칙
 - 본문은 한국어 1인칭, 150~250자 (공백 포함).
-- ${formality}, ${tone} 톤.
+${styleLines}
 - 환각 금지: 입력(사진·메모·EXIF)에 없는 사실·디테일·없는 사람·꾸며낸 대화·과장된 감정 추가 금지.
 - 응답은 JSON 객체 하나만. 코드블록·머리말·꼬리말 없음.
 - 스키마: { "title": string(1~50자), "content": string(20~500자), "suggestedMood": "joy"|"calm"|"sad"|"love"|"anger"|"tired"|null }`;
