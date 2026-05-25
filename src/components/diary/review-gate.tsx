@@ -42,6 +42,19 @@ function formatExifTime(iso: string | null): string | null {
   }
 }
 
+// 썸네일 배지용: "26/05/17\n오후 04:18" (날짜 yy/mm/dd 줄바꿈 + 오전·오후 시각).
+// diary-form.tsx 배지와 동일 포맷. whiteSpace: "pre-line"이 \n을 개행으로 렌더.
+function formatTakenBadge(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  const yy = String(d.getFullYear()).slice(-2);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const time = d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+  return `${yy}/${mm}/${dd}\n${time}`;
+}
+
 // KST(UTC+9) 기준 YYYY-MM-DD. exif.ts를 import하지 않고 클라이언트에서 직접 계산
 // (서버/클라이언트 경계 회피 — 다른 에이전트가 exif.ts 소유).
 function toKstDate(iso: string | null): string | null {
@@ -434,6 +447,28 @@ export function ReviewGate() {
                     >
                       ×
                     </button>
+                    {(() => {
+                      const b = formatTakenBadge(draftState.exifs[i]?.takenAt);
+                      return b ? (
+                        <span
+                          style={{
+                            position: "absolute",
+                            bottom: 4,
+                            left: 4,
+                            fontFamily: "var(--font-sans)",
+                            fontSize: 10,
+                            lineHeight: 1.4,
+                            color: "white",
+                            backgroundColor: "rgba(0,0,0,0.6)",
+                            padding: "1px 5px",
+                            borderRadius: "var(--radius-sm)",
+                            whiteSpace: "pre-line",
+                          }}
+                        >
+                          {b}
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
                 ) : null,
               )}

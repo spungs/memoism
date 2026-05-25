@@ -246,7 +246,7 @@ export function DiaryForm({
     const ta = textareaRef.current;
     if (!ta) return;
     ta.style.height = "auto";
-    ta.style.height = Math.max(240, ta.scrollHeight) + "px";
+    ta.style.height = Math.max(120, ta.scrollHeight) + "px";
   }, [content]);
 
   // 미리보기 URL revoke on unmount
@@ -549,7 +549,7 @@ export function DiaryForm({
               setContent(e.target.value);
               const el = e.currentTarget;
               el.style.height = "auto";
-              el.style.height = Math.max(240, el.scrollHeight) + "px";
+              el.style.height = Math.max(120, el.scrollHeight) + "px";
             }}
             placeholder={
               mode === "create"
@@ -560,7 +560,7 @@ export function DiaryForm({
             aria-invalid={Boolean(contentError)}
             style={{
               width: "100%",
-              minHeight: 240,
+              minHeight: 120,
               fontFamily: "var(--font-serif)",
               fontSize: "var(--text-md)",
               lineHeight: "var(--leading-relaxed)",
