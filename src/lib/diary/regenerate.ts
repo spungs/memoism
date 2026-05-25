@@ -7,6 +7,7 @@ import {
   type DiaryGenerationOutput,
 } from "@/lib/ai/gemini";
 import { checkAndIncrement } from "@/lib/ai/usage";
+import { buildExifSummary } from "./exif-summary";
 import { upsertDiaryEmbedding } from "./embedding";
 
 // 일기당 재생성 cap은 제거됨 (사용자 결정). 일일 cap이 비용·abuse 차단.
@@ -28,26 +29,6 @@ export type RegenerateResult =
       error: string;
       capExhausted?: boolean; // 일일 cap
     };
-
-function buildExifSummary(
-  images: Array<{
-    exifTakenAt: Date | null;
-    exifLat: number | null;
-    exifLng: number | null;
-  }>,
-): string | undefined {
-  const lines = images
-    .map((img, i) => {
-      const parts: string[] = [];
-      if (img.exifTakenAt) parts.push(`시간 ${img.exifTakenAt.toISOString()}`);
-      if (img.exifLat != null && img.exifLng != null) {
-        parts.push(`위치 ${img.exifLat.toFixed(4)},${img.exifLng.toFixed(4)}`);
-      }
-      return parts.length > 0 ? `사진${i + 1} — ${parts.join(", ")}` : null;
-    })
-    .filter((line): line is string => line !== null);
-  return lines.length > 0 ? lines.join("\n") : undefined;
-}
 
 function modeFor(source: string, photoCount: number): DiaryGenerationMode {
   if (source === "auto_a") return "A";
@@ -128,7 +109,13 @@ export async function regenerateDiary(
     },
   });
 
-  const exifSummary = buildExifSummary(diary.images);
+  const exifSummary = buildExifSummary(
+    diary.images.map((img) => ({
+      takenAt: img.exifTakenAt,
+      lat: img.exifLat,
+      lng: img.exifLng,
+    })),
+  );
   const text = mode === "A" ? undefined : diary.content;
 
   let draft: DiaryGenerationOutput;

@@ -9,6 +9,7 @@ import {
   type DiaryGenerationOutput,
 } from "@/lib/ai/gemini";
 import { checkAndIncrement } from "@/lib/ai/usage";
+import { buildExifSummary } from "./exif-summary";
 
 // 클라이언트가 EXIF를 추출해 multipart의 별도 필드로 보낸다 (압축 시 EXIF 손실 회피).
 export type ClientExif = {
@@ -39,20 +40,6 @@ export type AutoGenerateResult =
       capExhausted?: boolean;
       uploadedToCleanup?: string[]; // Gemini 실패 시 garbage collector(V2)가 정리
     };
-
-function buildExifSummary(exifs: ClientExif[]): string | undefined {
-  const lines = exifs
-    .map((e, i) => {
-      const parts: string[] = [];
-      if (e.takenAt) parts.push(`시간 ${e.takenAt}`);
-      if (e.lat != null && e.lng != null) {
-        parts.push(`위치 ${e.lat.toFixed(4)},${e.lng.toFixed(4)}`);
-      }
-      return parts.length > 0 ? `사진${i + 1} — ${parts.join(", ")}` : null;
-    })
-    .filter((line): line is string => line !== null);
-  return lines.length > 0 ? lines.join("\n") : undefined;
-}
 
 /**
  * F1 자동 생성 오케스트레이션 (NEW-4).

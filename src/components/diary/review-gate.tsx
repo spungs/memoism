@@ -22,6 +22,8 @@ type PendingDraft = {
     lng: number | null;
   }>;
   mode: "A" | "B" | "C";
+  /** 사용자 원본 텍스트 — "다시 생성"이 B/C 모드 재생성에 사용. */
+  text?: string;
   date: string;
   createdAt: number;
 };
@@ -94,6 +96,8 @@ export function ReviewGate() {
   const [editedContent, setEditedContent] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [signedUrls, setSignedUrls] = useState<(string | null)[]>([]);
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenError, setRegenError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // storagePaths가 있으면 signed URL 일괄 발급 (1h TTL).
@@ -184,6 +188,56 @@ export function ReviewGate() {
       router.push(`/diary/${result.data.id}`);
       router.refresh();
     });
+  };
+
+  // 저장하지 않고 AI 본문만 새로 생성 (일기 row 미생성).
+  // 이미 업로드된 사진은 storagePath로 서버가 재다운로드한다.
+  const handleRegenerate = async () => {
+    if (!draftState || regenerating || pending) return;
+    setRegenError(null);
+    setRegenerating(true);
+    try {
+      const res = await fetch("/api/diaries/preview-regenerate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storagePaths: draftState.storagePaths,
+          exifs: draftState.exifs,
+          text: draftState.text,
+          mode: draftState.mode,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data?.ok) {
+        if (data?.capExhausted) {
+          setRegenError("오늘 AI 생성 한도를 모두 사용했어요.");
+        } else {
+          setRegenError(data?.error ?? "다시 생성에 실패했어요");
+        }
+        return;
+      }
+
+      setEditedTitle(data.data.title);
+      setEditedContent(data.data.content);
+      setDraftState((prev) =>
+        prev
+          ? {
+              ...prev,
+              draft: {
+                ...prev.draft,
+                title: data.data.title,
+                content: data.data.content,
+                suggestedMood: data.data.suggestedMood,
+              },
+            }
+          : prev,
+      );
+    } catch (e) {
+      setRegenError(e instanceof Error ? e.message : "다시 생성 실패");
+    } finally {
+      setRegenerating(false);
+    }
   };
 
   // 저장 전 단계라 서버 호출 없이 로컬 상태만 정리.
@@ -306,7 +360,7 @@ export function ReviewGate() {
         <button
           type="button"
           onClick={handleApprove}
-          disabled={pending || !editedContent.trim()}
+          disabled={pending || regenerating || !editedContent.trim()}
           style={{
             background: "none",
             border: "none",
@@ -550,6 +604,40 @@ export function ReviewGate() {
               }}
             >
               추천 기분 · {draftState.draft.suggestedMood}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={handleRegenerate}
+            disabled={regenerating || pending}
+            style={{
+              alignSelf: "flex-start",
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-sm)",
+              fontWeight: 600,
+              color: regenerating ? "var(--fg-subtle)" : "var(--fg-muted)",
+              backgroundColor: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              padding: "8px 14px",
+              cursor: regenerating || pending ? "default" : "pointer",
+            }}
+          >
+            {regenerating ? "생성 중..." : "✨ 다시 생성"}
+          </button>
+
+          {regenError && (
+            <p
+              role="alert"
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                color: "var(--danger)",
+                margin: 0,
+              }}
+            >
+              {regenError}
             </p>
           )}
         </div>

@@ -408,6 +408,8 @@ export function DiaryForm({
           storagePaths: data.storagePaths,
           exifs: data.exifs,
           mode: data.mode,
+          // 사용자 원본 텍스트 — 검토 화면의 "다시 생성"이 B/C 모드 재생성에 사용.
+          text: content.trim() || undefined,
           date,
           createdAt: Date.now(),
         }),
