@@ -69,14 +69,15 @@ function formatTakenTime(d: Date | null): string | null {
   return d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 }
 
-// "26/05/23 13:08" — 썸네일 배지: 촬영 날짜(yy/mm/dd) + 시각.
+// "26/05/23\n오후 01:08" — 썸네일 배지: 날짜(yy/mm/dd) 줄바꿈 + 오전/오후 시각.
+// 배지 span의 whiteSpace: "pre-line"이 \n을 실제 개행으로 렌더한다.
 function formatTakenDateTime(d: Date | null): string | null {
   if (!d) return null;
   const time = formatTakenTime(d);
   const yy = String(d.getFullYear()).slice(-2);
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
-  return `${yy}/${mm}/${dd} ${time}`;
+  return `${yy}/${mm}/${dd}\n${time}`;
 }
 
 // "2026-05-23" → "5/23" — 경고 배너에 날짜를 짧게 나열.
@@ -173,6 +174,7 @@ function PhotoThumb({
             backgroundColor: "rgba(0,0,0,0.6)",
             padding: "1px 5px",
             borderRadius: "var(--radius-sm)",
+            whiteSpace: "pre-line",
           }}
         >
           {badge}
