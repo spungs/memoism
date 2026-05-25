@@ -42,11 +42,28 @@ type PickedImage = {
   id: string;
   file: File;
   previewUrl: string;
+  exif: ExifMeta;
 };
 
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// EXIF 촬영시각 오름차순. 시각이 있는 사진이 먼저, 없는 사진은 stable sort로
+// 원래(추가) 순서를 유지하며 뒤로 간다.
+function compareByTakenAt(a: ExifMeta, b: ExifMeta): number {
+  const ta = a.takenAt?.getTime() ?? null;
+  const tb = b.takenAt?.getTime() ?? null;
+  if (ta != null && tb != null) return ta - tb;
+  if (ta != null) return -1;
+  if (tb != null) return 1;
+  return 0;
+}
+
+function formatTakenTime(d: Date | null): string | null {
+  if (!d) return null;
+  return d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 }
 
 function exifToWire(e: ExifMeta) {
@@ -115,16 +132,36 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handlePickFiles: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+  const handlePickFiles: React.ChangeEventHandler<HTMLInputElement> = async (
+    e,
+  ) => {
     const files = Array.from(e.target.files ?? []);
-    const slotsLeft = MAX_IMAGES - pickedImages.length;
-    const newPicks: PickedImage[] = files.slice(0, slotsLeft).map((f) => ({
-      id: crypto.randomUUID(),
-      file: f,
-      previewUrl: URL.createObjectURL(f),
-    }));
-    setPickedImages((prev) => [...prev, ...newPicks]);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    const slotsLeft = MAX_IMAGES - pickedImages.length;
+    const accepted = files.slice(0, slotsLeft);
+
+    // 첨부 즉시 EXIF를 추출해 화면 미리보기를 촬영시각 순으로 정렬한다.
+    // 원본에서 추출(압축하면 메타데이터 손실) → 이후 저장/생성에서 재추출 불필요.
+    const newPicks: PickedImage[] = await Promise.all(
+      accepted.map(async (f) => {
+        let exif: ExifMeta;
+        try {
+          exif = await extractExif(f);
+        } catch {
+          exif = { takenAt: null, lat: null, lng: null };
+        }
+        return {
+          id: crypto.randomUUID(),
+          file: f,
+          previewUrl: URL.createObjectURL(f),
+          exif,
+        };
+      }),
+    );
+
+    setPickedImages((prev) =>
+      [...prev, ...newPicks].sort((a, b) => compareByTakenAt(a.exif, b.exif)),
+    );
   };
 
   const removePickedImage = (id: string) => {
@@ -149,38 +186,12 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
   };
 
   const buildExifsAndCompress = async () => {
-    // 1) 원본에서 EXIF 추출 (압축하면 메타데이터가 날아가므로 압축 전에).
-    const withExif = await Promise.all(
-      pickedImages.map(async (img) => {
-        let exif: ExifMeta;
-        try {
-          exif = await extractExif(img.file);
-        } catch {
-          exif = { takenAt: null, lat: null, lng: null };
-        }
-        return { img, exif };
-      }),
-    );
-
-    // 2) 촬영시각(takenAt) 오름차순 정렬. 사용자가 시간순이 아니게 추가해도
-    //    EXIF가 있으면 하루의 시간 흐름대로 재배열된다. EXIF 없는 사진은
-    //    원래 순서를 유지하며 뒤로 보낸다 (stable).
-    const ordered = withExif
-      .map((item, idx) => ({ ...item, idx }))
-      .sort((a, b) => {
-        const ta = a.exif.takenAt?.getTime() ?? null;
-        const tb = b.exif.takenAt?.getTime() ?? null;
-        if (ta != null && tb != null) return ta - tb;
-        if (ta != null) return -1;
-        if (tb != null) return 1;
-        return a.idx - b.idx;
-      });
-
-    // 3) 정렬된 순서로 압축. exifs와 compressed의 인덱스가 1:1로 맞는다.
+    // pickedImages는 handlePickFiles에서 이미 EXIF 추출 + 촬영시각 순으로 정렬됨.
+    // 여기선 그 순서를 신뢰하고 압축만 한다 (exifs와 compressed 인덱스 1:1).
     const compressed: File[] = [];
     const exifs: ExifMeta[] = [];
-    for (const { img, exif } of ordered) {
-      exifs.push(exif);
+    for (const img of pickedImages) {
+      exifs.push(img.exif);
       try {
         compressed.push(await compressImage(img.file));
       } catch {
@@ -503,9 +514,39 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
                   >
                     ×
                   </button>
+                  {formatTakenTime(img.exif.takenAt) && (
+                    <span
+                      style={{
+                        position: "absolute",
+                        bottom: 4,
+                        left: 4,
+                        fontFamily: "var(--font-sans)",
+                        fontSize: 10,
+                        lineHeight: 1.4,
+                        color: "white",
+                        backgroundColor: "rgba(0,0,0,0.6)",
+                        padding: "1px 5px",
+                        borderRadius: "var(--radius-sm)",
+                      }}
+                    >
+                      {formatTakenTime(img.exif.takenAt)}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
+          )}
+          {pickedImages.length > 1 && (
+            <p
+              style={{
+                ...MUTED_LABEL,
+                textTransform: "none",
+                letterSpacing: "normal",
+                color: "var(--fg-subtle)",
+              }}
+            >
+              촬영 시각이 있는 사진은 시간순으로 자동 정렬돼요.
+            </p>
           )}
           {pickedImages.length < MAX_IMAGES && (
             <label
