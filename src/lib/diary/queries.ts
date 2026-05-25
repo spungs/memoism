@@ -74,8 +74,38 @@ export async function getRecentDiaries(userId: string, take = 3) {
     where: { userId },
     orderBy: { createdAt: "desc" },
     take,
-    select: { id: true, title: true, createdAt: true, content: true },
+    select: {
+      id: true,
+      title: true,
+      createdAt: true,
+      content: true,
+      source: true,
+    },
   });
+}
+
+/**
+ * 홈 "이번 달" 요약용 카운트.
+ *   - total: 유저 전체 일기 수
+ *   - thisMonth: 이번 달(KST 1일 자정 기준) 작성 일기 수
+ * 적은 일기 수에도 홈이 비어 보이지 않도록 상단 요약 strip에 사용.
+ */
+export async function getDiaryCounts(userId: string) {
+  const now = new Date();
+  const kstOffsetMs = 9 * 60 * 60 * 1000;
+  const kstNow = new Date(now.getTime() + kstOffsetMs);
+  const monthStartUtc = new Date(
+    Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), 1) - kstOffsetMs,
+  );
+
+  const [total, thisMonth] = await Promise.all([
+    prisma.diary.count({ where: { userId } }),
+    prisma.diary.count({
+      where: { userId, createdAt: { gte: monthStartUtc } },
+    }),
+  ]);
+
+  return { total, thisMonth };
 }
 
 export type DiaryListItemWithThumbnail = DiaryListItem & {
