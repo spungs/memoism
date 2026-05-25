@@ -18,7 +18,6 @@ import { DiaryAiActions } from "./diary-ai-actions";
 import { DiaryDatePicker } from "./date-picker";
 import { MoodPicker, type MoodKey } from "./mood-picker";
 
-const MAX_IMAGES = 5;
 const PENDING_DRAFT_KEY = "memoism:pendingDraft";
 
 type Mode = "create" | "edit";
@@ -38,6 +37,8 @@ interface DiaryFormProps {
     mood: MoodKey | null;
     date?: string; // YYYY-MM-DD
   };
+  /** 사진 첨부 상한 — 구독 상태에 따라 서버에서 계산해 전달 (ACTIVE 10, 그 외 5). */
+  maxImages?: number;
 }
 
 type PickedImage = {
@@ -178,7 +179,12 @@ function PhotoThumb({
   );
 }
 
-export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
+export function DiaryForm({
+  mode,
+  diaryId,
+  initial,
+  maxImages = 5,
+}: DiaryFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -212,7 +218,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
   // 사진이 2일 이상에 걸치면 → 배지에 날짜 표기 + 경고 배너 + 생성 전 확인.
   const isMultiDate = dateKeys.length >= 2;
   const totalImageCount = visibleExisting.length + pickedImages.length;
-  const slotsLeft = MAX_IMAGES - totalImageCount;
+  const slotsLeft = maxImages - totalImageCount;
 
   const [titleError, setTitleError] = useState<string | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
@@ -570,9 +576,9 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
 
         <div style={{ height: 1, backgroundColor: "var(--border)" }} />
 
-        {/* 사진 (최대 5장) — 작성·수정 공용. 가로 스크롤(개행 X). */}
+        {/* 사진 (상한은 구독별, maxImages prop) — 작성·수정 공용. 가로 스크롤(개행 X). */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          <p style={MUTED_LABEL}>사진 ({totalImageCount}/{MAX_IMAGES})</p>
+          <p style={MUTED_LABEL}>사진 ({totalImageCount}/{maxImages})</p>
           {totalImageCount > 0 && (
             <div
               className="hide-scrollbar"

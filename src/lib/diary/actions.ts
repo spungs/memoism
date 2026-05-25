@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/session";
+import { getMaxImagesForUser } from "@/lib/character/queries";
 import { prisma } from "@/lib/db";
 import { deleteImage, saveImage } from "@/lib/storage";
 import { upsertDiaryEmbedding } from "./embedding";
@@ -12,7 +13,7 @@ import {
 } from "./schemas";
 
 // MIG-3 정식판:
-//   - 다중 이미지(최대 5장) 처리. DiaryImage 1:N 생성.
+//   - 다중 이미지(상한은 구독별: ACTIVE 10장 / 그 외 5장) 처리. DiaryImage 1:N 생성.
 //   - source 필드 세팅 ("manual" | "auto_a" | "auto_b" | "auto_c").
 //   - 두 가지 입력 경로:
 //     A) "직접 작성" — formData.image[] = File[] → 서버에서 saveImage 호출
@@ -30,7 +31,6 @@ export type DiaryActionResult =
       >;
     };
 
-const MAX_IMAGES = 5;
 const VALID_SOURCES = ["manual", "auto_a", "auto_b", "auto_c"] as const;
 type DiarySource = (typeof VALID_SOURCES)[number];
 
@@ -76,14 +76,17 @@ function parseExifs(raw: FormDataEntryValue | null): ExifInput[] {
   }
 }
 
-function parseStoragePaths(raw: FormDataEntryValue | null): string[] | null {
+function parseStoragePaths(
+  raw: FormDataEntryValue | null,
+  maxImages: number,
+): string[] | null {
   if (typeof raw !== "string" || raw.length === 0) return null;
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return null;
     return parsed
       .filter((p): p is string => typeof p === "string" && p.length > 0)
-      .slice(0, MAX_IMAGES);
+      .slice(0, maxImages);
   } catch {
     return null;
   }
@@ -130,9 +133,10 @@ export async function createDiaryAction(
   const diaryDate = parseDiaryDate(formData.get("date"));
   const source = parseSource(formData.get("source"));
   const exifs = parseExifs(formData.get("exifs"));
+  const maxImages = await getMaxImagesForUser(session.userId);
 
   // 이미지 경로 결정: AI 검토 통과(storagePaths) vs 직접 작성(image File[])
-  const preuploaded = parseStoragePaths(formData.get("storagePaths"));
+  const preuploaded = parseStoragePaths(formData.get("storagePaths"), maxImages);
   const storagePaths: string[] = [];
   const uploadedToCleanup: string[] = [];
 
@@ -142,7 +146,7 @@ export async function createDiaryAction(
     const files = formData
       .getAll("image")
       .filter((f): f is File => f instanceof File && f.size > 0)
-      .slice(0, MAX_IMAGES);
+      .slice(0, maxImages);
 
     for (const file of files) {
       try {
@@ -256,16 +260,17 @@ export async function updateDiaryAction(
   }
 
   // 새로 추가된 사진 저장 — createDiaryAction과 동일한 File→saveImage 경로.
-  // 제거 반영 후 남은 장수를 기준으로 전체 5장 상한을 지키고,
+  // 제거 반영 후 남은 장수를 기준으로 구독별 상한(ACTIVE 10 / 그 외 5)을 지키고,
   // orderIndex는 기존 최대값 다음부터 이어 붙인다(기존 사진 순서 보존).
   const newFiles = formData
     .getAll("image")
     .filter((f): f is File => f instanceof File && f.size > 0);
   if (newFiles.length > 0) {
+    const maxImages = await getMaxImagesForUser(session.userId);
     const currentCount = await prisma.diaryImage.count({
       where: { diaryId: id },
     });
-    const slots = MAX_IMAGES - currentCount;
+    const slots = maxImages - currentCount;
     if (slots > 0) {
       const accepted = newFiles.slice(0, slots);
       const exifs = parseExifs(formData.get("exifs"));

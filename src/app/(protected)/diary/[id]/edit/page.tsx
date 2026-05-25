@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { DiaryForm } from "@/components/diary/diary-form";
 import { getSession } from "@/lib/auth/session";
+import { getMaxImagesForUser } from "@/lib/character/queries";
 import { getDiary } from "@/lib/diary/queries";
 import { moodKeySchema, type MoodKey } from "@/lib/diary/schemas";
 import { getSignedUrls } from "@/lib/storage";
@@ -25,6 +26,8 @@ export default async function DiaryEditPage({ params }: PageProps) {
   const diary = await getDiary(id, session.userId);
   if (!diary) notFound();
 
+  const maxImages = await getMaxImagesForUser(session.userId);
+
   const diaryDate = diary.createdAt.toISOString().slice(0, 10);
 
   // 기존 사진들의 signed URL 발급 (edit 모드 표시 + 개별 제거용).
@@ -47,6 +50,7 @@ export default async function DiaryEditPage({ params }: PageProps) {
     <DiaryForm
       mode="edit"
       diaryId={diary.id}
+      maxImages={maxImages}
       initial={{
         title: diary.title,
         content: diary.content,
