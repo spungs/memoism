@@ -157,22 +157,16 @@ model UsageLog {
 
 // =============================================================================
 // Character — "친구" 페르소나 (Basic+ RAG 채팅 인터페이스)
-//   D-1/D-2/D-3 폐기 결정 반영:
-//   - age/bornAt/isAsleep: 게임화 제거, 컬럼만 보존 (V2 재활성 가능성)
-//   - coinBalance/trialStartedAt: deprecated
-//   - subscriptionStatus: 베타 사용자 전원 ACTIVE 자동 부여
-//   - 외형 관계(CharacterOutfit/Owned/Equipped) 모두 삭제
+//   D-1/D-2/D-3 폐기 결정 반영 (게임화 컬럼 드롭 완료):
+//   - 게임화(age/bornAt/isAsleep/coinBalance/trialStartedAt) + 개별 이름(name) 컬럼 제거.
+//     캐릭터 이름은 전역 시그니처 "메이"로 고정 (CHARACTER_NAME in lib/character/utils.ts).
+//   - subscriptionStatus: 베타 사용자 전원 ACTIVE 자동 부여 (구독 도메인은 유지).
+//   - 외형 관계(CharacterOutfit/Owned/Equipped) 모두 삭제.
 // =============================================================================
 
 model Character {
   id                    String             @id @default(uuid())
   userId                String             @unique @map("user_id")
-  name                  String             @default("메모")
-  age                   Int                @default(1)
-  bornAt                DateTime           @default(now()) @map("born_at")
-  isAsleep              Boolean            @default(false) @map("is_asleep")
-  coinBalance           Int                @default(0) @map("coin_balance")
-  trialStartedAt        DateTime?          @map("trial_started_at")
   subscriptionStatus    SubscriptionStatus @default(ACTIVE) @map("subscription_status")
   subscriptionExpiresAt DateTime?          @map("subscription_expires_at")
   createdAt             DateTime           @default(now()) @map("created_at")

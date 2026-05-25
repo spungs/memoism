@@ -26,7 +26,6 @@ export async function GET() {
     prisma.character.findUnique({
       where: { userId: session.userId },
       select: {
-        name: true,
         subscriptionStatus: true,
         subscriptionExpiresAt: true,
         createdAt: true,

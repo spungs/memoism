@@ -153,7 +153,7 @@ model UsageLog {
 | D-3 | `CharacterOutfit`/`Owned`/`Equipped` + `skins.ts` + `skin-actions.ts` + 캐릭터 SVG 3종 + `/character/shop` | drop. SVG 1종(`chick`)만 보존 또는 친구 아바타로 교체. *V2 재설계 예정* |
 | D-4 | `mood-picker.tsx`, `mood-badge.tsx`, MOOD_COLOR 토큰 | UI 제거. `Diary.mood` 컬럼은 유지 (V2 재활성 가능성) |
 | D-5 | `OLLAMA_URL` + Ollama fetch 로직 | `/api/chat`에서 제거 (Phase 2에서 Gemini 대체) |
-| D-7 | `TRIAL_DURATION_DAYS = 30` + 트라이얼 개념 전체 | 트라이얼 제거 결정 반영. `Character.trialStartedAt`/`subscriptionExpiresAt` 의미 변경 |
+| D-7 | `TRIAL_DURATION_DAYS = 30` + 트라이얼 개념 전체 | 트라이얼 제거 완료. `Character.trialStartedAt` 컬럼 drop, `subscriptionExpiresAt`만 유지 |
 
 ### 3.3 PR 단위 권장
 

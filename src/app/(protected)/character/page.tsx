@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { CharacterChat } from "@/components/character/character-chat";
+import { CHARACTER_NAME } from "@/lib/character/utils";
 
 export const metadata = { title: "친구" };
 
@@ -12,7 +13,7 @@ export default async function CharacterPage() {
   const [character, recentChat] = await Promise.all([
     prisma.character.findUnique({
       where: { userId: session.userId },
-      select: { name: true },
+      select: { id: true },
     }),
     prisma.chatMessage.findMany({
       where: {
@@ -36,7 +37,7 @@ export default async function CharacterPage() {
 
   return (
     <CharacterChat
-      characterName={character.name}
+      characterName={CHARACTER_NAME}
       initialMessages={initialMessages}
     />
   );

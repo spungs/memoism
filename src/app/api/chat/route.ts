@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { chat } from "@/lib/ai/gemini";
 import { searchDiaries, type RagSearchHit } from "@/lib/ai/rag";
 import { checkAndIncrement } from "@/lib/ai/usage";
+import { CHARACTER_NAME } from "@/lib/character/utils";
 
 const messageSchema = z.object({
   message: z
@@ -137,7 +138,7 @@ export async function POST(req: NextRequest) {
     await Promise.all([
       prisma.character.findUnique({
         where: { userId: session.userId },
-        select: { id: true, name: true, subscriptionStatus: true },
+        select: { id: true, subscriptionStatus: true },
       }),
       prisma.diary.findMany({
         where: { userId: session.userId },
@@ -190,7 +191,7 @@ export async function POST(req: NextRequest) {
   }
 
   const systemPrompt = buildSystemPrompt({
-    characterName: character.name,
+    characterName: CHARACTER_NAME,
     persona,
     recentDiaries,
     relatedHits,

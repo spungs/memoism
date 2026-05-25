@@ -3,7 +3,6 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { logoutAction, changePasswordAction, type ChangePasswordState } from "@/lib/auth/actions";
-import { updateCharacterName } from "@/lib/character/actions";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 
@@ -11,8 +10,6 @@ const APP_VERSION = "v0.1.0";
 
 interface SettingsViewProps {
   email: string;
-  characterName: string;
-  bornAt: string;
 }
 
 const SECTION_HEADER_STYLE: React.CSSProperties = {
@@ -63,15 +60,6 @@ const DIVIDER_STYLE: React.CSSProperties = {
   marginLeft: "var(--space-4)",
 };
 
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
-
 function getInitials(email: string): string {
   const local = email.split("@")[0] ?? "";
   const cleaned = local.replace(/[^a-zA-Z0-9가-힣]/g, "");
@@ -79,7 +67,7 @@ function getInitials(email: string): string {
   return cleaned.slice(0, 2).toUpperCase();
 }
 
-export function SettingsView({ email, characterName, bornAt }: SettingsViewProps) {
+export function SettingsView({ email }: SettingsViewProps) {
   const router = useRouter();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
@@ -89,17 +77,6 @@ export function SettingsView({ email, characterName, bornAt }: SettingsViewProps
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  const [editingName, setEditingName] = useState(false);
-  const [nameDraft, setNameDraft] = useState(characterName);
-  const [nameError, setNameError] = useState<string | null>(null);
-  const [namePending, setNamePending] = useState(false);
-  const [displayName, setDisplayName] = useState(characterName);
-  const nameInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (editingName) nameInputRef.current?.focus();
-  }, [editingName]);
 
   const handleLogout = async () => {
     setLogoutLoading(true);
@@ -146,27 +123,6 @@ export function SettingsView({ email, characterName, bornAt }: SettingsViewProps
       setDeleteError(e instanceof Error ? e.message : "탈퇴에 실패했어요");
       setDeleteLoading(false);
     }
-  };
-
-  const handleNameSave = async () => {
-    setNameError(null);
-    setNamePending(true);
-    const fd = new FormData();
-    fd.set("name", nameDraft);
-    const res = await updateCharacterName({}, fd);
-    setNamePending(false);
-    if (res.ok) {
-      setDisplayName(nameDraft.trim());
-      setEditingName(false);
-    } else {
-      setNameError(res.error ?? "저장에 실패했어요");
-    }
-  };
-
-  const handleNameCancel = () => {
-    setNameDraft(displayName);
-    setNameError(null);
-    setEditingName(false);
   };
 
   return (
@@ -258,110 +214,6 @@ export function SettingsView({ email, characterName, bornAt }: SettingsViewProps
             <span style={ROW_LABEL_STYLE}>비밀번호 변경</span>
             <Chevron />
           </button>
-        </div>
-      </section>
-
-      <section style={{ marginBottom: "var(--space-6)" }}>
-        <h2 style={SECTION_HEADER_STYLE}>앱</h2>
-        <div style={CARD_STYLE}>
-          <div style={{ ...ROW_STYLE, flexDirection: editingName ? "column" : "row", alignItems: editingName ? "stretch" : "center" }}>
-            <span style={ROW_LABEL_STYLE}>캐릭터 이름</span>
-            {editingName ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", width: "100%" }}>
-                <input
-                  ref={nameInputRef}
-                  type="text"
-                  value={nameDraft}
-                  onChange={(e) => setNameDraft(e.target.value)}
-                  maxLength={20}
-                  disabled={namePending}
-                  style={{
-                    width: "100%",
-                    height: 44,
-                    padding: "0 var(--space-3)",
-                    fontFamily: "var(--font-sans)",
-                    fontSize: "var(--text-base)",
-                    color: "var(--fg)",
-                    backgroundColor: "var(--paper-0)",
-                    border: `1px solid ${nameError ? "var(--danger)" : "var(--border)"}`,
-                    borderRadius: "var(--radius-md)",
-                    outline: "none",
-                  }}
-                />
-                {nameError && (
-                  <p style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-xs)", color: "var(--danger)", margin: 0 }}>
-                    {nameError}
-                  </p>
-                )}
-                <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
-                  <button
-                    type="button"
-                    onClick={handleNameCancel}
-                    disabled={namePending}
-                    style={{
-                      padding: "8px 16px",
-                      borderRadius: "var(--radius-md)",
-                      border: "1px solid var(--border)",
-                      backgroundColor: "transparent",
-                      fontFamily: "var(--font-sans)",
-                      fontSize: "var(--text-sm)",
-                      color: "var(--fg-muted)",
-                      cursor: namePending ? "default" : "pointer",
-                    }}
-                  >
-                    취소
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleNameSave}
-                    disabled={namePending || !nameDraft.trim() || nameDraft.trim() === displayName}
-                    style={{
-                      padding: "8px 16px",
-                      borderRadius: "var(--radius-md)",
-                      border: "none",
-                      backgroundColor:
-                        namePending || !nameDraft.trim() || nameDraft.trim() === displayName
-                          ? "var(--accent-rose-soft)"
-                          : "var(--accent-rose)",
-                      fontFamily: "var(--font-sans)",
-                      fontSize: "var(--text-sm)",
-                      fontWeight: 600,
-                      color: "#fff",
-                      cursor:
-                        namePending || !nameDraft.trim() || nameDraft.trim() === displayName
-                          ? "default"
-                          : "pointer",
-                    }}
-                  >
-                    {namePending ? "저장 중..." : "저장"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setNameDraft(displayName);
-                  setEditingName(true);
-                }}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  padding: 0,
-                  cursor: "pointer",
-                  ...ROW_VALUE_STYLE,
-                }}
-              >
-                <span style={{ color: "var(--fg)" }}>{displayName}</span>
-                <Chevron />
-              </button>
-            )}
-          </div>
-          <div style={DIVIDER_STYLE} />
-          <div style={ROW_STYLE}>
-            <span style={ROW_LABEL_STYLE}>탄생일</span>
-            <span style={ROW_VALUE_STYLE}>{formatDate(bornAt)}</span>
-          </div>
         </div>
       </section>
 

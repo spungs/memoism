@@ -56,7 +56,7 @@
 | 5 | UsageLog | (신규) | 🆕 NEW | ⑨, ⑪ 3중 abuse cap: 일일 AI 호출 cap 계산용 | S | 낮 |
 | 6 | UserPersona | (신규) | 🆕 NEW | ⑨, ⑬ D14: 베타엔 기본값 row만, UI 미노출 | S | 낮 |
 | 7 | ChatMessage | `prisma/schema.prisma:111` | 🔄 MIGRATE | ⑨: 캐릭터 RAG 채팅 인터페이스로 재활용. 24h 보존 정책 유지 | S | 낮 |
-| 8 | Character | `prisma/schema.prisma:82` | 🔄 MIGRATE | ⑨, ⑬ D16: "친구" 페르소나로 재포지셔닝. `coinBalance`/`age`/`isAsleep`/구독 필드는 의미 상실 → row는 유지, 필드는 일부 사용 중지 | M | 중 (기존 row의 의미 변화) |
+| 8 | Character | `prisma/schema.prisma` | 🔄 MIGRATE | ⑨, ⑬ D16: "친구" 페르소나로 재포지셔닝. 게임화 컬럼(`name`/`age`/`bornAt`/`isAsleep`/`coinBalance`/`trialStartedAt`) **drop 완료**, 구독 필드만 유지 | M | 중 (기존 row의 의미 변화) |
 | 9 | CoinTransaction | `prisma/schema.prisma:180` | ❌ DROP | ⑨: 베타 미사용. 코인 정체성 제거 | S | 중 (cascade 시 데이터 손실) |
 | 10 | CoinPackage | `prisma/schema.prisma:193` | ❌ DROP | ⑨: 베타 미사용 | S | 낮 |
 | 11 | CharacterOutfit | `prisma/schema.prisma:131` | ❌ DROP | ⑨, ⑧ Out-of-Scope "캐릭터 스킨·외형 커스텀" | S | 낮 |
@@ -71,7 +71,7 @@
 | 19 | `src/lib/diary/queries.ts` | `src/lib/diary/queries.ts` | 🔄 MIGRATE | DiaryImage 1:N 조인 추가, EXIF 헤더용 select | S | 낮 |
 | 20 | `src/lib/diary/schemas.ts` | `src/lib/diary/schemas.ts` | 🔄 MIGRATE | 다중 이미지 스키마, `source` enum 추가. `mood`/`location` 베타 미사용 (DB 잔존, UI 제거) | S | 낮 |
 | 21 | `src/lib/storage/index.ts` (Local FS) | `src/lib/storage/index.ts` | 🔄 MIGRATE | ⑪ 프라이버시 Supabase Storage Private + Signed URL. ⑦/⑧ 1024px 자동 압축. 인터페이스 `(file, ownerId)→URL` 유지 | M | 중 (외부 의존) |
-| 22 | `src/lib/character/actions.ts` (이름 변경) | `src/lib/character/actions.ts` | ✅ KEEP | 캐릭터 이름은 친구 정체성에서도 유효 | - | - |
+| 22 | `src/lib/character/actions.ts` | (삭제됨) | ❌ DROP | 개별 이름 저장 폐기 → 전역 시그니처 "메이"로 고정. `updateCharacterName` 액션·파일 제거 | - | - |
 | 23 | `src/lib/character/utils.ts` (트라이얼) | `src/lib/character/utils.ts` | 🔄 MIGRATE | TRIAL_DURATION_DAYS 30 → 3 (D22). `shouldBeAsleep` → 친구 활성 여부로 의미 변경 | S | 낮 |
 | 24 | `src/lib/character/growth.ts` (5단계 성장) | `src/lib/character/growth.ts` | ❌ DROP | ⑬ D16: 캐릭터 게임화 제거. 레벨·말풍선·진행바 모두 폐기 | S | 낮 |
 | 25 | `src/lib/character/skins.ts` + `skin-actions.ts` | `src/lib/character/` | ❌ DROP | ⑧ Out-of-Scope "캐릭터 스킨·외형 커스텀" | S | 낮 |
@@ -104,7 +104,7 @@
 | 49 | `/diary/review` (검토 게이트) | (신규) | 🆕 NEW | ④ F2: 생성 결과 미리보기 + 수정/승인/재생성 | M | 낮 |
 | 50 | `/character` (대화) | `src/app/(protected)/character/page.tsx` | 🔄 MIGRATE | RAG 채팅 인터페이스로 단순화. 코인·트라이얼·구독 UI 제거, 친구 메시지 톤 | M | 낮 |
 | 51 | `/character/shop` | `src/app/(protected)/character/shop/` | ❌ DROP | ⑧ Out-of-Scope. 스킨 카드·코인 잔액 UI 모두 제거 | S | 낮 |
-| 52 | `/settings` | `src/app/(protected)/settings/page.tsx` | 🔄 MIGRATE | 구독 관리·데이터 내보내기·계정 탈퇴·동의 토글 추가. 캐릭터 이름 행 유지 | M | 낮 |
+| 52 | `/settings` | `src/app/(protected)/settings/page.tsx` | 🔄 MIGRATE | 구독 관리·데이터 내보내기·계정 탈퇴·동의 토글 추가. 캐릭터 이름·탄생일 행 제거(이름 고정·게임화 폐기) | M | 낮 |
 | 53 | `/design` | `src/app/(protected)/design/page.tsx` | ✅ KEEP (dev-only 게이트 권장) | 디자인 토큰 프리뷰. QA P2-6 dev-only 게이트만 권장 | - | - |
 | **UI 컴포넌트 (10 그룹)** | | | | | | |
 | 54 | `components/ui/*` (button, card, input, label, textarea, bottom-sheet, confirm-sheet) | `src/components/ui/` | ✅ KEEP | shadcn 베이스 프리미티브. 변경 없음 | - | - |
@@ -150,12 +150,12 @@
 
 - **자산**: `src/lib/character/growth.ts` (GROWTH_LEVELS 5단계, calcGrowthPoints, getBubbleMessage), `components/character/character-card.tsx` (말풍선 + 진행바 + 코인 + 대화 CTA), `components/character/character-companion.tsx` (쓰다듬기·미세동작 스케줄러)
 - **폐기 이유 (기획서 §)**: ⑬ D16 "캐릭터 = 친구 재포지셔닝, Basic+ 한정". 게임화 → 친구 페르소나 전환으로 성장·쓰다듬기·코인 보상 루프 모두 의미 상실. ⑧ Out-of-Scope "캐릭터 스킨·외형 커스텀"으로 외형 변형도 폐기.
-- **데이터 처리**: `Character.age`, `Character.bornAt`은 row 보존하되 UI에서 미사용. `Character.coinBalance`는 항상 0 유지 (관련 트랜잭션 모두 폐기).
+- **데이터 처리**: `Character.age`/`bornAt`/`isAsleep`/`coinBalance`/`trialStartedAt` 컬럼 **모두 drop 완료** (당초 "row 보존" 계획에서 변경 — 죽은 컬럼이 export에 누수되어 근본 정리). 남은 컬럼은 `subscriptionStatus`/`subscriptionExpiresAt`뿐.
 - **영향**:
   - 홈 화면(`(protected)/page.tsx`) 전체 레이아웃 재설계 필요 (현재 화면의 중심이 캐릭터 카드).
   - `/character` 페이지의 헤더(`character-chat-view.tsx` 상단)에 성장바/코인/탄생일 모두 제거 → 친구 페르소나 헤더로 재작성.
   - 기존 사용자가 있다면 "내 캐릭터가 성장하던 시스템"의 정서적 손실. 베타 출시 시점에 사용자 미존재 가정.
-- **완화 방안**: (1) 캐릭터 row와 이름은 유지하므로 "친구 이름"으로 정체성 이어짐. (2) "메모"라는 기본 이름·아바타는 유지하되 SVG는 1종으로 통합 또는 새 친구 아바타로 교체.
+- **완화 방안**: (1) 친구 이름은 전역 시그니처 **"메이"로 고정** (개별 이름 저장 폐기, `Character.name` 컬럼 drop, `CHARACTER_NAME` 상수). (2) 아바타 SVG는 1종으로 통합 또는 새 친구 아바타로 교체.
 
 ### D-2. 코인 경제 시스템
 
