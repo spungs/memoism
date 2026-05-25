@@ -8,7 +8,11 @@ import {
   updateDiaryAction,
   type DiaryActionResult,
 } from "@/lib/diary/actions";
-import { extractExif, type ExifMeta } from "@/lib/diary/exif";
+import {
+  extractExif,
+  uniqueKstDateKeys,
+  type ExifMeta,
+} from "@/lib/diary/exif";
 import { compressImage } from "@/lib/diary/image-compress";
 import type { DiaryLocation } from "@/lib/diary/schemas";
 import { DiaryAiActions } from "./diary-ai-actions";
@@ -26,8 +30,8 @@ interface DiaryFormProps {
   initial?: {
     title: string;
     content: string;
-    /** edit 모드용: 기존 사진들의 signed URL. read-only 표시. */
-    existingImageUrls?: string[];
+    /** edit 모드용: 기존 사진들 (id + signed URL). 개별 제거 가능. */
+    existingImages?: { id: string; url: string }[];
     /** edit 모드용: AI 재생성 직후 백업 존재 여부 — "되돌리기" 노출 분기. */
     hasPreviousContent?: boolean;
     /** edit 모드용: 누적 AI 재생성 횟수 (라벨 분기용). */
@@ -66,6 +70,19 @@ function formatTakenTime(d: Date | null): string | null {
   return d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 }
 
+// "5/23 13:08" — 여러 날짜 사진이 섞였을 때 썸네일 배지용.
+function formatTakenDateTime(d: Date | null): string | null {
+  if (!d) return null;
+  const time = formatTakenTime(d);
+  return `${d.getMonth() + 1}/${d.getDate()} ${time}`;
+}
+
+// "2026-05-23" → "5/23" — 경고 배너에 날짜를 짧게 나열.
+function shortDateLabel(key: string): string {
+  const [, m, day] = key.split("-");
+  return `${Number(m)}/${Number(day)}`;
+}
+
 function exifToWire(e: ExifMeta) {
   return {
     takenAt: e.takenAt ? e.takenAt.toISOString() : null,
@@ -99,6 +116,14 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pickedImages, setPickedImages] = useState<PickedImage[]>([]);
+
+  // edit 모드: 사용자가 제거한 기존 사진 id 목록 (저장 시 서버로 전달).
+  const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
+
+  // 선택된 사진들이 걸쳐 있는 서로 다른 KST 날짜 (촬영시각 있는 것만).
+  // 2개 이상이면 "이틀 이상 섞임" → 배지에 날짜 표기 + 경고 배너 + 생성 전 확인.
+  const pickedDateKeys = uniqueKstDateKeys(pickedImages.map((p) => p.exif));
+  const isMultiDate = pickedDateKeys.length >= 2;
 
   const [titleError, setTitleError] = useState<string | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
@@ -231,6 +256,10 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
       for (const f of compressed) fd.append("image", f);
       fd.set("exifs", JSON.stringify(exifs.map(exifToWire)));
 
+      if (mode === "edit") {
+        fd.set("removeImageIds", JSON.stringify(removedImageIds));
+      }
+
       const result: DiaryActionResult =
         mode === "create"
           ? await createDiaryAction(fd)
@@ -255,6 +284,16 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
 
   const handleAiGenerate = async () => {
     if (aiPending || pending) return;
+
+    // 이틀 이상 사진이 섞여 있으면 하나의 일기로 묶기 전 명시적 확인.
+    if (isMultiDate) {
+      const dates = pickedDateKeys.map(shortDateLabel).join("·");
+      const proceed = window.confirm(
+        `이틀(${dates}) 사진이 섞여 있어요. 이대로 하나의 일기로 정리할까요?`,
+      );
+      if (!proceed) return;
+    }
+
     setAiPending(true);
     setAiError(null);
     try {
@@ -514,7 +553,9 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
                   >
                     ×
                   </button>
-                  {formatTakenTime(img.exif.takenAt) && (
+                  {(isMultiDate
+                    ? formatTakenDateTime(img.exif.takenAt)
+                    : formatTakenTime(img.exif.takenAt)) && (
                     <span
                       style={{
                         position: "absolute",
@@ -529,24 +570,47 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
                         borderRadius: "var(--radius-sm)",
                       }}
                     >
-                      {formatTakenTime(img.exif.takenAt)}
+                      {isMultiDate
+                        ? formatTakenDateTime(img.exif.takenAt)
+                        : formatTakenTime(img.exif.takenAt)}
                     </span>
                   )}
                 </div>
               ))}
             </div>
           )}
-          {pickedImages.length > 1 && (
+          {isMultiDate ? (
             <p
+              role="alert"
               style={{
-                ...MUTED_LABEL,
-                textTransform: "none",
-                letterSpacing: "normal",
-                color: "var(--fg-subtle)",
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                lineHeight: "var(--leading-relaxed)",
+                color: "var(--danger)",
+                backgroundColor:
+                  "color-mix(in srgb, var(--danger) 10%, transparent)",
+                padding: "var(--space-2) var(--space-3)",
+                borderRadius: "var(--radius-md)",
+                margin: 0,
               }}
             >
-              촬영 시각이 있는 사진은 시간순으로 자동 정렬돼요.
+              📷 {pickedDateKeys.map(shortDateLabel).join("·")}{" "}
+              {pickedDateKeys.length}일 사진이 섞여 있어요. 일기는 하루 단위라 한
+              날 사진만 두길 권해요.
             </p>
+          ) : (
+            pickedImages.length > 1 && (
+              <p
+                style={{
+                  ...MUTED_LABEL,
+                  textTransform: "none",
+                  letterSpacing: "normal",
+                  color: "var(--fg-subtle)",
+                }}
+              >
+                촬영 시각이 있는 사진은 시간순으로 자동 정렬돼요.
+              </p>
+            )
           )}
           {pickedImages.length < MAX_IMAGES && (
             <label
@@ -576,44 +640,74 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
         </div>
         )}
 
-        {/* edit 모드: 기존 사진 read-only 표시. 사진 변경은 Phase 3c-4/NEW-7에서 본격 지원. */}
-        {mode === "edit" && (initial?.existingImageUrls?.length ?? 0) > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-            <p style={MUTED_LABEL}>사진 ({initial?.existingImageUrls?.length}장)</p>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))",
-                gap: "var(--space-2)",
-              }}
-            >
-              {initial?.existingImageUrls?.map((url, i) => (
+        {/* edit 모드: 기존 사진 표시 + 개별 제거. removedImageIds로 추적, 저장 시 서버 전달. */}
+        {mode === "edit" &&
+          (() => {
+            const visibleImages = (initial?.existingImages ?? []).filter(
+              (img) => !removedImageIds.includes(img.id),
+            );
+            if (visibleImages.length === 0) return null;
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                <p style={MUTED_LABEL}>사진 ({visibleImages.length}장)</p>
                 <div
-                  key={i}
                   style={{
-                    position: "relative",
-                    aspectRatio: "1 / 1",
-                    overflow: "hidden",
-                    borderRadius: "var(--radius-md)",
-                    backgroundColor: "var(--surface)",
-                    border: "1px solid var(--border)",
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))",
+                    gap: "var(--space-2)",
                   }}
                 >
-                  <Image
-                    src={url}
-                    alt=""
-                    fill
-                    sizes="120px"
-                    style={{ objectFit: "cover" }}
-                  />
+                  {visibleImages.map((img) => (
+                    <div
+                      key={img.id}
+                      style={{
+                        position: "relative",
+                        aspectRatio: "1 / 1",
+                        overflow: "hidden",
+                        borderRadius: "var(--radius-md)",
+                        backgroundColor: "var(--surface)",
+                        border: "1px solid var(--border)",
+                      }}
+                    >
+                      <Image
+                        src={img.url}
+                        alt=""
+                        fill
+                        sizes="120px"
+                        style={{ objectFit: "cover" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRemovedImageIds((prev) => [...prev, img.id])
+                        }
+                        aria-label="제거"
+                        style={{
+                          position: "absolute",
+                          top: 4,
+                          right: 4,
+                          width: 22,
+                          height: 22,
+                          borderRadius: "50%",
+                          backgroundColor: "rgba(0,0,0,0.6)",
+                          color: "white",
+                          border: "none",
+                          cursor: "pointer",
+                          fontSize: 14,
+                          lineHeight: 1,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <p style={{ ...MUTED_LABEL, textTransform: "none", letterSpacing: "normal", color: "var(--fg-subtle)" }}>
-              사진 변경은 다음 업데이트에서 지원될 예정이에요.
-            </p>
-          </div>
-        )}
+              </div>
+            );
+          })()}
 
         {/* AI 정리 — 베타 척추 (create 모드만) */}
         {mode === "create" && (

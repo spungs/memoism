@@ -104,6 +104,19 @@ function parseStoragePaths(raw: FormDataEntryValue | null): string[] | null {
   }
 }
 
+function parseRemoveImageIds(raw: FormDataEntryValue | null): string[] {
+  if (typeof raw !== "string" || raw.length === 0) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (v): v is string => typeof v === "string" && v.length > 0,
+    );
+  } catch {
+    return [];
+  }
+}
+
 function fieldErrorsFromZod(
   error: ReturnType<typeof diaryInputSchema.safeParse>,
 ): NonNullable<Extract<DiaryActionResult, { ok: false }>["fieldErrors"]> {
@@ -243,6 +256,23 @@ export async function updateDiaryAction(
       contentEditedAt: new Date(),
     },
   });
+
+  // 선택된 기존 사진 제거 — 이 일기(소유 확인 완료)에 속한 DiaryImage만 대상.
+  // 매칭 안 되는 id는 무시. DB row 삭제 후 Storage 정리(DB→Storage 순서, lifecycle invariant).
+  const removeImageIds = parseRemoveImageIds(formData.get("removeImageIds"));
+  if (removeImageIds.length > 0) {
+    const toRemove = await prisma.diaryImage.findMany({
+      where: { id: { in: removeImageIds }, diaryId: id },
+      select: { id: true, storagePath: true },
+    });
+    if (toRemove.length > 0) {
+      await prisma.diaryImage.deleteMany({
+        where: { id: { in: toRemove.map((img) => img.id) }, diaryId: id },
+      });
+      // Storage 정리는 best-effort (실패해도 DB는 이미 삭제됨)
+      await Promise.all(toRemove.map((img) => deleteImage(img.storagePath)));
+    }
+  }
 
   // 임베딩 재갱신 (content 변경 가능성)
   await upsertDiaryEmbedding(id, parsed.data.title, parsed.data.content);

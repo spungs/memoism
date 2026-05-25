@@ -44,6 +44,25 @@ function formatExifTime(iso: string | null): string | null {
   }
 }
 
+// KST(UTC+9) 기준 YYYY-MM-DD. exif.ts를 import하지 않고 클라이언트에서 직접 계산
+// (서버/클라이언트 경계 회피 — 다른 에이전트가 exif.ts 소유).
+function toKstDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  const y = kst.getUTCFullYear();
+  const m = String(kst.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(kst.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// "YYYY-MM-DD" → "M/D" (range 표시용)
+function shortKstLabel(ymd: string): string {
+  const [, m, d] = ymd.split("-");
+  return `${Number(m)}/${Number(d)}`;
+}
+
 function modeLabel(mode: "A" | "B" | "C"): string {
   switch (mode) {
     case "A":
@@ -160,6 +179,22 @@ export function ReviewGate() {
     });
   };
 
+  // 저장 전 단계라 서버 호출 없이 로컬 상태만 정리.
+  // storagePaths / exifs / signedUrls를 같은 index에서 동시에 제거해 정렬 유지.
+  // 업로드된 파일은 기존 정책대로 V2 GC가 정리.
+  const handleRemovePhoto = (index: number) => {
+    setDraftState((prev) =>
+      prev
+        ? {
+            ...prev,
+            storagePaths: prev.storagePaths.filter((_, i) => i !== index),
+            exifs: prev.exifs.filter((_, i) => i !== index),
+          }
+        : prev,
+    );
+    setSignedUrls((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleCancel = () => {
     if (
       !window.confirm(
@@ -196,6 +231,21 @@ export function ReviewGate() {
   const exifTimeLabel = earliestExif ? formatExifTime(earliestExif.takenAt) : null;
   const exifHasLocation = draftState.exifs.some((e) => e.lat != null && e.lng != null);
   const photoCount = draftState.storagePaths.length;
+
+  // 촬영 날짜(KST) distinct — 2일 이상이면 "섞임" 경고 표시
+  const distinctKstDates = Array.from(
+    new Set(
+      draftState.exifs
+        .map((e) => toKstDate(e.takenAt))
+        .filter((d): d is string => d != null),
+    ),
+  ).sort();
+  const multiDay = distinctKstDates.length >= 2;
+  const dateRangeLabel = multiDay
+    ? `${shortKstLabel(distinctKstDates[0])} ~ ${shortKstLabel(
+        distinctKstDates[distinctKstDates.length - 1],
+      )} (${distinctKstDates.length}일)`
+    : null;
 
   return (
     <div
@@ -316,11 +366,21 @@ export function ReviewGate() {
               사진 {photoCount}장
               {photoCount === 0 && " (텍스트만)"}
             </li>
-            {exifTimeLabel && <li>촬영 시각 · {exifTimeLabel}</li>}
+            {multiDay && dateRangeLabel && (
+              <li>촬영 날짜 · {dateRangeLabel}</li>
+            )}
+            {exifTimeLabel && (
+              <li>{multiDay ? "가장 이른 시각" : "촬영 시각"} · {exifTimeLabel}</li>
+            )}
             {exifHasLocation && <li>위치 정보 있음</li>}
             <li style={{ color: "var(--fg-subtle)" }}>
               날짜 · {draftState.date}
             </li>
+            {multiDay && (
+              <li style={{ color: "var(--danger)" }}>
+                ⚠️ 서로 다른 날 사진이 섞여 있어요. 한 날 사진만 두는 걸 권해요.
+              </li>
+            )}
           </ul>
           {signedUrls.length > 0 && (
             <div
@@ -354,6 +414,32 @@ export function ReviewGate() {
                       sizes="(max-width: 720px) 50vw, 200px"
                       style={{ objectFit: "cover" }}
                     />
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePhoto(i)}
+                      disabled={pending}
+                      aria-label="사진 제거"
+                      style={{
+                        position: "absolute",
+                        top: 4,
+                        right: 4,
+                        width: 24,
+                        height: 24,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: "var(--radius-pill)",
+                        border: "none",
+                        backgroundColor: "rgba(0, 0, 0, 0.55)",
+                        color: "#fff",
+                        fontSize: 16,
+                        lineHeight: 1,
+                        cursor: pending ? "default" : "pointer",
+                        padding: 0,
+                      }}
+                    >
+                      ×
+                    </button>
                   </div>
                 ) : null,
               )}

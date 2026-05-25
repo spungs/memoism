@@ -36,6 +36,18 @@ function kstDateKey(d: Date): string {
   return kst.toISOString().slice(0, 10);
 }
 
+/**
+ * EXIF 촬영시각이 있는 사진들의 서로 다른 KST 날짜(YYYY-MM-DD)를 정렬해 반환.
+ * takenAt이 null인 사진은 무시한다.
+ */
+export function uniqueKstDateKeys(metas: ExifMeta[]): string[] {
+  const keys = new Set<string>();
+  for (const m of metas) {
+    if (m.takenAt != null) keys.add(kstDateKey(m.takenAt));
+  }
+  return [...keys].sort();
+}
+
 export type SameDayValidation =
   | { ok: true; date: Date; warning?: string }
   | { ok: false; reason: string };

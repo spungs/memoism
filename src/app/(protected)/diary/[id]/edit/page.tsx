@@ -38,15 +38,14 @@ export default async function DiaryEditPage({ params }: PageProps) {
 
   const diaryDate = diary.createdAt.toISOString().slice(0, 10);
 
-  // 기존 사진들의 signed URL 발급 (edit 모드 read-only 표시용).
-  // 사진 수정 자체는 Phase 3c-4 NEW-7 백업 스왑과 함께 본격 지원.
+  // 기존 사진들의 signed URL 발급 (edit 모드 표시 + 개별 제거용).
+  // id와 signed URL을 짝지어 전달하고, URL 발급 실패(null)한 항목은 제외한다.
   const imagePaths = diary.images.map((img) => img.storagePath);
-  const existingImageUrls =
-    imagePaths.length > 0
-      ? (await getSignedUrls(imagePaths)).filter(
-          (u): u is string => u !== null,
-        )
-      : [];
+  const signedUrls =
+    imagePaths.length > 0 ? await getSignedUrls(imagePaths) : [];
+  const existingImages = diary.images
+    .map((img, i) => ({ id: img.id, url: signedUrls[i] }))
+    .filter((entry): entry is { id: string; url: string } => entry.url !== null);
 
   return (
     <DiaryForm
@@ -55,7 +54,7 @@ export default async function DiaryEditPage({ params }: PageProps) {
       initial={{
         title: diary.title,
         content: diary.content,
-        existingImageUrls,
+        existingImages,
         hasPreviousContent: diary.previousContent !== null,
         aiGenerationVersion: diary.aiGenerationVersion,
         location: parseStoredLocation(diary.location),
