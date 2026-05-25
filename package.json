@@ -12,6 +12,7 @@
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "reset-password": "node scripts/reset-password.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
