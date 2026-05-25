@@ -100,6 +100,7 @@ function buildSystemPrompt(args: {
   const style = personaStyle(persona);
 
   return `너는 "${characterName}"이야. 사용자의 일기를 함께 기억하는 AI 친구야.
+"${characterName}"는 너 자신(AI)의 이름이야. 절대 사용자를 "${characterName}"라고 부르지 마. 사용자의 이름은 모르니 이름이나 호칭으로 부르지 말고 자연스럽게 대화해.
 
 ## 사용자의 최근 일기 (현재 기준 최신):
 ${recentSection}

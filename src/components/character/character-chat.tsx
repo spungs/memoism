@@ -6,6 +6,13 @@ import { Send } from "lucide-react";
 type Role = "user" | "assistant";
 type Message = { id: string; role: Role; content: string };
 
+// 빈 화면에서 탭하면 바로 전송되는 예시 질문 (메이가 먼저 건네는 첫 대화 가이드)
+const EXAMPLE_QUESTIONS = [
+  "최근에 행복했던 날은?",
+  "요즘 기분이 어땠어?",
+  "지난주에 뭐 했지?",
+];
+
 interface Props {
   characterName: string;
   initialMessages: Message[];
@@ -26,8 +33,8 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  async function send() {
-    const text = draft.trim();
+  async function send(textArg?: string) {
+    const text = (textArg ?? draft).trim();
     if (!text || sending || capExhausted) return;
     setSending(true);
     setError(null);
@@ -127,17 +134,42 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
         }}
       >
         {messages.length === 0 && (
-          <p
-            style={{
-              fontFamily: "var(--font-sans)",
-              fontSize: "var(--text-sm)",
-              color: "var(--fg-subtle)",
-              textAlign: "center",
-              margin: "auto",
-            }}
-          >
-            오늘 어땠는지 가볍게 말 걸어보세요.
-          </p>
+          <>
+            <Bubble role="assistant">
+              {`안녕하세요, 저는 ${characterName}예요. 🌿\n일기에 대해 뭐든 편하게 물어보세요.`}
+            </Bubble>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                gap: "var(--space-2)",
+              }}
+            >
+              {EXAMPLE_QUESTIONS.map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => void send(q)}
+                  disabled={sending || capExhausted}
+                  style={{
+                    padding: "8px var(--space-3)",
+                    borderRadius: "var(--radius-pill)",
+                    border: "1px solid var(--border)",
+                    backgroundColor: "var(--surface-raised)",
+                    color: "var(--fg)",
+                    fontFamily: "var(--font-sans)",
+                    fontSize: "var(--text-sm)",
+                    cursor:
+                      sending || capExhausted ? "not-allowed" : "pointer",
+                    textAlign: "left",
+                  }}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </>
         )}
         {messages.map((m) => (
           <Bubble key={m.id} role={m.role}>
