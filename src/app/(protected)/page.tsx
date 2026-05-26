@@ -12,7 +12,7 @@ import {
 //   - 상단 헤더 (메모이즘 + 오늘 날짜)
 //   - "오늘의 일기" 위젯 (있으면 카드, 없으면 "오늘 첫 줄 시작해볼까?" CTA)
 //   - "이번 달" 요약 strip (이번 달 / 전체 기록 수) — 적어도 모은 기록을 안심시키는 단서
-//   - 최근 일기 6개 (날짜·요일·AI칩·2줄 발췌·썸네일 — /diary 카드와 동일 어휘)
+//   - 최근 일기 6개 (날짜·요일·2줄 발췌·썸네일 — /diary 카드와 동일 어휘)
 
 const todayLabelFmt = new Intl.DateTimeFormat("ko-KR", {
   month: "long",
@@ -315,7 +315,6 @@ export default async function HomePage() {
             >
               {otherRecent.map((diary) => {
                 const date = new Date(diary.createdAt);
-                const isAi = diary.source?.startsWith("auto_") ?? false;
                 const previewTitle =
                   diary.title?.trim() ||
                   diary.content.split("\n")[0].slice(0, 40) ||
@@ -357,28 +356,6 @@ export default async function HomePage() {
                       </time>
                       <span style={{ opacity: 0.6 }}>·</span>
                       <span>{weekdayFmt.format(date)}요일</span>
-                      {isAi && (
-                        <span
-                          title="AI가 정리한 일기"
-                          style={{
-                            marginLeft: 2,
-                            fontSize: 10,
-                            padding: "1px 7px",
-                            borderRadius: "var(--radius-pill)",
-                            backgroundColor:
-                              "color-mix(in srgb, var(--accent-rose) 14%, transparent)",
-                            color: "var(--accent-rose-deep, var(--accent-rose))",
-                            fontWeight: 700,
-                            letterSpacing: "var(--tracking-wide)",
-                            lineHeight: 1,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 2,
-                          }}
-                        >
-                          <span aria-hidden>✨</span>AI
-                        </span>
-                      )}
                     </div>
                     <p
                       style={{
