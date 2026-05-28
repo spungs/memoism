@@ -45,7 +45,6 @@ interface DiaryCardProps {
 export function DiaryCard({ diary }: DiaryCardProps) {
   const date = new Date(diary.createdAt);
   const accent = moodColor(diary.mood);
-  const isAi = diary.source?.startsWith("auto_") ?? false;
 
   return (
     <Link
@@ -103,28 +102,6 @@ export function DiaryCard({ diary }: DiaryCardProps) {
           </time>
           <span style={{ opacity: 0.6 }}>·</span>
           <span>{weekdayFmt.format(date)}요일</span>
-          {isAi && (
-            <span
-              title="AI가 정리한 일기"
-              style={{
-                marginLeft: 4,
-                fontSize: 10,
-                padding: "1px 7px",
-                borderRadius: "var(--radius-pill)",
-                backgroundColor:
-                  "color-mix(in srgb, var(--accent-rose) 14%, transparent)",
-                color: "var(--accent-rose-deep, var(--accent-rose))",
-                fontWeight: 700,
-                letterSpacing: "var(--tracking-wide)",
-                lineHeight: 1,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 2,
-              }}
-            >
-              <span aria-hidden>✨</span>AI
-            </span>
-          )}
         </div>
 
         <p
