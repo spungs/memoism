@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Memoism — 마일스톤 진행 리포트 (2026-05-26)</title>
+<style>
+  :root {
+    --paper-0: #fbf7ef;
+    --paper-1: #f4ecdc;
+    --paper-2: #ece1cb;
+    --ink-0:   #2a2118;
+    --ink-1:   #4b3e30;
+    --ink-2:   #6e5a44;
+    --ink-3:   #a08769;
+    --accent:  #b9794a;
+    --accent-2:#8a4f2a;
+    --ok:      #5c7a3f;
+    --warn:    #b08518;
+    --todo:    #8a4f2a;
+    --line:    #d9c9aa;
+    --shadow:  0 1px 0 #ead9b9, 0 8px 24px -16px rgba(70,40,10,.25);
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--paper-0); color: var(--ink-0); }
+  body {
+    margin: 0;
+    font-family: "Iowan Old Style", "Noto Serif KR", Georgia, "Apple SD Gothic Neo", serif;
+    line-height: 1.65;
+    font-size: 16px;
+    background-image:
+      radial-gradient(circle at 12% 18%, rgba(160,135,105,.08) 0 1px, transparent 2px),
+      radial-gradient(circle at 78% 62%, rgba(160,135,105,.06) 0 1px, transparent 2px),
+      radial-gradient(circle at 42% 88%, rgba(160,135,105,.07) 0 1px, transparent 2px);
+    background-size: 220px 220px, 280px 280px, 340px 340px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 56px 28px 96px; }
+
+  header.title {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 22px;
+    margin-bottom: 32px;
+  }
+  .eyebrow {
+    font-family: ui-monospace, "JetBrains Mono", "Menlo", monospace;
+    font-size: 12px;
+    letter-spacing: .08em;
+    color: var(--ink-2);
+    text-transform: uppercase;
+  }
+  h1 { font-size: 34px; margin: 6px 0 4px; letter-spacing: -.01em; }
+  .sub { color: var(--ink-2); font-size: 15px; }
+
+  h2 {
+    font-size: 22px;
+    margin: 48px 0 14px;
+    letter-spacing: -.005em;
+    border-bottom: 1px dashed var(--line);
+    padding-bottom: 6px;
+  }
+  h3 { font-size: 17px; margin: 22px 0 8px; color: var(--ink-1); }
+
+  /* Summary cards */
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 8px 0 4px;
+  }
+  .card {
+    background: var(--paper-1);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+  }
+  .card .k { font-size: 12px; color: var(--ink-2); letter-spacing: .04em; text-transform: uppercase; }
+  .card .v { font-size: 26px; font-weight: 600; color: var(--ink-0); margin-top: 2px; }
+  .card .n { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+
+  /* Phase table */
+  table.phases {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+    background: var(--paper-1);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  table.phases th, table.phases td {
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--line);
+    font-size: 14.5px;
+    vertical-align: top;
+  }
+  table.phases th {
+    background: var(--paper-2);
+    font-weight: 600;
+    color: var(--ink-1);
+    font-size: 12px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  table.phases tr:last-child td { border-bottom: none; }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 12px;
+    border-radius: 999px;
+    font-family: ui-monospace, "JetBrains Mono", "Menlo", monospace;
+    border: 1px solid transparent;
+  }
+  .pill.ok    { background: #e6efd9; color: #3e5527; border-color: #c7d8a4; }
+  .pill.warn  { background: #f4e6b8; color: #6e5210; border-color: #e4cf8a; }
+  .pill.todo  { background: #f1d8c2; color: #6e3514; border-color: #e1b596; }
+  .pill.v2    { background: #e4dbc8; color: #5a4a30; border-color: #cab98e; }
+
+  /* Phase detail */
+  .phase {
+    background: var(--paper-1);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin: 12px 0;
+    box-shadow: var(--shadow);
+  }
+  .phase header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+  .phase header h3 { margin: 0; font-size: 16px; }
+  .phase header .meta {
+    margin-left: auto;
+    font-family: ui-monospace, "JetBrains Mono", "Menlo", monospace;
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+  ul.items {
+    list-style: none;
+    padding: 0;
+    margin: 6px 0 0;
+  }
+  ul.items li {
+    position: relative;
+    padding: 4px 0 4px 22px;
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: var(--ink-1);
+  }
+  ul.items li::before {
+    content: "✓";
+    color: var(--ok);
+    position: absolute; left: 4px; top: 4px;
+    font-weight: 700;
+  }
+  ul.items.todo li::before { content: "•"; color: var(--todo); font-size: 22px; line-height: 1; top: 4px; }
+  ul.items.warn li::before { content: "!"; color: var(--warn); font-weight: 700; }
+
+  /* Recent commits */
+  .commits {
+    background: var(--paper-1);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 12px 0;
+    box-shadow: var(--shadow);
+  }
+  .commits ol { padding-left: 0; margin: 6px 0; list-style: none; counter-reset: c; }
+  .commits li {
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--line);
+    font-size: 14px;
+    color: var(--ink-1);
+  }
+  .commits li:last-child { border-bottom: none; }
+  .commits code {
+    font-family: ui-monospace, "JetBrains Mono", "Menlo", monospace;
+    font-size: 12px;
+    color: var(--accent-2);
+    margin-right: 8px;
+  }
+
+  /* Two-col */
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  /* V2 section */
+  .v2-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  .v2-card {
+    background: var(--paper-1);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 18px;
+    box-shadow: var(--shadow);
+  }
+  .v2-card h4 {
+    margin: 0 0 8px;
+    font-size: 15px;
+    color: var(--accent-2);
+    letter-spacing: -.005em;
+  }
+  .v2-card ul { margin: 0; padding-left: 18px; }
+  .v2-card li { font-size: 14px; color: var(--ink-1); padding: 2px 0; }
+
+  /* Callout */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: #f7ecd9;
+    padding: 12px 16px;
+    margin: 14px 0;
+    border-radius: 0 8px 8px 0;
+    color: var(--ink-1);
+    font-size: 14.5px;
+  }
+
+  footer {
+    margin-top: 56px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--ink-2);
+    text-align: center;
+  }
+
+  @media (max-width: 720px) {
+    .summary { grid-template-columns: repeat(2, 1fr); }
+    .v2-grid, .grid2 { grid-template-columns: 1fr; }
+    h1 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="title">
+    <div class="eyebrow">Memoism · Milestone Progress Report</div>
+    <h1>마일스톤 진행 현황 — 2026-05-26</h1>
+    <div class="sub">
+      기준 문서: <code>Milestone/second_milestone.md</code> · 코드베이스 실측(타입체크·lint·빌드 통과 = 코드 완료)
+      <br>2차 마일스톤(베타) <strong>거의 도달</strong>. 코드 측면은 6개 Phase 모두 완료, 잔여는 <strong>배포 전 액션</strong>과 <strong>DoD #8</strong> 단 한 항목.
+    </div>
+  </header>
+
+  <!-- 한눈에 보기 -->
+  <h2>한눈에 보기</h2>
+  <div class="summary">
+    <div class="card">
+      <div class="k">2차 마일스톤</div>
+      <div class="v">6 / 6</div>
+      <div class="n">Phase 코드 완료</div>
+    </div>
+    <div class="card">
+      <div class="k">베타 DoD</div>
+      <div class="v">12 / 13</div>
+      <div class="n">충족 (남은 1: 광고 RAG 모의)</div>
+    </div>
+    <div class="card">
+      <div class="k">배포 전 액션</div>
+      <div class="v">3</div>
+      <div class="n">db:push · env · E2E</div>
+    </div>
+    <div class="card">
+      <div class="k">상태</div>
+      <div class="v" style="color:var(--ok)">베타 준비</div>
+      <div class="n">지인 3~5명 공유 가능 임박</div>
+    </div>
+  </div>
+
+  <!-- Phase 요약 -->
+  <h2>Phase별 상태</h2>
+  <table class="phases">
+    <thead>
+      <tr><th style="width:90px">Phase</th><th>주제</th><th style="width:130px">상태</th><th>핵심 산출물</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>0</strong></td>
+        <td>인프라 준비</td>
+        <td><span class="pill ok">완료</span></td>
+        <td>Supabase Storage·pgvector·pg_cron, VAPID 키, JWT 회전, magic-byte/SVG 차단</td>
+      </tr>
+      <tr>
+        <td><strong>1</strong></td>
+        <td>데이터 모델 마이그</td>
+        <td><span class="pill ok">완료</span></td>
+        <td>DiaryImage 1:N, DiaryEmbedding, UserPersona, <code>source</code>; 코인·스킨·트라이얼·mood UI 폐기</td>
+      </tr>
+      <tr>
+        <td><strong>2</strong></td>
+        <td>Storage·LLM 이관</td>
+        <td><span class="pill ok">완료</span></td>
+        <td>Gemini 2.5 Flash 전환(Ollama 제거), UsageLog 일일 cap</td>
+      </tr>
+      <tr>
+        <td><strong>3</strong></td>
+        <td>자동 생성 척추 <em>(핵심)</em></td>
+        <td><span class="pill ok">완료</span></td>
+        <td>EXIF → Vision → 모드 A/B/C → 검토 게이트 → 재생성·되돌리기 · 다중 이미지 CRUD</td>
+      </tr>
+      <tr>
+        <td><strong>4</strong></td>
+        <td>RAG 검색 + 캐릭터</td>
+        <td><span class="pill ok">완료</span></td>
+        <td>pgvector 코사인 top-K, 채팅 RAG, 사진 그리드 검색, 메이 첫 인사</td>
+      </tr>
+      <tr>
+        <td><strong>5</strong></td>
+        <td>비즈니스/정책</td>
+        <td><span class="pill warn">코드 완료 · 배포 대기</span></td>
+        <td>동의 체크박스 · 내보내기 · 계정 탈퇴 · 자동 Basic · 22:00 리마인드 푸시</td>
+      </tr>
+      <tr>
+        <td><strong>6</strong></td>
+        <td>안정성 다지기</td>
+        <td><span class="pill warn">코드 완료 · 배포 대기</span></td>
+        <td>Zod 검증, 미들웨어 정확 매칭, 보상 트랜잭션, tokenVersion 세션 무효화</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 완료 상세 -->
+  <h2>완료된 항목 (코드 기준)</h2>
+
+  <div class="phase">
+    <header>
+      <h3>Phase 0 — 인프라 준비</h3>
+      <span class="meta">완료</span>
+    </header>
+    <ul class="items">
+      <li>Supabase Storage(<code>diary-images</code>) 이관 · signed URL TTL 1h</li>
+      <li>pgvector · pg_cron 확장 활성(24h 채팅 정리 cron)</li>
+      <li>JWT_SECRET 회전, Vercel 환경변수 일괄 정리</li>
+      <li>이미지 magic-byte 검증 + SVG 명시 차단</li>
+      <li>Web Push VAPID 키 생성</li>
+    </ul>
+  </div>
+
+  <div class="phase">
+    <header>
+      <h3>Phase 1 — 데이터 모델 마이그레이션</h3>
+      <span class="meta">완료</span>
+    </header>
+    <div class="grid2">
+      <ul class="items">
+        <li>Diary 6 신규 필드 + <code>DiaryImage</code> 1:N 분리</li>
+        <li><code>DiaryEmbedding</code> (pgvector 768) · public.* 한정자 정착</li>
+        <li><code>UserPersona</code> 기본값 자동 생성</li>
+        <li><code>source</code> 컬럼(manual / auto_a/b/c)</li>
+      </ul>
+      <ul class="items">
+        <li><code>CoinTransaction</code>·<code>CoinPackage</code>·<code>coinBalance</code> drop</li>
+        <li>캐릭터 스킨·상점·게임화 폴더 일괄 제거</li>
+        <li>mood UI 제거(컬럼은 V2 위해 보존)</li>
+        <li>트라이얼 개념 제거(<code>trialStartedAt</code> drop)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="phase">
+    <header>
+      <h3>Phase 2 — Storage · LLM 인프라 이관</h3>
+      <span class="meta">완료</span>
+    </header>
+    <ul class="items">
+      <li><code>@supabase/supabase-js</code> 도입 — <code>saveImage</code> 내부 교체</li>
+      <li><code>getSignedUrl</code> RSC 헬퍼(1h TTL) · props로 전달</li>
+      <li>Gemini 클라이언트(<code>src/lib/ai/gemini.ts</code>) · 친절한 에러 + 일시적 503 자동 재시도</li>
+      <li><code>/api/chat</code> Ollama → Gemini 교체(<code>OLLAMA_URL</code> 제거)</li>
+      <li>UsageLog 일일 cap(무료/Basic/Pro 차등)</li>
+    </ul>
+  </div>
+
+  <div class="phase">
+    <header>
+      <h3>Phase 3 — 자동 생성 척추 (핵심 차별화)</h3>
+      <span class="meta">완료</span>
+    </header>
+    <div class="grid2">
+      <ul class="items">
+        <li>EXIF 추출(<code>exifr</code>) + 클라이언트 1024px 압축</li>
+        <li>모드 A(사진) / B(텍스트) / C(사진+텍스트) 분기 오케스트레이션</li>
+        <li><code>/api/diaries/auto-generate</code> draft 반환 (DB 미저장)</li>
+        <li>검토 게이트 페이지 · ✨ AI 마커 · sessionStorage TTL</li>
+        <li>EXIF 시각 KST 보정(오후→아침 환각 버그 fix)</li>
+        <li>EXIF 촬영시각 기준 사진 정렬 (작성·검토 공통)</li>
+      </ul>
+      <ul class="items">
+        <li>다중 이미지 CRUD · 카드/목록/상세 캐러셀</li>
+        <li>"AI 정리" 탭 + 트리거 조건(사진 1+ OR 텍스트≠빈값)</li>
+        <li>재생성 + previousContent 백업 스왑 + 재생성 cap</li>
+        <li>저장 직전 AI 재생성 버튼</li>
+        <li>유료(ACTIVE) 사진 첨부 10장 · 무료 5장</li>
+        <li>다른 날 사진 섞임 경고 + 사진별 제거</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="phase">
+    <header>
+      <h3>Phase 4 — RAG 검색 + 캐릭터 친구</h3>
+      <span class="meta">완료</span>
+    </header>
+    <ul class="items">
+      <li>임베딩 모듈(<code>gemini-embedding-001</code>) + diary 저장 후 백그라운드 임베딩</li>
+      <li>기존 일기 backfill 스크립트</li>
+      <li>RAG <code>/api/diaries/search</code> · 코사인 top-K</li>
+      <li>사진 그리드 결과 컴포넌트</li>
+      <li><code>/character</code> 페이지 친구 단순화(코인/성장/트라이얼 UI 제거)</li>
+      <li><code>/api/chat</code> RAG 통합(top-5 일기 stuff) + UserPersona 반영</li>
+      <li>메이 첫 인사 화면 · 호칭 버그 fix</li>
+    </ul>
+  </div>
+
+  <div class="phase">
+    <header>
+      <h3>Phase 5 — 비즈니스/정책 (결제 제외)</h3>
+      <span class="meta">코드 완료 · 배포 대기</span>
+    </header>
+    <ul class="items">
+      <li>signup 외부 LLM 동의 체크박스 · 미체크 시 가입 차단</li>
+      <li>데이터 내보내기 JSON · 계정 탈퇴(Cascade + Storage 일괄 삭제)</li>
+      <li>설정 페이지에 행 추가(내보내기/탈퇴/동의 토글)</li>
+      <li>가입 시 자동 Basic(ACTIVE) 부여 — 베타 정책</li>
+      <li>22:00 KST 리마인드 푸시 (Web Push + Vercel Cron <code>0 13 * * *</code> + web-push) — 만료 구독 자동 prune</li>
+      <li>관리자용 비밀번호 수동 재설정 CLI(베타 운영용)</li>
+    </ul>
+    <div class="callout">
+      <strong>결정 메모.</strong> 기획서의 "pg_cron 발송"은 Postgres가 VAPID 서명·HTTP 발송을 못 하므로 <strong>Vercel Cron + web-push로 대체</strong>. 기존 24h 채팅 정리용 pg_cron은 순수 SQL이라 유지.
+    </div>
+  </div>
+
+  <div class="phase">
+    <header>
+      <h3>Phase 6 — 안정성 다지기</h3>
+      <span class="meta">코드 완료 · 배포 대기</span>
+    </header>
+    <ul class="items">
+      <li><code>/api/chat</code> Zod 검증 · 메시지 길이 cap 2000자</li>
+      <li>Diary CRUD 보상 트랜잭션 (insert 실패 시 업로드 이미지 정리)</li>
+      <li>이미지 magic-byte 검증 + SVG 차단</li>
+      <li><code>parseLocation</code> strict 모드</li>
+      <li>비번 변경 시 다른 세션 무효화 (<code>User.tokenVersion</code> + JWT payload)</li>
+      <li>Edge 미들웨어에 Prisma 끌려오지 않게 jose 검증 분리(<code>src/lib/auth/jwt.ts</code>)</li>
+      <li>미들웨어 PUBLIC 정확 일치 매칭(<code>/login</code>·<code>/signup</code> whitelist)</li>
+      <li><code>/design</code> 라우트 dev-only 게이트</li>
+    </ul>
+  </div>
+
+  <!-- 최근 작업 -->
+  <h2>2026-05-25 이후 추가 작업 (베타 폴리시)</h2>
+  <div class="commits">
+    <ol>
+      <li><code>17ea48dd</code> 저장·취소 시 미저장 이탈 경고창 안 뜨도록 (beforeunload 가드 + 의도적 이탈 플래그)</li>
+      <li><code>63828253</code> EXIF 시각 프롬프트 KST 보정 (오후→아침 환각 버그) + 저장 전 AI 재생성 버튼</li>
+      <li><code>e365ba0f</code> 홈 재설계 — 이번 달/총 기록 요약 + 최근 일기 6개 리치 카드(날짜·요일·AI칩·스니펫)</li>
+      <li><code>d9cc0912</code> AI 검토 화면 사진에도 촬영 날짜/시각 배지 · 작성 본문칸 240→120 축소</li>
+      <li><code>056bb51c</code> PWA 프론트 네비게이션 선제 캐싱 비활성화 (배포 후 빈 화면 방지)</li>
+      <li><code>62867203 / be68d497</code> 사진 배지 날짜/시각 분리 표시</li>
+      <li><code>107f7b4e</code> 기본 페르소나 사실기반 평서문(<em>"~했다"</em>체)로 일기 생성</li>
+      <li><code>2213545f</code> 유료(ACTIVE) 구독 유저 사진 첨부 10장</li>
+      <li><code>ad7e05b3</code> 22:00 리마인드 푸시 + 비번 변경 시 세션 무효화 (Phase 5·6)</li>
+      <li><code>1aeaf6ae / 775db08b</code> 메이 첫 인사 · 호칭 버그 fix · 관리자 비밀번호 재설정 CLI</li>
+    </ol>
+  </div>
+
+  <!-- 베타 잔여 -->
+  <h2>베타 출시까지 남은 일</h2>
+
+  <div class="phase">
+    <header>
+      <h3>① 배포 전 필수 액션</h3>
+      <span class="meta">사용자 작업</span>
+    </header>
+    <ul class="items todo">
+      <li><code>pnpm db:push</code> — <code>token_version</code> 컬럼 + <code>push_subscriptions</code> 테이블 반영<br>
+        <small style="color:var(--ink-2)">⚠️ 배포 시 기존 발급 토큰 전부 무효화(전원 재로그인) — JWT_SECRET 회전과 동일한 1회성, 의도된 동작</small></li>
+      <li>env 등록 (<code>.env.local</code> + Vercel):
+        <code>NEXT_PUBLIC_VAPID_PUBLIC_KEY</code>,
+        <code>VAPID_PRIVATE_KEY</code>,
+        <code>VAPID_SUBJECT</code>,
+        <code>CRON_SECRET</code></li>
+      <li>prod 배포 후 E2E: 설정에서 푸시 구독 → 22:00(또는 cron 수동 트리거) 알림 수신 / 비번 변경 후 다른 기기 즉시 차단</li>
+    </ul>
+  </div>
+
+  <div class="phase">
+    <header>
+      <h3>② 베타 DoD 잔여</h3>
+      <span class="meta">DoD #8</span>
+    </header>
+    <ul class="items todo">
+      <li><strong>DoD #8 — 무료 사용자 광고 RAG 모의 언락</strong>:
+        <code>usage.ts</code>는 일일 cap만 구현 상태. "광고 시청(모의) → RAG 1회 unlock" UX 플로우 별도 결정 필요.
+        <br><small style="color:var(--ink-2)">베타엔 실제 광고 SDK 없이 모의 UI만 검증 — 또는 베타에선 전원 Basic이므로 V2로 이연하는 안도 가능</small></li>
+      <li><strong>나머지 DoD</strong> (#1~#7, #9~#13) — 코드상 충족. env·DB·배포 후 E2E 재검증 1회 권장</li>
+    </ul>
+  </div>
+
+  <div class="callout">
+    <strong>요약.</strong> 코드는 베타 도달. 사용자가 <code>pnpm db:push</code> + env 등록 + 배포만 마치면 11/13 DoD 즉시 실증 가능.
+    DoD #8(광고 모의)에 대한 결정만 내리면 베타 출시 가능 상태로 잠금된다.
+  </div>
+
+  <!-- 다음 마일스톤 -->
+  <h2>다음 마일스톤 — V2 (<code>third_milestone.md</code> 작성 예정)</h2>
+  <p class="sub">
+    2차 마일스톤 §10에 정리된 V2 항목. 광고/결제/캐릭터 V2 재설계가 골자. 베타 운영 데이터(D7 리텐션·자동생성 채택률·재생성 빈도) 확보 후 우선순위 재조정 권장.
+  </p>
+
+  <div class="v2-grid">
+    <div class="v2-card">
+      <h4>결제 · 법적 인프라</h4>
+      <ul>
+        <li>포트원/토스 페이먼츠 (Basic ₩2,900 정기결제)</li>
+        <li>약관 · 개인정보처리방침 정적 페이지</li>
+        <li>14세 미만 보호자 동의</li>
+        <li>가입/로그인 rate limit (Upstash sliding window)</li>
+        <li>CSP · X-Frame-Options 등 보안 헤더</li>
+        <li>비밀번호 재설정 + 이메일 인증 (Resend 등)</li>
+      </ul>
+    </div>
+
+    <div class="v2-card">
+      <h4>광고 + 코인 (앱테크 모델)</h4>
+      <ul>
+        <li>AdMob 보상형 비디오 통합</li>
+        <li>무료: 광고 1회 = AI 호출 +1 / RAG 1회</li>
+        <li>코인 적립: 광고 시청 / 연속 출석 streak / 친구 초대</li>
+        <li>코인 = 베리(Soft 통화, 환금성 0)</li>
+        <li>상점: 캐릭터 스킨·외형·홈 꾸미기·일기 테마·AI 페르소나 프리셋·추억 캡슐</li>
+        <li>Pro 티어 ₩4,900 (일 100회, 광고 없음, 사진 10장, 페르소나 커스텀)</li>
+      </ul>
+    </div>
+
+    <div class="v2-card">
+      <h4>캐릭터 V2 재설계</h4>
+      <ul>
+        <li>캐릭터 스킨 (V2 코인으로 구매)</li>
+        <li>홈 꾸미기 (V2 신규)</li>
+        <li>캐릭터 페르소나 (UserPersona UI 노출 + 톤 선택)</li>
+      </ul>
+    </div>
+
+    <div class="v2-card">
+      <h4>그 외 V2 후보</h4>
+      <ul>
+        <li>일기 공유 (OS share + 카드 이미지 생성)</li>
+        <li>마크다운 렌더링</li>
+        <li>오프라인 캐시 · 동기화</li>
+        <li>다국어</li>
+        <li>DiaryRevision 1:N (전체 수정 이력)</li>
+        <li>"N년 전 오늘" passive 회고 카드</li>
+        <li>음성 입력 (별도 UI)</li>
+        <li>지도 동선 V2 — EXIF GPS 핀으로 하루 동선</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>가까운 다음 한 수 (Top 3 제안)</h2>
+  <div class="phase">
+    <ul class="items warn">
+      <li><strong>오늘~내일</strong>: <code>pnpm db:push</code> + VAPID/CRON env 등록 → prod 배포 → 22:00 알림 + 세션 무효화 E2E 1회 확인 (Phase 5·6 클로즈)</li>
+      <li><strong>이번 주</strong>: DoD #8 결정 — (a) 베타엔 전원 Basic이므로 V2 이연 / (b) 모의 광고 unlock UI 구현. 결정 후 마일스톤 문서에 반영</li>
+      <li><strong>다음 주</strong>: 지인 3~5명에게 가입 링크 공유 → 1주 단위 사용 데이터(자동생성 채택률·재생성 빈도·22:00 푸시 반응) 수집 → V2 우선순위 재조정 후 <code>third_milestone.md</code> 착수</li>
+    </ul>
+  </div>
+
+  <footer>
+    Memoism · Milestone progress as of 2026-05-26 · 기준 문서 <code>Milestone/second_milestone.md</code>
+  </footer>
+
+</div>
+</body>
+</html>
