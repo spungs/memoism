@@ -289,15 +289,6 @@ export function SettingsView({ email }: SettingsViewProps) {
             <span style={ROW_LABEL_STYLE}>버전</span>
             <span style={ROW_VALUE_STYLE}>{APP_VERSION}</span>
           </div>
-          <div style={DIVIDER_STYLE} />
-          <a
-            href="#"
-            onClick={(e) => e.preventDefault()}
-            style={{ ...ROW_STYLE, textDecoration: "none" }}
-          >
-            <span style={ROW_LABEL_STYLE}>개인정보처리방침</span>
-            <Chevron />
-          </a>
         </div>
       </section>
 
