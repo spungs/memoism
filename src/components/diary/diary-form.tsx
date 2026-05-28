@@ -46,6 +46,8 @@ type PickedImage = {
   file: File;
   previewUrl: string;
   exif: ExifMeta;
+  /** EXIF 추출 진행 중이면 true — 썸네일에 스피너를 띄운다. */
+  extracting?: boolean;
 };
 
 function todayStr() {
@@ -109,11 +111,13 @@ function PhotoThumb({
   src,
   unoptimized,
   badge,
+  loading,
   onRemove,
 }: {
   src: string;
   unoptimized?: boolean;
   badge: string | null;
+  loading?: boolean;
   onRemove: () => void;
 }) {
   return (
@@ -137,6 +141,30 @@ function PhotoThumb({
         style={{ objectFit: "cover" }}
         unoptimized={unoptimized}
       />
+      {loading && (
+        <div
+          aria-label="사진 정보 읽는 중"
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(0,0,0,0.35)",
+          }}
+        >
+          <span
+            style={{
+              width: 20,
+              height: 20,
+              border: "2px solid rgba(255,255,255,0.4)",
+              borderTopColor: "white",
+              borderRadius: "50%",
+              animation: "spin 0.7s linear infinite",
+            }}
+          />
+        </div>
+      )}
       <button
         type="button"
         onClick={onRemove}
@@ -263,28 +291,39 @@ export function DiaryForm({
     const files = Array.from(e.target.files ?? []);
     if (fileInputRef.current) fileInputRef.current.value = "";
     const accepted = files.slice(0, slotsLeft);
+    if (accepted.length === 0) return;
 
-    // 첨부 즉시 EXIF를 추출해 화면 미리보기를 촬영시각 순으로 정렬한다.
-    // 원본에서 추출(압축하면 메타데이터 손실) → 이후 저장/생성에서 재추출 불필요.
-    const newPicks: PickedImage[] = await Promise.all(
-      accepted.map(async (f) => {
+    // 1) 썸네일을 즉시 화면에 띄운다(스피너 표시). previewUrl은 EXIF 없이 바로 생성 가능.
+    const newPicks: PickedImage[] = accepted.map((f) => ({
+      id: crypto.randomUUID(),
+      file: f,
+      previewUrl: URL.createObjectURL(f),
+      exif: { takenAt: null, lat: null, lng: null },
+      extracting: true,
+    }));
+    setPickedImages((prev) => [...prev, ...newPicks]);
+
+    // 2) EXIF를 병렬 추출, 끝나는 사진부터 스피너를 끄고 메타데이터를 채운다.
+    //    원본에서 추출(압축하면 메타데이터 손실) → 이후 저장/생성에서 재추출 불필요.
+    await Promise.all(
+      newPicks.map(async (pick) => {
         let exif: ExifMeta;
         try {
-          exif = await extractExif(f);
+          exif = await extractExif(pick.file);
         } catch {
           exif = { takenAt: null, lat: null, lng: null };
         }
-        return {
-          id: crypto.randomUUID(),
-          file: f,
-          previewUrl: URL.createObjectURL(f),
-          exif,
-        };
+        setPickedImages((prev) =>
+          prev.map((p) =>
+            p.id === pick.id ? { ...p, exif, extracting: false } : p,
+          ),
+        );
       }),
     );
 
+    // 3) 모든 추출 완료 후 촬영시각 순으로 한 번 정렬.
     setPickedImages((prev) =>
-      [...prev, ...newPicks].sort((a, b) => compareByTakenAt(a.exif, b.exif)),
+      [...prev].sort((a, b) => compareByTakenAt(a.exif, b.exif)),
     );
   };
 
@@ -585,7 +624,28 @@ export function DiaryForm({
 
         {/* 사진 (상한은 구독별, maxImages prop) — 작성·수정 공용. 가로 스크롤(개행 X). */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          <p style={MUTED_LABEL}>사진 ({totalImageCount}/{maxImages})</p>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              flexWrap: "wrap",
+              gap: "var(--space-2)",
+            }}
+          >
+            <p style={MUTED_LABEL}>사진 ({totalImageCount}/{maxImages})</p>
+            {!isMultiDate && pickedImages.length > 1 && (
+              <span
+                style={{
+                  ...MUTED_LABEL,
+                  textTransform: "none",
+                  letterSpacing: "normal",
+                  fontWeight: 400,
+                }}
+              >
+                촬영 시각이 있는 사진은 시간순으로 자동 정렬돼요.
+              </span>
+            )}
+          </div>
           {totalImageCount > 0 && (
             <div
               className="hide-scrollbar"
@@ -612,12 +672,13 @@ export function DiaryForm({
                   src={img.previewUrl}
                   unoptimized
                   badge={formatTakenDateTime(img.exif.takenAt)}
+                  loading={img.extracting}
                   onRemove={() => removePickedImage(img.id)}
                 />
               ))}
             </div>
           )}
-          {isMultiDate ? (
+          {isMultiDate && (
             <p
               role="alert"
               style={{
@@ -636,19 +697,6 @@ export function DiaryForm({
               {dateKeys.length}일 사진이 섞여 있어요. 일기는 하루 단위라 한
               날 사진만 두길 권해요.
             </p>
-          ) : (
-            pickedImages.length > 1 && (
-              <p
-                style={{
-                  ...MUTED_LABEL,
-                  textTransform: "none",
-                  letterSpacing: "normal",
-                  color: "var(--fg-subtle)",
-                }}
-              >
-                촬영 시각이 있는 사진은 시간순으로 자동 정렬돼요.
-              </p>
-            )
           )}
           {slotsLeft > 0 && (
             <label

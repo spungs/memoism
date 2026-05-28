@@ -374,6 +374,10 @@ html {
   50% { opacity: 0.4; }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .skeleton {
   background-color: var(--paper-2);
   border-radius: var(--radius-sm);
