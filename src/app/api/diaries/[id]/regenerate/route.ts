@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { captureServer } from "@/lib/analytics/server";
 import { regenerateDiary } from "@/lib/diary/regenerate";
 
 export async function POST(
@@ -25,5 +26,6 @@ export async function POST(
     );
   }
 
+  await captureServer("ai_regenerated", session.userId, { diary_id: id });
   return NextResponse.json({ diary: result.diary });
 }

@@ -1,4 +1,9 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { PostHogProvider } from "@/providers/posthog-provider";
+import { PageTracker } from "@/components/analytics/page-tracker";
 import { QueryProvider } from "@/providers/query-provider";
 import "./globals.css";
 
@@ -40,9 +45,16 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className="antialiased">
-        <QueryProvider>
-          <div className="app-shell">{children}</div>
-        </QueryProvider>
+        <PostHogProvider>
+          <QueryProvider>
+            <div className="app-shell">{children}</div>
+          </QueryProvider>
+          <Suspense fallback={null}>
+            <PageTracker />
+          </Suspense>
+        </PostHogProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

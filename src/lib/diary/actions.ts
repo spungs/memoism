@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { captureServer } from "@/lib/analytics/server";
 import { getSession } from "@/lib/auth/session";
 import { getMaxImagesForUser } from "@/lib/character/queries";
 import { prisma } from "@/lib/db";
@@ -194,6 +195,11 @@ export async function createDiaryAction(
 
     revalidatePath("/diary");
     revalidatePath("/");
+    await captureServer("diary_created", session.userId, {
+      source,
+      image_count: storagePaths.length,
+      has_mood: parsed.data.mood != null,
+    });
     return { ok: true, data: diary };
   } catch (e) {
     // DB 실패 시 직접 업로드한 이미지 보상 정리

@@ -3,6 +3,7 @@
 import { Prisma, SubscriptionStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { captureServer } from "@/lib/analytics/server";
 import { hashPassword, verifyPassword } from "./password";
 import { signupSchema, loginSchema } from "./schemas";
 import { createSession, deleteSession, getSession } from "./session";
@@ -77,6 +78,7 @@ export async function signupAction(
 
   // New users start at tokenVersion 0 (DB default).
   await createSession(user.id, user.email, 0);
+  await captureServer("signup_completed", user.id, { email: user.email });
   redirect("/");
 }
 

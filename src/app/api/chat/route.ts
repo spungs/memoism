@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { chat } from "@/lib/ai/gemini";
 import { searchDiaries, type RagSearchHit } from "@/lib/ai/rag";
 import { checkAndIncrement } from "@/lib/ai/usage";
+import { captureServer } from "@/lib/analytics/server";
 import { CHARACTER_NAME } from "@/lib/character/utils";
 
 const messageSchema = z.object({
@@ -238,6 +239,11 @@ export async function POST(req: NextRequest) {
     }),
   ]);
 
+  await captureServer("chat_message_sent", session.userId, {
+    message_length: userMessage.length,
+    rag_hits: relatedHits.length,
+    cap_remaining: cap.remaining,
+  });
   return NextResponse.json({
     message: assistantText,
     capRemaining: cap.remaining,
