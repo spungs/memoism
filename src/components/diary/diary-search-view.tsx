@@ -13,7 +13,6 @@ export interface SearchResultItem {
   mood: string | null;
   source: string;
   createdAt: string;
-  similarity: number;
   thumbnailUrl: string | null;
 }
 
@@ -105,7 +104,7 @@ export function DiarySearchView({ onActiveChange }: Props) {
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="작년 봄 카페, 친구랑 점심..."
+          placeholder="카페, 여행, 친구 이름..."
           aria-label="일기 검색"
           style={{
             flex: 1,

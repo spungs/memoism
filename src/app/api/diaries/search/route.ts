@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
-import { searchDiaries } from "@/lib/ai/rag";
+import { searchDiariesByText } from "@/lib/diary/queries";
 import { getSignedUrlsForOwner } from "@/lib/storage";
 
 const queryBodySchema = z.object({
@@ -11,7 +11,6 @@ const queryBodySchema = z.object({
     .trim()
     .min(1, "검색어를 입력해주세요")
     .max(200, "검색어는 200자 이내여야 합니다"),
-  topK: z.number().int().positive().max(20).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -31,9 +30,7 @@ export async function POST(req: NextRequest) {
 
   let hits;
   try {
-    hits = await searchDiaries(session.userId, parsed.data.q, {
-      topK: parsed.data.topK ?? 5,
-    });
+    hits = await searchDiariesByText(session.userId, parsed.data.q);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[search] failed:", msg);
@@ -78,7 +75,6 @@ export async function POST(req: NextRequest) {
       mood: h.mood,
       source: h.source,
       createdAt: h.createdAt.toISOString(),
-      similarity: h.similarity,
       thumbnailUrl: path ? (urlByPath.get(path) ?? null) : null,
     };
   });

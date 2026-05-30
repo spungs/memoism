@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getSignedUrl } from "@/lib/storage";
 
 const DEFAULT_TAKE = 20;
+const SEARCH_TAKE = 50;
 
 export interface DiariesPage<T> {
   items: T[];
@@ -106,6 +107,40 @@ export async function getDiaryCounts(userId: string) {
   ]);
 
   return { total, thisMonth };
+}
+
+/**
+ * 일기목록 검색창용 단순 텍스트 검색.
+ *   - 의미 기반(RAG)이 아니라, 입력 텍스트가 제목·본문에 실제로 든 일기만 조회.
+ *   - 공백으로 나눈 각 단어가 모두(AND) 들어가야 매칭 (제목 OR 본문, 대소문자 무시).
+ *   - 최근순, 최대 SEARCH_TAKE개. 본인 일기로만 scope.
+ *   - 의미 기반 검색이 필요한 자리는 메이(chat)의 searchDiaries(RAG)를 쓴다.
+ */
+export async function searchDiariesByText(userId: string, query: string) {
+  const tokens = query.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return [];
+
+  return prisma.diary.findMany({
+    where: {
+      userId,
+      AND: tokens.map((t) => ({
+        OR: [
+          { title: { contains: t, mode: "insensitive" as const } },
+          { content: { contains: t, mode: "insensitive" as const } },
+        ],
+      })),
+    },
+    orderBy: { createdAt: "desc" },
+    take: SEARCH_TAKE,
+    select: {
+      id: true,
+      title: true,
+      content: true,
+      mood: true,
+      source: true,
+      createdAt: true,
+    },
+  });
 }
 
 export type DiaryListItemWithThumbnail = DiaryListItem & {
