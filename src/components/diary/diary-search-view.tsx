@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { MOOD_EMOJI, type MoodKey } from "./mood-data";
@@ -40,6 +41,9 @@ export function DiarySearchView({ onActiveChange }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // 직전에 실제로 검색한 검색어. 한글 IME 조합 확정(blur 등)으로 같은 값이
+  // 다시 들어와도 중복 요청하지 않도록 dedupe 한다.
+  const lastSearchedRef = useRef<string | null>(null);
 
   // 검색어 변경 시 debounce → API 호출
   useEffect(() => {
@@ -48,12 +52,15 @@ export function DiarySearchView({ onActiveChange }: Props) {
       setItems([]);
       setError(null);
       setTouched(false);
+      lastSearchedRef.current = null;
       onActiveChange(false);
       return;
     }
     onActiveChange(true);
     setTouched(true);
     const handle = setTimeout(async () => {
+      if (lastSearchedRef.current === trimmed) return; // 같은 검색어 재요청 방지
+      lastSearchedRef.current = trimmed;
       setLoading(true);
       setError(null);
       try {
@@ -80,6 +87,7 @@ export function DiarySearchView({ onActiveChange }: Props) {
   }, [query, onActiveChange]);
 
   const handleClear = () => {
+    if (inputRef.current) inputRef.current.value = "";
     setQuery("");
     inputRef.current?.focus();
   };
@@ -102,9 +110,14 @@ export function DiarySearchView({ onActiveChange }: Props) {
         <input
           ref={inputRef}
           type="search"
-          value={query}
+          // 비제어 입력: value를 React가 다시 써넣지 않으므로 한글 IME 조합이
+          // 깨지지 않는다. 조합 중 글자까지 query에 반영하려고 onChange와
+          // onCompositionUpdate 양쪽에서 동기화 → blur로 조합 확정돼도 값이
+          // 그대로라 재검색이 일어나지 않음.
+          defaultValue=""
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="카페, 여행, 친구 이름..."
+          onCompositionUpdate={(e) => setQuery(e.currentTarget.value)}
+          placeholder="단어로 검색 (예: 카페, 엄마, 제주도)"
           aria-label="일기 검색"
           style={{
             flex: 1,
@@ -194,6 +207,10 @@ export function DiarySearchView({ onActiveChange }: Props) {
 
           {!loading && !error && items.length > 0 && (
             <div
+              // 결과 영역에 마우스가 진입하면 입력창의 한글 IME 조합을 미리 확정한다.
+              // mouseenter는 이동 기반이라 IME에 흡수되지 않으므로, 뒤이은 결과 클릭이
+              // 조합 확정에 소비돼 씹히는 일을 막는다(데스크톱 웹 한정).
+              onMouseEnter={() => inputRef.current?.blur()}
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
@@ -212,15 +229,28 @@ export function DiarySearchView({ onActiveChange }: Props) {
 }
 
 function SearchResultCard({ item }: { item: SearchResultItem }) {
+  const router = useRouter();
+  const href = `/diary/${item.id}`;
   const date = new Date(item.createdAt);
   const moodEmoji =
     item.mood && item.mood in MOOD_EMOJI
       ? MOOD_EMOJI[item.mood as MoodKey]
       : "📝";
 
+  // 한글 IME 조합 중 입력창이 포커스를 쥔 상태에서 결과를 클릭하면, 첫 click이
+  // 조합 확정에 소비돼 네비게이션이 씹힌다(데스크톱 웹 한정). click보다 먼저
+  // 발생하는 mousedown에서 이동시켜 한 번에 상세로 가게 한다. 수정키·중클릭·우클릭은
+  // 기본 동작(새 탭 등)에 맡긴다.
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    router.push(href);
+  };
+
   return (
     <Link
-      href={`/diary/${item.id}`}
+      href={href}
+      onMouseDown={handleMouseDown}
       style={{
         display: "flex",
         flexDirection: "column",

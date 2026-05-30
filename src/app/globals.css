@@ -391,3 +391,11 @@ html {
 .hide-scrollbar::-webkit-scrollbar {
   display: none; /* Webkit */
 }
+
+/* 검색창은 자체 clear 버튼(원형 ✕)을 그리므로 Webkit 네이티브 취소 버튼을 숨겨
+   ✕ 두 개로 겹쳐 보이는 것을 방지한다. */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
