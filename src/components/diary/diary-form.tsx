@@ -55,6 +55,11 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// 새벽(자정~) 작성 안내: 이 시각(로컬=KST) 이전에 폼을 열면 날짜선택기 기본값은
+// 오늘로 두되 "어제 일기인가요?" 힌트를 띄운다. 'day starts at 5am' 통념 —
+// 자정 직후 회고는 보통 '어제'를 정리하는 것.
+const NIGHT_HINT_BEFORE_HOUR = 5;
+
 // EXIF 촬영시각 오름차순. 시각이 있는 사진이 먼저, 없는 사진은 stable sort로
 // 원래(추가) 순서를 유지하며 뒤로 간다.
 function compareByTakenAt(a: ExifMeta, b: ExifMeta): number {
@@ -226,6 +231,10 @@ export function DiaryForm({
   const [mood, setMood] = useState<MoodKey | null>(initial?.mood ?? null);
   const [date, setDate] = useState(initial?.date ?? todayStr());
 
+  // 새벽 작성 시 "어제로 바꾸기" 안내. 시각은 클라이언트에서만 계산해
+  // (초기값 null) hydration mismatch를 피한다.
+  const [nightHint, setNightHint] = useState<{ date: string; label: string } | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pickedImages, setPickedImages] = useState<PickedImage[]>([]);
 
@@ -284,6 +293,17 @@ export function DiaryForm({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 새벽 시간대 + create 모드일 때만 "어제 일기?" 안내를 준비한다.
+  useEffect(() => {
+    if (mode !== "create") return;
+    const now = new Date();
+    if (now.getHours() >= NIGHT_HINT_BEFORE_HOUR) return;
+    const y = new Date(now);
+    y.setDate(y.getDate() - 1);
+    const date = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, "0")}-${String(y.getDate()).padStart(2, "0")}`;
+    setNightHint({ date, label: `${y.getMonth() + 1}월 ${y.getDate()}일` });
+  }, [mode]);
 
   const handlePickFiles: React.ChangeEventHandler<HTMLInputElement> = async (
     e,
@@ -549,6 +569,44 @@ export function DiaryForm({
         }}
       >
         <DiaryDatePicker value={date} max={today} onChange={setDate} />
+
+        {nightHint && date === today && (
+          <button
+            type="button"
+            onClick={() => setDate(nightHint.date)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--space-2)",
+              width: "100%",
+              textAlign: "left",
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-sm)",
+              lineHeight: "var(--leading-relaxed)",
+              color: "var(--fg-muted)",
+              backgroundColor: "var(--accent-rose-soft)",
+              border:
+                "1px solid color-mix(in srgb, var(--accent-rose) 30%, transparent)",
+              borderRadius: "var(--radius-md)",
+              padding: "var(--space-2) var(--space-3)",
+              cursor: "pointer",
+            }}
+          >
+            <span aria-hidden>🌙</span>
+            <span style={{ flex: 1 }}>
+              지금은 새벽이에요. 어제({nightHint.label}) 일기인가요?
+            </span>
+            <span
+              style={{
+                fontWeight: 700,
+                color: "var(--accent-rose-deep)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              어제로 바꾸기
+            </span>
+          </button>
+        )}
 
         <MoodPicker value={mood} onChange={setMood} />
 
