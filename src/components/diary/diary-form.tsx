@@ -17,6 +17,7 @@ import { compressImage } from "@/lib/diary/image-compress";
 import { DiaryAiActions } from "./diary-ai-actions";
 import { DiaryDatePicker } from "./date-picker";
 import { MoodPicker, type MoodKey } from "./mood-picker";
+import { AiBusyOverlay, Spinner } from "@/components/ui/ai-busy-overlay";
 
 const PENDING_DRAFT_KEY = "memoism:pendingDraft";
 
@@ -268,6 +269,8 @@ export function DiaryForm({
 
   const [aiPending, setAiPending] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  // 진행 중인 AI 생성 요청을 취소(Abort)하기 위한 핸들.
+  const aiAbortRef = useRef<AbortController | null>(null);
 
   // edit 모드 AI 액션 state (재생성·되돌리기 후 부모로 lift된 값 갱신용)
   const [hasPrev, setHasPrev] = useState(
@@ -440,6 +443,8 @@ export function DiaryForm({
 
     setAiPending(true);
     setAiError(null);
+    const ac = new AbortController();
+    aiAbortRef.current = ac;
     try {
       const { compressed, exifs } = await buildExifsAndCompress();
 
@@ -451,6 +456,7 @@ export function DiaryForm({
       const res = await fetch("/api/diaries/auto-generate", {
         method: "POST",
         body: fd,
+        signal: ac.signal,
       });
       const data = await res.json();
 
@@ -475,10 +481,18 @@ export function DiaryForm({
       );
       router.push("/diary/review");
     } catch (e) {
+      // 사용자가 취소한 경우는 에러로 표시하지 않는다.
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setAiError(e instanceof Error ? e.message : "AI 생성 실패");
     } finally {
       setAiPending(false);
+      aiAbortRef.current = null;
     }
+  };
+
+  // 진행 중 오버레이의 "취소" — 요청을 끊고 작성 화면으로 복귀.
+  const handleCancelAi = () => {
+    aiAbortRef.current?.abort();
   };
 
   const canManualSave = content.trim().length > 0 && !pending && !aiPending;
@@ -803,7 +817,21 @@ export function DiaryForm({
                 transition: "background-color 120ms",
               }}
             >
-              {aiPending ? "AI가 정리 중..." : "✨ AI로 정리하기"}
+              {aiPending ? (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                  }}
+                >
+                  <Spinner size={16} />
+                  AI가 정리 중...
+                </span>
+              ) : (
+                "✨ AI로 정리하기"
+              )}
             </button>
             <p style={{ ...MUTED_LABEL, textTransform: "none", letterSpacing: "normal" }}>
               사진만 있어도, 텍스트만 있어도, 둘 다 있어도 OK.
@@ -846,6 +874,13 @@ export function DiaryForm({
           />
         )}
       </form>
+
+      {aiPending && (
+        <AiBusyOverlay
+          label={"사진과 메모를 읽고\n일기로 정리하고 있어요"}
+          onCancel={handleCancelAi}
+        />
+      )}
     </div>
   );
 }

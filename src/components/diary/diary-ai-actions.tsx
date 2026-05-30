@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Sparkles, Undo2 } from "lucide-react";
 import { revertDiaryAction } from "@/lib/diary/actions";
+import { AiBusyOverlay, Spinner } from "@/components/ui/ai-busy-overlay";
 
 export interface DiaryAiUpdate {
   title: string;
@@ -28,15 +29,20 @@ export function DiaryAiActions({
   const [aiPending, setAiPending] = useState(false);
   const [reverting, startRevert] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // 진행 중인 재생성 요청 취소(Abort) 핸들.
+  const aiAbortRef = useRef<AbortController | null>(null);
 
   const busy = aiPending || reverting;
 
   const handleRegenerate = async () => {
     setAiPending(true);
     setError(null);
+    const ac = new AbortController();
+    aiAbortRef.current = ac;
     try {
       const res = await fetch(`/api/diaries/${diaryId}/regenerate`, {
         method: "POST",
+        signal: ac.signal,
       });
       const data = await res.json();
       if (!res.ok) {
@@ -51,10 +57,18 @@ export function DiaryAiActions({
         aiGenerationVersion: d.aiGenerationVersion,
       });
     } catch (e) {
+      // 사용자가 취소한 경우는 에러로 표시하지 않는다.
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setError(e instanceof Error ? e.message : "재생성에 실패했어요");
     } finally {
       setAiPending(false);
+      aiAbortRef.current = null;
     }
+  };
+
+  // 진행 중 오버레이의 "취소" — 응답 대기를 끊는다(그만 기다리기).
+  const handleCancelAi = () => {
+    aiAbortRef.current?.abort();
   };
 
   const handleRevert = () => {
@@ -101,7 +115,7 @@ export function DiaryAiActions({
             boxShadow: "var(--shadow-xs)",
           }}
         >
-          <Sparkles size={14} aria-hidden />
+          {aiPending ? <Spinner size={14} /> : <Sparkles size={14} aria-hidden />}
           {aiPending
             ? "AI가 정리 중..."
             : aiGenerationVersion === 0
@@ -164,6 +178,13 @@ export function DiaryAiActions({
         >
           {error}
         </p>
+      )}
+
+      {aiPending && (
+        <AiBusyOverlay
+          label={"작성한 내용과 사진을 바탕으로\n일기를 다시 정리하고 있어요"}
+          onCancel={handleCancelAi}
+        />
       )}
     </div>
   );
