@@ -353,7 +353,7 @@ export function DiaryCalendar({ initialYear, initialMonth, initialDays }: Props)
                       <MoodBadge mood={e.mood} size="sm" />
                     ) : (
                       <span aria-hidden style={{ fontSize: 14 }}>
-                        {e.source === "ai" ? "📷" : "📝"}
+                        {e.source.startsWith("auto_") ? "📷" : "📝"}
                       </span>
                     )}
                     <span style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-xs)", color: "var(--fg-subtle)" }}>
