@@ -2,30 +2,59 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { DiaryListWithSearch } from "@/components/diary/diary-list-with-search";
+import { DiaryViewToggle } from "@/components/diary/diary-view-toggle";
+import { DiaryCalendar } from "@/components/diary/diary-calendar";
 import { getSession } from "@/lib/auth/session";
-import { getDiariesWithThumbnails } from "@/lib/diary/queries";
+import {
+  getDiariesWithThumbnails,
+  getDiariesForMonth,
+  getDiaryCounts,
+} from "@/lib/diary/queries";
+import { kstTodayKey } from "@/lib/diary/kst";
 
 export const metadata = { title: "일기" };
 
-export default async function DiaryListPage() {
+export default async function DiaryListPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const page = await getDiariesWithThumbnails(session.userId, { take: 50 });
-  const initialData = {
-    nextCursor: page.nextCursor,
-    items: page.items.map((d) => ({
-      id: d.id,
-      title: d.title,
-      content: d.content,
-      thumbnailUrl: d.thumbnailUrl,
-      mood: d.mood,
-      source: d.source,
-      createdAt: d.createdAt.toISOString(),
-    })),
-  };
+  const { view } = await searchParams;
+  const isCalendar = view === "calendar";
 
-  const total = initialData.items.length;
+  let total: number;
+  let body: React.ReactNode;
+
+  if (isCalendar) {
+    const [ty, tm] = kstTodayKey().split("-").map(Number);
+    const [monthData, counts] = await Promise.all([
+      getDiariesForMonth(session.userId, ty, tm),
+      getDiaryCounts(session.userId),
+    ]);
+    total = counts.total;
+    body = (
+      <DiaryCalendar initialYear={ty} initialMonth={tm} initialDays={monthData.days} />
+    );
+  } else {
+    const page = await getDiariesWithThumbnails(session.userId, { take: 50 });
+    const initialData = {
+      nextCursor: page.nextCursor,
+      items: page.items.map((d) => ({
+        id: d.id,
+        title: d.title,
+        content: d.content,
+        thumbnailUrl: d.thumbnailUrl,
+        mood: d.mood,
+        source: d.source,
+        createdAt: d.createdAt.toISOString(),
+      })),
+    };
+    total = initialData.items.length;
+    body = <DiaryListWithSearch initialData={initialData} />;
+  }
 
   return (
     <main
@@ -41,7 +70,7 @@ export default async function DiaryListPage() {
           alignItems: "flex-end",
           justifyContent: "space-between",
           gap: "var(--space-3)",
-          marginBottom: "var(--space-6)",
+          marginBottom: "var(--space-4)",
           padding: "0 var(--space-1)",
         }}
       >
@@ -92,7 +121,11 @@ export default async function DiaryListPage() {
         </Link>
       </header>
 
-      <DiaryListWithSearch initialData={initialData} />
+      <div style={{ marginBottom: "var(--space-5)", padding: "0 var(--space-1)" }}>
+        <DiaryViewToggle active={isCalendar ? "calendar" : "list"} />
+      </div>
+
+      {body}
     </main>
   );
 }
