@@ -79,7 +79,7 @@ export function AiBusyOverlay({ label, onCancel }: Props) {
           gap: "var(--space-4)",
           width: "100%",
           maxWidth: 300,
-          padding: "var(--space-7) var(--space-6)",
+          padding: "var(--space-8) var(--space-6)",
           backgroundColor: "var(--surface-raised)",
           borderRadius: "var(--radius-xl)",
           boxShadow: "0 8px 32px rgba(74,61,46,0.18)",
