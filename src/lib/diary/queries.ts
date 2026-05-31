@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { getSignedUrl } from "@/lib/storage";
+import { kstDateKey, kstMonthRangeUtc } from "@/lib/diary/kst";
 
 const DEFAULT_TAKE = 20;
 const SEARCH_TAKE = 50;
@@ -215,4 +216,58 @@ export async function getDiariesWithThumbnails(
     }),
   );
   return { items, nextCursor: page.nextCursor };
+}
+
+export interface CalendarEntry {
+  id: string;
+  title: string;
+  content: string;
+  source: string;
+  mood: string | null;
+  createdAt: string; // ISO
+}
+
+export interface CalendarMonthData {
+  year: number;
+  month: number; // 1~12
+  /** KST dateKey("YYYY-MM-DD") → 그날 일기들(시각 오름차순). */
+  days: Record<string, CalendarEntry[]>;
+}
+
+/**
+ * KST 한 달치 일기를 날짜별로 그룹핑해 반환. 캘린더 표식·그날 시트에 사용.
+ * 이미지/썸네일은 포함하지 않는다(시트는 무드뱃지+시각+발췌만 쓰므로 가벼움).
+ */
+export async function getDiariesForMonth(
+  userId: string,
+  year: number,
+  month: number,
+): Promise<CalendarMonthData> {
+  const { startUtc, endUtc } = kstMonthRangeUtc(year, month);
+  const rows = await prisma.diary.findMany({
+    where: { userId, createdAt: { gte: startUtc, lt: endUtc } },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      title: true,
+      content: true,
+      source: true,
+      mood: true,
+      createdAt: true,
+    },
+  });
+
+  const days: Record<string, CalendarEntry[]> = {};
+  for (const r of rows) {
+    const key = kstDateKey(r.createdAt);
+    (days[key] ??= []).push({
+      id: r.id,
+      title: r.title,
+      content: r.content,
+      source: r.source,
+      mood: r.mood,
+      createdAt: r.createdAt.toISOString(),
+    });
+  }
+  return { year, month, days };
 }
