@@ -265,7 +265,7 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
             maxHeight: collapsed ? 0 : 480,
             opacity: collapsed ? 0 : 1,
             transition:
-              "max-height var(--duration-base, 240ms) var(--ease-out, ease), opacity var(--duration-base, 240ms) var(--ease-out, ease)",
+              "max-height var(--duration-slow, 420ms) var(--ease-in-out, ease), opacity var(--duration-slow, 420ms) var(--ease-in-out, ease)",
           }}
         >
           {/* 요일 헤더 */}
