@@ -331,7 +331,8 @@ export function DiaryCalendar({ initialYear, initialMonth, initialDays }: Props)
                 margin: "0 0 var(--space-3)",
               }}
             >
-              {sheetDateLabel(openDate)} · {openEntries.length}편
+              {sheetDateLabel(openDate)}
+              {openEntries.length > 1 ? ` · ${openEntries.length}편` : ""}
             </h2>
             <div style={{ display: "flex", flexDirection: "column" }}>
               {openEntries.map((e) => (
