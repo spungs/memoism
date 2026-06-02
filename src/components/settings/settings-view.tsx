@@ -6,6 +6,7 @@ import { logoutAction, changePasswordAction, type ChangePasswordState } from "@/
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { PushToggle } from "@/components/settings/push-toggle";
+import { PageHeader } from "@/components/layout/page-header";
 
 const APP_VERSION = "v0.1.0";
 
@@ -131,21 +132,10 @@ export function SettingsView({ email }: SettingsViewProps) {
       style={{
         backgroundColor: "var(--paper-0)",
         minHeight: "100svh",
-        padding: "var(--space-6) var(--space-5) var(--space-10)",
+        padding: "0 var(--space-5) var(--space-10)",
       }}
     >
-      <h1
-        style={{
-          fontFamily: "var(--font-serif)",
-          fontSize: "var(--text-3xl)",
-          fontWeight: 700,
-          color: "var(--fg)",
-          letterSpacing: "var(--tracking-tight)",
-          margin: "0 0 var(--space-6)",
-        }}
-      >
-        설정
-      </h1>
+      <PageHeader title="설정" />
 
       <section
         style={{
