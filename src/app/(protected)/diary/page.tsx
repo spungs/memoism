@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Pencil } from "lucide-react";
 import { DiaryMonthView } from "@/components/diary/diary-month-view";
 import { getSession } from "@/lib/auth/session";
 import { getDiariesForMonth, getDiaryCounts } from "@/lib/diary/queries";
@@ -63,25 +61,6 @@ export default async function DiaryListPage() {
             총 {counts.total}개
           </p>
         </div>
-        <Link
-          href="/diary/new"
-          aria-label="새 일기 쓰기"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 44,
-            height: 44,
-            borderRadius: "var(--radius-pill)",
-            backgroundColor: "var(--fg)",
-            color: "var(--bg)",
-            textDecoration: "none",
-            boxShadow: "var(--shadow-sm)",
-            transition: "transform var(--duration-fast, 120ms) var(--ease-out, ease)",
-          }}
-        >
-          <Pencil size={18} aria-hidden />
-        </Link>
       </header>
 
       <DiaryMonthView initialYear={ty} initialMonth={tm} initialDays={monthData.days} />

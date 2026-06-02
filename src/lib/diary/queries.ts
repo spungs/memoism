@@ -225,6 +225,7 @@ export interface CalendarEntry {
   source: string;
   mood: string | null;
   createdAt: string; // ISO
+  thumbnailUrl: string | null; // 첫 사진 signed URL (없으면 null)
 }
 
 export interface CalendarMonthData {
@@ -235,8 +236,9 @@ export interface CalendarMonthData {
 }
 
 /**
- * KST 한 달치 일기를 날짜별로 그룹핑해 반환. 캘린더 표식·그날 시트에 사용.
- * 이미지/썸네일은 포함하지 않는다(시트는 무드뱃지+시각+발췌만 쓰므로 가벼움).
+ * KST 한 달치 일기를 날짜별로 그룹핑해 반환. 캘린더 표식·그 달 목록에 사용.
+ * 목록 카드 썸네일용으로 각 일기의 첫 사진 signed URL을 포함한다
+ * (그 달 전체 경로를 모아 batch 1회 서명 — getDiariesWithThumbnails와 동일 패턴).
  */
 export async function getDiariesForMonth(
   userId: string,
@@ -254,12 +256,25 @@ export async function getDiariesForMonth(
       source: true,
       mood: true,
       createdAt: true,
+      images: {
+        select: { storagePath: true },
+        orderBy: { orderIndex: "asc" },
+        take: 1,
+      },
     },
   });
+
+  // 본인 prefix 경로만 모아 batch 1회 서명 (cross-account 차단).
+  const prefix = `${userId}/`;
+  const paths = rows
+    .map((r) => r.images[0]?.storagePath)
+    .filter((p): p is string => !!p && p.startsWith(prefix));
+  const urlMap = await getSignedUrlsByPath(paths);
 
   const days: Record<string, CalendarEntry[]> = {};
   for (const r of rows) {
     const key = kstDateKey(r.createdAt);
+    const path = r.images[0]?.storagePath;
     (days[key] ??= []).push({
       id: r.id,
       title: r.title,
@@ -267,6 +282,7 @@ export async function getDiariesForMonth(
       source: r.source,
       mood: r.mood,
       createdAt: r.createdAt.toISOString(),
+      thumbnailUrl: path ? urlMap.get(path) ?? null : null,
     });
   }
   return { year, month, days };

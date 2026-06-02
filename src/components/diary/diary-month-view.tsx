@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { DiarySearchView } from "./diary-search-view";
 import { MoodBadge } from "./mood-badge";
@@ -225,16 +226,40 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
           }}
         >
           <button type="button" onClick={goPrev} aria-label="이전 달" style={navBtn}>‹</button>
-          <span
+          <div
             style={{
-              fontFamily: "var(--font-serif)",
-              fontSize: "var(--text-lg)",
-              fontWeight: 600,
-              color: "var(--fg)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 1,
+              lineHeight: 1.1,
             }}
           >
-            {year}년 {month}월
-          </span>
+            {/* 접혀 페이지 헤더('일기')가 사라진 뒤에도 화면 정체성 유지 */}
+            {collapsed && (
+              <span
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "var(--tracking-wider)",
+                  color: "var(--fg-subtle)",
+                }}
+              >
+                일기
+              </span>
+            )}
+            <span
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontSize: "var(--text-lg)",
+                fontWeight: 600,
+                color: "var(--fg)",
+              }}
+            >
+              {year}년 {month}월
+            </span>
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
             <button
               type="button"
@@ -444,6 +469,9 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
                     type="button"
                     onClick={() => router.push(`/diary/${e.id}`)}
                     style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "var(--space-3)",
                       textAlign: "left",
                       background: "var(--surface)",
                       border: "1px solid var(--border)",
@@ -453,33 +481,52 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
                       boxShadow: "var(--shadow-xs)",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: 4 }}>
-                      {e.mood && KNOWN_MOOD_KEYS.has(e.mood) ? (
-                        <MoodBadge mood={e.mood} size="sm" />
-                      ) : (
-                        <span aria-hidden style={{ fontSize: 14 }}>
-                          {e.source.startsWith("auto_") ? "📷" : "📝"}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: 4 }}>
+                        {e.mood && KNOWN_MOOD_KEYS.has(e.mood) ? (
+                          <MoodBadge mood={e.mood} size="sm" />
+                        ) : (
+                          <span aria-hidden style={{ fontSize: 14 }}>
+                            {e.source.startsWith("auto_") ? "📷" : "📝"}
+                          </span>
+                        )}
+                        <span style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-xs)", color: "var(--fg-subtle)" }}>
+                          {timeLabel(e.createdAt)}
                         </span>
-                      )}
-                      <span style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-xs)", color: "var(--fg-subtle)" }}>
-                        {timeLabel(e.createdAt)}
-                      </span>
+                      </div>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontFamily: "var(--font-serif)",
+                          fontSize: "var(--text-sm)",
+                          color: "var(--fg)",
+                          lineHeight: "var(--leading-relaxed)",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {e.title?.trim() || snippet(e.content)}
+                      </p>
                     </div>
-                    <p
-                      style={{
-                        margin: 0,
-                        fontFamily: "var(--font-serif)",
-                        fontSize: "var(--text-sm)",
-                        color: "var(--fg)",
-                        lineHeight: "var(--leading-relaxed)",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {e.title?.trim() || snippet(e.content)}
-                    </p>
+                    {e.thumbnailUrl && (
+                      <Image
+                        src={e.thumbnailUrl}
+                        alt=""
+                        width={64}
+                        height={64}
+                        sizes="64px"
+                        style={{
+                          flexShrink: 0,
+                          width: 64,
+                          height: 64,
+                          objectFit: "cover",
+                          borderRadius: "var(--radius-md)",
+                          border: "1px solid var(--border)",
+                        }}
+                      />
+                    )}
                   </button>
                 ))}
               </div>
