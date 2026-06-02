@@ -87,7 +87,7 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
       style={{
         display: "flex",
         flexDirection: "column",
-        height: "calc(100svh - 56px)",
+        height: "calc(100svh - 56px - env(safe-area-inset-bottom))",
         backgroundColor: "var(--bg)",
       }}
     >
