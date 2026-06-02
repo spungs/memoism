@@ -214,6 +214,28 @@ export async function getSignedUrls(
 }
 
 /**
+ * 여러 path의 signed URL을 batch 1회 호출로 발급 (개별 N회 대비 네트워크 비용 절감).
+ * path → signedUrl Map 반환. 실패/누락 path는 Map에 없음(caller가 null fallback).
+ */
+export async function getSignedUrlsByPath(
+  storagePaths: string[],
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (storagePaths.length === 0) return map;
+  const { data, error } = await getClient()
+    .storage.from(BUCKET)
+    .createSignedUrls(storagePaths, SIGNED_URL_TTL_SECONDS);
+  if (error || !data) {
+    console.warn(`[storage] getSignedUrlsByPath failed:`, error?.message);
+    return map;
+  }
+  for (const item of data) {
+    if (item.path && item.signedUrl) map.set(item.path, item.signedUrl);
+  }
+  return map;
+}
+
+/**
  * Owner-scoped signed URL 발급. storagePath가 `{ownerId}/`로 시작하는지 검증해
  * 다른 사용자의 storagePath에 대한 cross-account 접근을 차단한다.
  * 검증 실패한 path는 null로 반환 (순서 보존).

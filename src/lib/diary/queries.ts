@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { getSignedUrl } from "@/lib/storage";
+import { getSignedUrl, getSignedUrlsByPath } from "@/lib/storage";
 import { kstDateKey, kstMonthRangeUtc } from "@/lib/diary/kst";
 
 const DEFAULT_TAKE = 20;
@@ -205,16 +205,16 @@ export async function getDiariesWithThumbnails(
 ): Promise<DiariesPage<DiaryListItemWithThumbnail>> {
   const page = await getDiaries(userId, opts);
   const prefix = `${userId}/`;
-  const items = await Promise.all(
-    page.items.map(async (d): Promise<DiaryListItemWithThumbnail> => {
-      const path = d.images[0]?.storagePath;
-      if (!path || !path.startsWith(prefix)) {
-        return { ...d, thumbnailUrl: null };
-      }
-      const url = await getSignedUrl(path);
-      return { ...d, thumbnailUrl: url };
-    }),
-  );
+  // 썸네일 signed URL을 개별 호출(N회) 대신 batch 1회로 — 목록 로딩 병목 해소.
+  const paths = page.items
+    .map((d) => d.images[0]?.storagePath)
+    .filter((p): p is string => !!p && p.startsWith(prefix));
+  const urlMap = await getSignedUrlsByPath(paths);
+  const items = page.items.map((d): DiaryListItemWithThumbnail => {
+    const path = d.images[0]?.storagePath;
+    const thumbnailUrl = path ? urlMap.get(path) ?? null : null;
+    return { ...d, thumbnailUrl };
+  });
   return { items, nextCursor: page.nextCursor };
 }
 
