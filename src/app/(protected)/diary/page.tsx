@@ -1,60 +1,23 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Pencil } from "lucide-react";
-import { DiaryListWithSearch } from "@/components/diary/diary-list-with-search";
-import { DiaryViewToggle } from "@/components/diary/diary-view-toggle";
-import { DiaryCalendar } from "@/components/diary/diary-calendar";
+import { DiaryMonthView } from "@/components/diary/diary-month-view";
 import { getSession } from "@/lib/auth/session";
-import {
-  getDiariesWithThumbnails,
-  getDiariesForMonth,
-  getDiaryCounts,
-} from "@/lib/diary/queries";
+import { getDiariesForMonth, getDiaryCounts } from "@/lib/diary/queries";
 import { kstTodayKey } from "@/lib/diary/kst";
 
 export const metadata = { title: "일기" };
 
-export default async function DiaryListPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ view?: string }>;
-}) {
+export default async function DiaryListPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const { view } = await searchParams;
-  const isCalendar = view === "calendar";
-
-  let total: number;
-  let body: React.ReactNode;
-
-  if (isCalendar) {
-    const [ty, tm] = kstTodayKey().split("-").map(Number);
-    const [monthData, counts] = await Promise.all([
-      getDiariesForMonth(session.userId, ty, tm),
-      getDiaryCounts(session.userId),
-    ]);
-    total = counts.total;
-    body = (
-      <DiaryCalendar initialYear={ty} initialMonth={tm} initialDays={monthData.days} />
-    );
-  } else {
-    const page = await getDiariesWithThumbnails(session.userId, { take: 50 });
-    const initialData = {
-      nextCursor: page.nextCursor,
-      items: page.items.map((d) => ({
-        id: d.id,
-        title: d.title,
-        content: d.content,
-        thumbnailUrl: d.thumbnailUrl,
-        mood: d.mood,
-        source: d.source,
-        createdAt: d.createdAt.toISOString(),
-      })),
-    };
-    total = initialData.items.length;
-    body = <DiaryListWithSearch initialData={initialData} />;
-  }
+  // 통합 뷰: 검색창 + 접히는 월 달력 + 그 달 목록. 초기 월(이번 달)은 서버 prefetch.
+  const [ty, tm] = kstTodayKey().split("-").map(Number);
+  const [monthData, counts] = await Promise.all([
+    getDiariesForMonth(session.userId, ty, tm),
+    getDiaryCounts(session.userId),
+  ]);
 
   return (
     <main
@@ -97,7 +60,7 @@ export default async function DiaryListPage({
               letterSpacing: "var(--tracking-wide)",
             }}
           >
-            총 {total}개
+            총 {counts.total}개
           </p>
         </div>
         <Link
@@ -121,11 +84,7 @@ export default async function DiaryListPage({
         </Link>
       </header>
 
-      <div style={{ marginBottom: "var(--space-5)", padding: "0 var(--space-1)" }}>
-        <DiaryViewToggle active={isCalendar ? "calendar" : "list"} />
-      </div>
-
-      {body}
+      <DiaryMonthView initialYear={ty} initialMonth={tm} initialDays={monthData.days} />
     </main>
   );
 }
