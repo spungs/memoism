@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Send } from "lucide-react";
 
 type Role = "user" | "assistant";
-type Message = { id: string; role: Role; content: string };
+type RelatedDiary = { id: string; title: string; createdAt: string };
+type Message = { id: string; role: Role; content: string; relatedDiaries?: RelatedDiary[] };
 
 // 빈 화면에서 탭하면 바로 전송되는 예시 질문 (메이가 먼저 건네는 첫 대화 가이드)
 const EXAMPLE_QUESTIONS = [
@@ -19,6 +21,7 @@ interface Props {
 }
 
 export function CharacterChat({ characterName, initialMessages }: Props) {
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -64,6 +67,7 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
           id: `local-${Date.now()}-a`,
           role: "assistant",
           content: data.message,
+          relatedDiaries: data.relatedDiaries,
         },
       ]);
     } catch (e) {
@@ -172,9 +176,60 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
           </>
         )}
         {messages.map((m) => (
-          <Bubble key={m.id} role={m.role}>
-            {m.content}
-          </Bubble>
+          <div key={m.id}>
+            <Bubble role={m.role}>{m.content}</Bubble>
+            {m.role === "assistant" && m.relatedDiaries && m.relatedDiaries.length > 0 && (
+              <div style={{ marginTop: "var(--space-2)" }}>
+                <p
+                  style={{
+                    margin: "0 0 var(--space-1) 0",
+                    fontFamily: "var(--font-sans)",
+                    fontSize: "var(--text-xs)",
+                    color: "var(--fg-subtle)",
+                  }}
+                >
+                  관련된 일기
+                </p>
+                <div
+                  className="hide-scrollbar"
+                  style={{
+                    display: "flex",
+                    overflowX: "auto",
+                    gap: "var(--space-2)",
+                  }}
+                >
+                  {m.relatedDiaries.map((d) => {
+                    const dateLabel = new Date(d.createdAt).toLocaleDateString("ko-KR", {
+                      month: "long",
+                      day: "numeric",
+                    });
+                    const titlePart = d.title?.trim() ? ` · ${d.title}` : "";
+                    return (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => router.push(`/diary/${d.id}`)}
+                        style={{
+                          backgroundColor: "var(--surface-raised)",
+                          border: "1px solid var(--border)",
+                          borderRadius: "var(--radius-pill)",
+                          fontFamily: "var(--font-sans)",
+                          fontSize: "var(--text-sm)",
+                          color: "var(--fg)",
+                          padding: "6px var(--space-3)",
+                          whiteSpace: "nowrap",
+                          cursor: "pointer",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {dateLabel}{titlePart}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         ))}
         {sending && (
           <Bubble role="assistant" muted>

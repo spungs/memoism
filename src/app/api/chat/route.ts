@@ -239,6 +239,13 @@ export async function POST(req: NextRequest) {
     }),
   ]);
 
+  const RELATED_CHIP_THRESHOLD = 0.7;
+  const RELATED_CHIP_MAX = 3;
+  const relatedDiaries = relatedHits
+    .filter((h) => h.similarity >= RELATED_CHIP_THRESHOLD)
+    .slice(0, RELATED_CHIP_MAX)
+    .map((h) => ({ id: h.id, title: h.title, createdAt: h.createdAt.toISOString() }));
+
   await captureServer("chat_message_sent", session.userId, {
     message_length: userMessage.length,
     rag_hits: relatedHits.length,
@@ -247,5 +254,6 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     message: assistantText,
     capRemaining: cap.remaining,
+    relatedDiaries,
   });
 }
