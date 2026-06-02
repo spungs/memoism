@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { DiarySearchView } from "./diary-search-view";
+import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 import { MoodBadge } from "./mood-badge";
 import { MOODS, KNOWN_MOOD_KEYS } from "./mood-data";
 import { kstTodayKey } from "@/lib/diary/kst";
@@ -93,6 +94,7 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [pendingDate, setPendingDate] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string>(() =>
     initialYear === ty && initialMonth === tm
       ? todayKey
@@ -187,7 +189,9 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
     setSelectedKey(key);
     const entries = days[key];
     if (!entries || entries.length === 0) {
-      router.push(`/diary/new?date=${key}`);
+      // 오늘 빈 날은 바로 작성, 과거 빈 날은 실수 진입 방지로 확인 후 이동.
+      if (key === todayKey) router.push(`/diary/new?date=${key}`);
+      else setPendingDate(key);
       return;
     }
     // 먼저 접어 sticky 높이를 고정(scrollMarginTop 정합) + 전환-스크롤 경합 제거 후 스크롤.
@@ -200,6 +204,9 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
   }
 
   const cells = buildCells(year, month);
+  // 주 단위로 끊어 role="row"로 감싼다 (ARIA grid > row > gridcell 구조).
+  const weeks: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
 
   // 그 달 목록 — 날짜 내림차순.
   const dayKeys = Object.keys(days).sort().reverse();
@@ -316,73 +323,86 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
           <div
             role="grid"
             style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(7, 1fr)",
+              display: "flex",
+              flexDirection: "column",
               gap: GAP,
             }}
           >
-            {cells.map((day, i) => {
-              if (day == null) return <div key={`b${i}`} style={{ height: ROW }} />;
-              const key = cellKey(year, month, day);
-              const entries = days[key] ?? [];
-              const isToday = key === todayKey;
-              const isSelected = key === selectedKey;
-              const isFuture = key > todayKey;
-              const aria = isFuture
-                ? `${month}월 ${day}일, 미래`
-                : `${month}월 ${day}일, 일기 ${entries.length}개`;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  role="gridcell"
-                  aria-label={aria}
-                  aria-disabled={isFuture}
-                  onClick={() => onDayTap(day)}
-                  style={{
-                    height: ROW,
-                    border: isSelected ? "1px solid var(--accent-rose)" : "1px solid transparent",
-                    borderRadius: "var(--radius-md)",
-                    background: entries.length
-                      ? "color-mix(in srgb, var(--accent-rose) 5%, transparent)"
-                      : isToday
-                        ? "var(--accent-rose-soft)"
-                        : "transparent",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 4,
-                    cursor: isFuture ? "default" : "pointer",
-                    opacity: loading ? 0.5 : 1,
-                    transition: "opacity var(--duration-base, 200ms) var(--ease-out, ease)",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: "var(--font-sans)",
-                      fontSize: "var(--text-sm)",
-                      fontWeight: isToday ? 600 : 400,
-                      color: isFuture
-                        ? "var(--border-strong)"
-                        : isToday
-                          ? "var(--accent-rose-deep)"
-                          : "var(--fg)",
-                    }}
-                  >
-                    {day}
-                  </span>
-                  <span style={{ display: "flex", gap: 3, height: 5 }}>
-                    {entries.slice(0, 2).map((e) => (
+            {weeks.map((week, wi) => (
+              <div
+                role="row"
+                key={`w${wi}`}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, 1fr)",
+                  gap: GAP,
+                }}
+              >
+                {week.map((day, di) => {
+                  if (day == null)
+                    return <div role="gridcell" key={`b${wi}-${di}`} style={{ height: ROW }} />;
+                  const key = cellKey(year, month, day);
+                  const entries = days[key] ?? [];
+                  const isToday = key === todayKey;
+                  const isSelected = key === selectedKey;
+                  const isFuture = key > todayKey;
+                  const aria = isFuture
+                    ? `${month}월 ${day}일, 미래`
+                    : `${month}월 ${day}일, 일기 ${entries.length}개`;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="gridcell"
+                      aria-label={aria}
+                      aria-disabled={isFuture}
+                      onClick={() => onDayTap(day)}
+                      style={{
+                        height: ROW,
+                        border: isSelected ? "1px solid var(--accent-rose)" : "1px solid transparent",
+                        borderRadius: "var(--radius-md)",
+                        background: entries.length
+                          ? "color-mix(in srgb, var(--accent-rose) 5%, transparent)"
+                          : isToday
+                            ? "var(--accent-rose-soft)"
+                            : "transparent",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 4,
+                        cursor: isFuture ? "default" : "pointer",
+                        opacity: loading ? 0.5 : 1,
+                        transition: "opacity var(--duration-base, 200ms) var(--ease-out, ease)",
+                      }}
+                    >
                       <span
-                        key={e.id}
-                        style={{ width: 5, height: 5, borderRadius: "50%", backgroundColor: dotColor(e) }}
-                      />
-                    ))}
-                  </span>
-                </button>
-              );
-            })}
+                        style={{
+                          fontFamily: "var(--font-sans)",
+                          fontSize: "var(--text-sm)",
+                          fontWeight: isToday ? 600 : 400,
+                          color: isFuture
+                            ? "var(--border-strong)"
+                            : isToday
+                              ? "var(--accent-rose-deep)"
+                              : "var(--fg)",
+                        }}
+                      >
+                        {day}
+                      </span>
+                      <span style={{ display: "flex", gap: 3, height: 5 }}>
+                        {entries.slice(0, 2).map((e) => (
+                          <span
+                            key={e.id}
+                            style={{ width: 5, height: 5, borderRadius: "50%", backgroundColor: dotColor(e) }}
+                          />
+                        ))}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -534,6 +554,17 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
           ))}
         </div>
       )}
+
+      <ConfirmSheet
+        isOpen={pendingDate != null}
+        onClose={() => setPendingDate(null)}
+        onConfirm={() => {
+          if (pendingDate) router.push(`/diary/new?date=${pendingDate}`);
+        }}
+        title={pendingDate ? dayLabel(pendingDate) : ""}
+        description="이 날짜로 새 일기를 쓸까요?"
+        confirmLabel="쓰기"
+      />
     </div>
   );
 }
