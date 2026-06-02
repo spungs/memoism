@@ -20,12 +20,9 @@ const MOOD_DOT_COLOR: Record<string, string> = Object.fromEntries(
   MOODS.map((m) => [m.key, m.color]),
 );
 
-// 그리드 셀 행 높이/간격 — 접힘 시 활성 주(week) 한 줄만 보이게 translate 계산에 사용.
+// 그리드 셀 행 높이/간격.
 const ROW = 56;
 const GAP = 4;
-const WEEK_PITCH = ROW + GAP;
-// 이 픽셀 이상 스크롤하면 달력을 활성 주 한 줄로 접는다.
-const COLLAPSE_THRESHOLD = 72;
 
 function cellKey(y: number, m: number, d: number): string {
   return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -112,7 +109,13 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
-        setCollapsed(window.scrollY > COLLAPSE_THRESHOLD);
+        // 히스테리시스: 접힘 80 / 펼침 40 으로 경계 떨림 방지.
+        setCollapsed((prev) => {
+          const y = window.scrollY;
+          if (!prev && y > 80) return true;
+          if (prev && y < 40) return false;
+          return prev;
+        });
       });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -196,19 +199,6 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
   }
 
   const cells = buildCells(year, month);
-  const weeksCount = cells.length / 7;
-  const fullHeight = weeksCount * ROW + (weeksCount - 1) * GAP;
-
-  // 활성 주: selectedKey가 이 달이면 그 날이 속한 주, 아니면 0.
-  const [sy, sm, sd] = selectedKey.split("-").map(Number);
-  const firstWeekday = new Date(year, month - 1, 1).getDay();
-  const activeWeekIndex =
-    sy === year && sm === month
-      ? Math.floor((firstWeekday + (sd - 1)) / 7)
-      : 0;
-
-  const gridHeight = collapsed ? ROW : fullHeight;
-  const gridTranslate = collapsed ? -(activeWeekIndex * WEEK_PITCH) : 0;
 
   // 그 달 목록 — 날짜 내림차순.
   const dayKeys = Object.keys(days).sort().reverse();
@@ -268,41 +258,42 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
           </div>
         </div>
 
-        {/* 요일 헤더 */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: "var(--space-2)" }}>
-          {WEEKDAYS.map((w, i) => (
-            <span
-              key={w}
-              style={{
-                textAlign: "center",
-                fontFamily: "var(--font-sans)",
-                fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: "var(--tracking-wider)",
-                color: i === 0 ? "var(--danger)" : i === 6 ? "#4a90d9" : "var(--fg-subtle)",
-              }}
-            >
-              {w}
-            </span>
-          ))}
-        </div>
-
-        {/* 그리드 (접힘: 활성 주만) */}
+        {/* 접히는 영역: 요일 헤더 + 그리드 (접힘 시 월 바만 남고 닫힘) */}
         <div
           style={{
             overflow: "hidden",
-            height: gridHeight,
-            transition: "height 220ms var(--ease-out, ease)",
+            maxHeight: collapsed ? 0 : 480,
+            opacity: collapsed ? 0 : 1,
+            transition:
+              "max-height var(--duration-base, 240ms) var(--ease-out, ease), opacity var(--duration-base, 240ms) var(--ease-out, ease)",
           }}
         >
+          {/* 요일 헤더 */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: "var(--space-2)" }}>
+            {WEEKDAYS.map((w, i) => (
+              <span
+                key={w}
+                style={{
+                  textAlign: "center",
+                  fontFamily: "var(--font-sans)",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "var(--tracking-wider)",
+                  color: i === 0 ? "var(--danger)" : i === 6 ? "var(--info)" : "var(--fg-subtle)",
+                }}
+              >
+                {w}
+              </span>
+            ))}
+          </div>
+
+          {/* 그리드 */}
           <div
             role="grid"
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(7, 1fr)",
               gap: GAP,
-              transform: `translateY(${gridTranslate}px)`,
-              transition: "transform 220ms var(--ease-out, ease)",
             }}
           >
             {cells.map((day, i) => {
@@ -433,7 +424,7 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
           }}
         >
           {dayKeys.map((key) => (
-            <section key={key} id={`day-${key}`} style={{ scrollMarginTop: 132 }}>
+            <section key={key} id={`day-${key}`} style={{ scrollMarginTop: 64 }}>
               <h3
                 style={{
                   margin: "0 0 var(--space-2) 0",
