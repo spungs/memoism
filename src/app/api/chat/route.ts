@@ -53,9 +53,11 @@ function formatRecent(
   return diaries
     .map((d) => {
       const date = d.createdAt.toLocaleDateString("ko-KR", {
+        timeZone: "Asia/Seoul",
         year: "numeric",
         month: "long",
         day: "numeric",
+        weekday: "short",
       });
       const mood = d.mood ? ` [기분: ${d.mood}]` : "";
       const preview = d.content.slice(0, 200) + (d.content.length > 200 ? "…" : "");
@@ -70,9 +72,11 @@ function formatRelated(hits: RagSearchHit[], excludeIds: Set<string>): string {
   return filtered
     .map((h) => {
       const date = h.createdAt.toLocaleDateString("ko-KR", {
+        timeZone: "Asia/Seoul",
         year: "numeric",
         month: "long",
         day: "numeric",
+        weekday: "short",
       });
       const mood = h.mood ? ` [기분: ${h.mood}]` : "";
       const preview = h.content.slice(0, 200) + (h.content.length > 200 ? "…" : "");
@@ -99,9 +103,18 @@ function buildSystemPrompt(args: {
   const recentIds = new Set(recentDiaries.map((d) => d.id));
   const relatedSection = formatRelated(relatedHits, recentIds);
   const style = personaStyle(persona);
+  const todayLabel = new Date().toLocaleDateString("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "long",
+  });
 
   return `너는 "${characterName}"이야. 사용자의 일기를 함께 기억하는 AI 친구야.
 "${characterName}"는 너 자신(AI)의 이름이야. 절대 사용자를 "${characterName}"라고 부르지 마. 사용자의 이름은 모르니 이름이나 호칭으로 부르지 말고 자연스럽게 대화해.
+
+오늘은 ${todayLabel}이야. 날짜나 시점은 반드시 오늘을 기준으로 계산해.
 
 ## 사용자의 최근 일기 (현재 기준 최신):
 ${recentSection}
@@ -116,6 +129,8 @@ ${
 - ${style}.
 - 사용자의 말에 먼저 공감하고, 위 일기 중 직접 관련 있는 것만 자연스럽게 언급해 (억지 연결 금지).
 - 일기에 없는 사실은 단정하거나 꾸며내지 마.
+- '어제·그제·이번 주·지난주' 같은 상대적 시점 표현은 오늘 기준으로 실제로 맞을 때만 써라. 헷갈리면 '6월 1일'처럼 날짜로 말해. (예: 오늘이 수요일이면 이번 주 월요일은 '그제'이지 '지난주'가 아니야.)
+- 담백하고 자연스러운 구어체로 말해. 과장된 감탄이나 '~했었지/~였었네' 같은 어색한 말투는 피하고, 친한 친구에게 말하듯 편하게.
 - 한국어로만 대화해.
 - 이모지는 1개 이내로 자연스럽게.`;
 }
