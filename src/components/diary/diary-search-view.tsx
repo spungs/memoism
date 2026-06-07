@@ -117,7 +117,7 @@ export function DiarySearchView({ onActiveChange }: Props) {
           defaultValue=""
           onChange={(e) => setQuery(e.target.value)}
           onCompositionUpdate={(e) => setQuery(e.currentTarget.value)}
-          placeholder="단어로 검색 (예: 카페, 엄마, 제주도)"
+          placeholder="단어로 검색 (예: 카페, 가족, 제주도)"
           aria-label="일기 검색"
           style={{
             flex: 1,
