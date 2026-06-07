@@ -480,11 +480,11 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
                 borderRadius: "var(--radius-lg)",
                 backgroundColor:
                   highlightKey === key
-                    ? "color-mix(in srgb, var(--accent-rose) 9%, transparent)"
+                    ? "color-mix(in srgb, var(--accent-rose) 16%, transparent)"
                     : "transparent",
                 boxShadow:
                   highlightKey === key
-                    ? "0 0 0 1px color-mix(in srgb, var(--accent-rose) 22%, transparent), var(--shadow-sm)"
+                    ? "0 0 0 1.5px color-mix(in srgb, var(--accent-rose) 55%, transparent), var(--shadow-sm)"
                     : "none",
                 transition:
                   "background-color 0.45s var(--ease-out, ease), box-shadow 0.45s var(--ease-out, ease)",
