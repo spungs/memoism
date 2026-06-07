@@ -93,7 +93,8 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
   const [days, setDays] = useState(initialDays);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [highlightKey, setHighlightKey] = useState<string | null>(null);
   const [pendingDate, setPendingDate] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string>(() =>
     initialYear === ty && initialMonth === tm
@@ -105,15 +106,16 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
 
   const canGoNext = ym(year, month) < todayYm;
 
-  // 스크롤 연동 접힘: 일정 이상 내리면 달력이 활성 주 한 줄로 축소.
+  // 스크롤 플래그: 그리드가 위로 스크롤돼 사라지면 월 바에 '일기' 라벨을 띄운다.
+  // (그리드는 높이 애니메이션 없이 자연 스크롤 — 레이아웃 변화가 없어 overshoot 없음.)
   useEffect(() => {
     let raf = 0;
     const onScroll = () => {
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
-        // 히스테리시스: 접힘 80 / 펼침 40 으로 경계 떨림 방지.
-        setCollapsed((prev) => {
+        // 히스테리시스: 80 넘으면 스크롤됨 / 40 미만이면 해제 (경계 떨림 방지).
+        setScrolled((prev) => {
           const y = window.scrollY;
           if (!prev && y > 80) return true;
           if (prev && y < 40) return false;
@@ -129,15 +131,22 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
     };
   }, []);
 
+  // 날짜 탭으로 스크롤한 그날 섹션 하이라이트는 잠깐 보였다 사라진다.
+  useEffect(() => {
+    if (!highlightKey) return;
+    const t = setTimeout(() => setHighlightKey(null), 1500);
+    return () => clearTimeout(t);
+  }, [highlightKey]);
+
   async function loadMonth(y: number, m: number) {
     setYear(y);
     setMonth(m);
     setSelectedKey(y === ty && m === tm ? todayKey : cellKey(y, m, 1));
     setError(null);
     setLoading(true);
-    // 월 이동 시 맨 위로 → 달력 펼침 복원.
+    // 월 이동 시 맨 위로 → 달력 그리드 다시 보이게.
     window.scrollTo({ top: 0 });
-    setCollapsed(false);
+    setScrolled(false);
     const reqId = ++reqRef.current;
     try {
       const res = await fetch(
@@ -194,8 +203,8 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
       else setPendingDate(key);
       return;
     }
-    // 먼저 접어 sticky 높이를 고정(scrollMarginTop 정합) + 전환-스크롤 경합 제거 후 스크롤.
-    setCollapsed(true);
+    // 그날 섹션을 sticky 월 바 바로 아래로 스크롤 + 잠깐 하이라이트(도착 명확화).
+    setHighlightKey(key);
     requestAnimationFrame(() => {
       document
         .getElementById(`day-${key}`)
@@ -242,8 +251,8 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
               lineHeight: 1.1,
             }}
           >
-            {/* 접혀 페이지 헤더('일기')가 사라진 뒤에도 화면 정체성 유지 */}
-            {collapsed && (
+            {/* 스크롤돼 페이지 헤더('일기')가 사라진 뒤에도 화면 정체성 유지 */}
+            {scrolled && (
               <span
                 style={{
                   fontFamily: "var(--font-sans)",
@@ -289,17 +298,10 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
             </button>
           </div>
         </div>
+      </div>
 
-        {/* 접히는 영역: 요일 헤더 + 그리드 (접힘 시 월 바만 남고 닫힘) */}
-        <div
-          style={{
-            overflow: "hidden",
-            maxHeight: collapsed ? 0 : 480,
-            opacity: collapsed ? 0 : 1,
-            transition:
-              "max-height 400ms var(--ease-in-out, ease), opacity 400ms var(--ease-in-out, ease)",
-          }}
-        >
+      {/* 요일 헤더 + 그리드 — 일반 흐름이라 스크롤하면 월 바 뒤로 자연스럽게 사라진다. */}
+      <div style={{ paddingBottom: "var(--space-1)" }}>
           {/* 요일 헤더 */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: "var(--space-2)" }}>
             {WEEKDAYS.map((w, i) => (
@@ -404,7 +406,6 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
               </div>
             ))}
           </div>
-        </div>
       </div>
 
       {error && (
@@ -424,24 +425,22 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
         </p>
       )}
 
-      {/* 범례 (펼침일 때만) */}
-      {!collapsed && (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "var(--space-2) var(--space-4)",
-            margin: "var(--space-2) 0 var(--space-4)",
-            paddingTop: "var(--space-3)",
-            borderTop: "1px solid var(--border)",
-          }}
-        >
-          {MOODS.map((m) => (
-            <LegendItem key={m.key} color={m.color} label={m.label} />
-          ))}
-          <LegendItem color={NEUTRAL_DOT} label="미설정" hollow />
-        </div>
-      )}
+      {/* 범례 — 그리드와 함께 자연 스크롤 */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "var(--space-2) var(--space-4)",
+          margin: "var(--space-2) 0 var(--space-4)",
+          paddingTop: "var(--space-3)",
+          borderTop: "1px solid var(--border)",
+        }}
+      >
+        {MOODS.map((m) => (
+          <LegendItem key={m.key} color={m.color} label={m.label} />
+        ))}
+        <LegendItem color={NEUTRAL_DOT} label="미설정" hollow />
+      </div>
 
       {/* 그 달 목록 */}
       {dayKeys.length === 0 ? (
@@ -469,7 +468,20 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
           }}
         >
           {dayKeys.map((key) => (
-            <section key={key} id={`day-${key}`} style={{ scrollMarginTop: 64 }}>
+            <section
+              key={key}
+              id={`day-${key}`}
+              style={{
+                scrollMarginTop: 64,
+                borderRadius: "var(--radius-md)",
+                backgroundColor:
+                  highlightKey === key ? "var(--accent-rose-soft)" : "transparent",
+                boxShadow:
+                  highlightKey === key ? "0 0 0 2px var(--accent-rose)" : "none",
+                transition:
+                  "background-color 0.8s var(--ease-out, ease), box-shadow 0.8s var(--ease-out, ease)",
+              }}
+            >
               <h3
                 style={{
                   margin: "0 0 var(--space-2) 0",
