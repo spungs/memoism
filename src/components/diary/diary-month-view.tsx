@@ -134,7 +134,7 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
   // 날짜 탭으로 스크롤한 그날 섹션 하이라이트는 잠깐 보였다 사라진다.
   useEffect(() => {
     if (!highlightKey) return;
-    const t = setTimeout(() => setHighlightKey(null), 1500);
+    const t = setTimeout(() => setHighlightKey(null), 2400);
     return () => clearTimeout(t);
   }, [highlightKey]);
 
@@ -473,13 +473,21 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
               id={`day-${key}`}
               style={{
                 scrollMarginTop: 64,
-                borderRadius: "var(--radius-md)",
+                // 상시 패딩 + 동일 음수 마진 → 콘텐츠 위치·섹션 간격 불변, 하이라이트 박스만 바깥으로 확장.
+                // 가로는 space-2(8px): 카드보다 넓히되 페이지 셸(가로 space-4)을 넘지 않아 overflow 없음.
+                padding: "var(--space-3) var(--space-2)",
+                margin: "calc(-1 * var(--space-3)) calc(-1 * var(--space-2))",
+                borderRadius: "var(--radius-lg)",
                 backgroundColor:
-                  highlightKey === key ? "var(--accent-rose-soft)" : "transparent",
+                  highlightKey === key
+                    ? "color-mix(in srgb, var(--accent-rose) 9%, transparent)"
+                    : "transparent",
                 boxShadow:
-                  highlightKey === key ? "0 0 0 2px var(--accent-rose)" : "none",
+                  highlightKey === key
+                    ? "0 0 0 1px color-mix(in srgb, var(--accent-rose) 22%, transparent), var(--shadow-sm)"
+                    : "none",
                 transition:
-                  "background-color 0.8s var(--ease-out, ease), box-shadow 0.8s var(--ease-out, ease)",
+                  "background-color 0.45s var(--ease-out, ease), box-shadow 0.45s var(--ease-out, ease)",
               }}
             >
               <h3
