@@ -536,6 +536,79 @@ export function ReviewGate() {
           )}
         </section>
 
+        {/* 내가 쓴 원본 — 모드 B/C에서만. AI가 다듬으며 내 글이 줄었을 때
+            한 탭으로 원본을 되살릴 안전망. (text는 sessionStorage에 보존돼 있음) */}
+        {draftState.text && (
+          <section
+            style={{
+              backgroundColor: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              padding: "var(--space-3) var(--space-4)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--space-2)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "space-between",
+                gap: "var(--space-2)",
+              }}
+            >
+              <p
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-xs)",
+                  color: "var(--fg-subtle)",
+                  letterSpacing: "var(--tracking-wider)",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  margin: 0,
+                }}
+              >
+                내가 쓴 원본
+              </p>
+              <button
+                type="button"
+                onClick={() => setEditedContent(draftState.text ?? "")}
+                disabled={pending || regenerating}
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-sm)",
+                  fontWeight: 600,
+                  color:
+                    pending || regenerating
+                      ? "var(--fg-subtle)"
+                      : "var(--fg-muted)",
+                  backgroundColor: "var(--bg)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-md)",
+                  padding: "6px 12px",
+                  cursor: pending || regenerating ? "default" : "pointer",
+                  flexShrink: 0,
+                }}
+              >
+                이걸로 되돌리기
+              </button>
+            </div>
+            <p
+              style={{
+                whiteSpace: "pre-wrap",
+                fontFamily: "var(--font-serif)",
+                fontSize: "var(--text-md)",
+                lineHeight: "var(--leading-relaxed)",
+                color: "var(--fg-muted)",
+                margin: 0,
+              }}
+            >
+              {draftState.text}
+            </p>
+          </section>
+        )}
+
         {/* Story 영역 — AI 생성 본문 (수정 가능) */}
         <div
           style={{

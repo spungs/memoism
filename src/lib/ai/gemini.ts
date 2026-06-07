@@ -149,9 +149,12 @@ export type DiaryGenerationOutput = {
   suggestedMood: "joy" | "calm" | "sad" | "love" | "anger" | "tired" | null;
 };
 
+// content max는 사용자 입력 텍스트 상한(MAX_TEXT_LENGTH 2000) + 사진 사실 보강
+// 여유를 합쳐 3000자. 모드 B/C(사용자가 쓴 글 보존)에서 긴 원본이 잘리지 않게
+// 한다. 모드 A(사진→생성)는 프롬프트가 150~250자로 짧게 유도.
 const draftResponseSchema = z.object({
   title: z.string().trim().min(1).max(50),
-  content: z.string().trim().min(20).max(500),
+  content: z.string().trim().min(1).max(3000),
   suggestedMood: z
     .enum(["joy", "calm", "sad", "love", "anger", "tired"])
     .nullable(),
@@ -161,6 +164,7 @@ function buildDiarySystemPrompt(
   mode: DiaryGenerationMode,
   persona: DiaryGenerationPersona | undefined,
   exifSummary: string | undefined,
+  userTextLength: number,
 ): string {
   // 베타 기본 preset은 "factual" — 담백한 사실 중심 평서문('~했다'체).
   // (UserPersona UI는 V2 노출 예정. 그때 다른 preset에서 tone/formality 기반으로 확장.)
@@ -172,13 +176,22 @@ function buildDiarySystemPrompt(
 - 일어난 일을 시간 순서대로 간결히 적는다. 구어체 말투('~했어/~했지/~네')·느낌표·과장된 감탄은 쓰지 않는다. 느낀 점도 담백한 평서문으로 적는다('아쉬웠다'처럼).`
       : `- ${formality}, ${tone} 톤.`;
 
+  // 길이 규칙은 모드에 따라 다르다.
+  //  - 사용자가 쓴 글이 있으면(B/C): 그 분량을 바닥값으로 보존, 요약 금지.
+  //    "짧게 고정"이 사용자가 쓴 생각·과정을 잘라먹던 문제(2026-06-07)를 막는다.
+  //  - 사진만(A): 사진→생성이라 150~250자로 짧게 유도.
+  const lengthLine =
+    userTextLength > 0
+      ? `- 본문은 한국어 1인칭. 사용자가 쓴 메모(약 ${userTextLength}자)의 문장과 분량을 그대로 보존한다 — 절대 요약하지 말고, 사용자가 쓴 것보다 짧아지지 않게 한다. 오탈자 교정·사진 사실 보강으로 분량이 비슷하거나 조금 길어지는 정도는 괜찮다(최대 3000자).`
+      : `- 본문은 한국어 1인칭, 150~250자 (공백 포함).`;
+
   const common = `## 출력 규칙
-- 본문은 한국어 1인칭, 150~250자 (공백 포함).
+${lengthLine}
 ${styleLines}
 - 시간 표기는 일반적인 일기처럼 자연스럽게: 분 단위 시각('14시 08분', '오후 2시 8분')은 쓰지 않는다. 시간을 꼭 드러내야 할 땐 '오전/오후', '아침/점심/저녁', '○시쯤' 정도로만 쓰고, 보통은 시각 없이 일어난 일을 자연스럽게 이어서 적는다('~하고 ~했다. 그리고 ~했다').
 - 환각 금지: 입력(사진·메모·EXIF)에 없는 사실·디테일·없는 사람·꾸며낸 대화·과장된 감정 추가 금지.
 - 응답은 JSON 객체 하나만. 코드블록·머리말·꼬리말 없음.
-- 스키마: { "title": string(1~50자), "content": string(20~500자), "suggestedMood": "joy"|"calm"|"sad"|"love"|"anger"|"tired"|null }`;
+- 스키마: { "title": string(1~50자), "content": string(1~3000자), "suggestedMood": "joy"|"calm"|"sad"|"love"|"anger"|"tired"|null }`;
 
   const exif = exifSummary
     ? `\n## EXIF 사실 (이건 진짜로 일어난 것):\n${exifSummary}\n`
@@ -203,8 +216,8 @@ ${common}`;
 
 ${common}`;
     case "C":
-      return `너는 사용자의 메모와 첨부 사진을 통합해 일기 본문을 만든다.${exif}${chronological}
-사용자 메모의 의미를 핵심으로 유지하면서 사진의 사실(시간·장소·관찰 가능한 객체)을 자연스럽게 녹여라. 메모·사진에 없는 디테일·인물·대화 추가 금지.
+      return `너는 사용자가 쓴 일기를 존중하며 다듬는 도우미다. 사용자가 직접 쓴 메모가 일기의 핵심이고, 사진은 보조 자료다.${exif}${chronological}
+사용자가 쓴 문장·디테일·생각·과정·감정은 그대로 보존한다. 오탈자·띄어쓰기·어색한 문장 흐름만 다듬어라. 사진의 사실(시간·장소·관찰 가능한 객체)은 사용자가 빠뜨린 부분에만 자연스럽게 보강한다. 사용자가 쓴 내용을 요약하거나 삭제하지 마라. 메모·사진에 없는 디테일·인물·대화는 추가하지 마라.
 
 ${common}`;
   }
@@ -232,6 +245,7 @@ export async function generateDiary(
     input.mode,
     input.persona,
     input.exifSummary,
+    input.text?.trim().length ?? 0,
   );
 
   const parts: Array<
@@ -260,7 +274,9 @@ export async function generateDiary(
         config: {
           systemInstruction: systemPrompt,
           temperature: 0.6,
-          maxOutputTokens: 1500,
+          // 보존 모드(B/C)에서 최대 3000자 본문이 끝까지 안 잘리게 여유.
+          // 한국어 ≈ 2자/토큰 → 3000자 ≒ 1500토큰 + 제목·JSON 래퍼 여유.
+          maxOutputTokens: 2048,
           responseMimeType: "application/json",
           // Gemini 2.5 Flash thinking 비활성. thinking 모델이 응답 토큰을 다 먹어
           // JSON 잘림 발생 → thinkingBudget 0으로 비-thinking 모드.
