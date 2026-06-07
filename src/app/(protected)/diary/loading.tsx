@@ -1,13 +1,10 @@
 export default function DiaryLoading() {
   return (
-    <main style={{ minHeight: '100vh', backgroundColor: 'var(--bg)', padding: 'var(--space-5) var(--space-4) var(--space-12)' }}>
-      {/* 헤더 */}
-      <header style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 'var(--space-6)', padding: '0 var(--space-1)' }}>
-        <div>
-          <div className="skeleton" style={{ width: 60, height: 32, marginBottom: 8 }} />
-          <div className="skeleton" style={{ width: 48, height: 14 }} />
-        </div>
-        <div className="skeleton" style={{ width: 44, height: 44, borderRadius: 'var(--radius-pill)' }} />
+    <div style={{ minHeight: '100vh', backgroundColor: 'var(--bg)', padding: '0 var(--space-4) var(--space-12)' }}>
+      {/* 헤더 (PageHeader 스켈레톤) */}
+      <header style={{ paddingTop: 'calc(var(--space-5) + env(safe-area-inset-top))', marginBottom: 'var(--space-4)' }}>
+        <div className="skeleton" style={{ width: 72, height: 36, marginBottom: 8 }} />
+        <div className="skeleton" style={{ width: 48, height: 14 }} />
       </header>
 
       {/* 일기 카드 목록 */}
@@ -21,6 +18,6 @@ export default function DiaryLoading() {
           </div>
         ))}
       </div>
-    </main>
+    </div>
   )
 }
