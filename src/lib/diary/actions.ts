@@ -7,6 +7,7 @@ import { getMaxImagesForUser } from "@/lib/character/queries";
 import { prisma } from "@/lib/db";
 import { deleteImage, saveImage } from "@/lib/storage";
 import { upsertDiaryEmbedding } from "./embedding";
+import { kstTodayKey } from "./kst";
 import {
   diaryInputSchema,
   moodKeySchema,
@@ -41,12 +42,20 @@ type ExifInput = {
   lng: number | null;
 };
 
+// createdAt은 "일기의 날짜(달력 칸)"와 "작성 시각(목록 표시)"을 겸한다.
+// Vercel은 UTC 환경이라 단순 "raw + T12:00:00"은 정오 UTC = 21:00 KST로 저장돼
+// 목록 시각이 늘 "오후 09:00"으로 보이고, 자정 직후엔 미래 가드가 오작동해
+// 날짜가 하루 밀렸다. 그래서 KST 날짜 기준으로 분기한다.
 function parseDiaryDate(raw: FormDataEntryValue | null): Date {
-  if (typeof raw !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(raw))
-    return new Date();
-  const d = new Date(raw + "T12:00:00");
-  if (isNaN(d.getTime())) return new Date();
-  return d > new Date() ? new Date() : d;
+  const now = new Date();
+  if (typeof raw !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return now;
+  // 오늘(KST) 선택 → 실제 작성 시각(real instant) 저장. 목록 시각이 정확하고
+  // kstDateKey로 오늘 칸에 정확히 버킷된다. (picker max=today지만 미래 입력도 now로 클램프.)
+  if (raw >= kstTodayKey()) return now;
+  // 과거 날짜 → 그 날 KST 정오로 앵커. 서버 TZ와 무관하게 같은 KST 날짜로 버킷되고,
+  // 항상 과거라 미래 가드 오작동·"정오 UTC=21:00 KST" 아티팩트가 사라진다.
+  const d = new Date(`${raw}T12:00:00+09:00`);
+  return isNaN(d.getTime()) ? now : d;
 }
 
 function parseMood(raw: FormDataEntryValue | null): MoodKey | null {

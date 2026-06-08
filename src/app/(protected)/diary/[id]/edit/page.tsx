@@ -3,6 +3,7 @@ import { DiaryForm } from "@/components/diary/diary-form";
 import { getSession } from "@/lib/auth/session";
 import { getMaxImagesForUser } from "@/lib/character/queries";
 import { getDiary } from "@/lib/diary/queries";
+import { kstDateKey } from "@/lib/diary/kst";
 import { moodKeySchema, type MoodKey } from "@/lib/diary/schemas";
 import { getSignedUrls } from "@/lib/storage";
 
@@ -28,7 +29,9 @@ export default async function DiaryEditPage({ params }: PageProps) {
 
   const maxImages = await getMaxImagesForUser(session.userId);
 
-  const diaryDate = diary.createdAt.toISOString().slice(0, 10);
+  // createdAt(UTC instant)을 KST 날짜로 변환해 date picker에 채운다.
+  // toISOString().slice(0,10)은 UTC 날짜라 자정 직후 일기가 하루 밀려 채워졌다.
+  const diaryDate = kstDateKey(diary.createdAt);
 
   // 기존 사진들의 signed URL 발급 (edit 모드 표시 + 개별 제거용).
   // id와 signed URL을 짝지어 전달하고, URL 발급 실패(null)한 항목은 제외한다.

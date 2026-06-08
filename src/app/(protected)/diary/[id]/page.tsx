@@ -10,11 +10,15 @@ import { getDiary } from "@/lib/diary/queries";
 import { getSignedUrls } from "@/lib/storage";
 
 const dateFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
   year: "numeric",
   month: "long",
   day: "numeric",
 });
-const weekdayFmt = new Intl.DateTimeFormat("ko-KR", { weekday: "long" });
+const weekdayFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  weekday: "long",
+});
 
 interface PageProps {
   params: Promise<{ id: string }>;

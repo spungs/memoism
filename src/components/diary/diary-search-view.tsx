@@ -25,6 +25,7 @@ interface Props {
 const DEBOUNCE_MS = 350;
 
 const monthDayFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
   month: "short",
   day: "numeric",
 });

@@ -48,6 +48,7 @@ function dotColor(entry: CalendarEntry): string {
 }
 function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString("ko-KR", {
+    timeZone: "Asia/Seoul",
     hour: "2-digit",
     minute: "2-digit",
   });

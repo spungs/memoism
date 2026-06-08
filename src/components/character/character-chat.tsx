@@ -200,6 +200,7 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
                 >
                   {m.relatedDiaries.map((d) => {
                     const dateLabel = new Date(d.createdAt).toLocaleDateString("ko-KR", {
+                      timeZone: "Asia/Seoul",
                       month: "long",
                       day: "numeric",
                     });

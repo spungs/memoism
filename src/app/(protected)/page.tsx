@@ -15,15 +15,20 @@ import {
 //   - 최근 일기 6개 (날짜·요일·2줄 발췌·썸네일 — /diary 카드와 동일 어휘)
 
 const todayLabelFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
   month: "long",
   day: "numeric",
   weekday: "short",
 });
 const dayFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
   month: "long",
   day: "numeric",
 });
-const weekdayFmt = new Intl.DateTimeFormat("ko-KR", { weekday: "short" });
+const weekdayFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  weekday: "short",
+});
 
 function snippet(content: string, n = 90): string {
   const plain = content
