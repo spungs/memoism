@@ -344,6 +344,11 @@
 
 html {
   -webkit-tap-highlight-color: transparent;
+  /* 고무줄 바운스·당겨서 새로고침 제거 — 웹 스크롤이 네이티브처럼 닫혀 보이게 */
+  overscroll-behavior: none;
+  /* 가로 회전 시 폰트 크기 자동 확대 방지 (네이티브 일관성) */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 @layer base {
@@ -359,10 +364,40 @@ html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    overscroll-behavior: none;
   }
   html {
     @apply font-sans;
   }
+}
+
+/* UI 크롬은 네이티브처럼 — 길게 눌러도 콜아웃/선택 메뉴 안 뜨고, 더블탭 줌·탭 지연 제거.
+   일기 본문·입력처럼 "내용"은 .selectable로 선택을 다시 허용한다. */
+button,
+a,
+[role="button"],
+nav,
+header,
+label {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+input,
+textarea,
+[contenteditable],
+.selectable {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* 이미지 드래그 고스트 방지 (네이티브엔 없는 웹 티) */
+img {
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 /* Mobile-first app shell */
@@ -372,6 +407,23 @@ html {
   min-height: 100svh;
   position: relative;
   background-color: var(--bg);
+  overscroll-behavior: none;
+}
+
+/* 페이지 전환 — 라우트 이동 시 콘텐츠가 살짝 떠오르며 페이드 인 (네이티브 push 느낌).
+   탭바·헤더는 고정, 본문만 움직인다. prefers-reduced-motion에서 자동 비활성. */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.page-enter {
+  animation: page-enter 280ms var(--ease-out);
 }
 
 /* Typography utilities — iOS 텍스트 스타일 매핑 */

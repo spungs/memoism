@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth/session'
 import { Identifier } from '@/components/analytics/identifier'
 import { BottomNav } from '@/components/nav/bottom-nav'
+import { PageTransition } from '@/components/layout/page-transition'
 
 export default async function ProtectedLayout({
   children,
@@ -12,7 +13,7 @@ export default async function ProtectedLayout({
   return (
     <>
       <main style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom))' }}>
-        {children}
+        <PageTransition>{children}</PageTransition>
       </main>
       <BottomNav />
       {session ? (
