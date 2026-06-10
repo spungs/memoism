@@ -382,40 +382,49 @@ export function DiaryForm({
       trimmedTitle || trimmedContent.split("\n")[0]?.slice(0, 60) || "일기";
 
     startTransition(async () => {
-      const { compressed, exifs } = await buildExifsAndCompress();
+      try {
+        const { compressed, exifs } = await buildExifsAndCompress();
 
-      const fd = new FormData();
-      fd.set("title", effectiveTitle);
-      fd.set("content", trimmedContent);
-      fd.set("source", "manual");
-      fd.set("mood", mood ?? "");
-      fd.set("date", date);
-      for (const f of compressed) fd.append("image", f);
-      fd.set("exifs", JSON.stringify(exifs.map(exifToWire)));
+        const fd = new FormData();
+        fd.set("title", effectiveTitle);
+        fd.set("content", trimmedContent);
+        fd.set("source", "manual");
+        fd.set("mood", mood ?? "");
+        fd.set("date", date);
+        for (const f of compressed) fd.append("image", f);
+        fd.set("exifs", JSON.stringify(exifs.map(exifToWire)));
 
-      if (mode === "edit") {
-        fd.set("removeImageIds", JSON.stringify(removedImageIds));
-      }
-
-      const result: DiaryActionResult =
-        mode === "create"
-          ? await createDiaryAction(fd)
-          : await updateDiaryAction(diaryId!, fd);
-
-      if (!result.ok) {
-        if (result.fieldErrors) {
-          for (const [k, msg] of Object.entries(result.fieldErrors)) {
-            if (k === "title") setTitleError(msg ?? null);
-            else if (k === "content") setContentError(msg ?? null);
-            else if (k === "image") setSubmitError(msg ?? "이미지 처리 중 오류가 발생했습니다");
-          }
+        if (mode === "edit") {
+          fd.set("removeImageIds", JSON.stringify(removedImageIds));
         }
-        if (result.error) setSubmitError(result.error);
-        return;
-      }
 
-      router.push(`/diary/${result.data.id}`);
-      router.refresh();
+        const result: DiaryActionResult =
+          mode === "create"
+            ? await createDiaryAction(fd)
+            : await updateDiaryAction(diaryId!, fd);
+
+        if (!result.ok) {
+          if (result.fieldErrors) {
+            for (const [k, msg] of Object.entries(result.fieldErrors)) {
+              if (k === "title") setTitleError(msg ?? null);
+              else if (k === "content") setContentError(msg ?? null);
+              else if (k === "image") setSubmitError(msg ?? "이미지 처리 중 오류가 발생했습니다");
+            }
+          }
+          if (result.error) setSubmitError(result.error);
+          return;
+        }
+
+        router.push(`/diary/${result.data.id}`);
+        router.refresh();
+      } catch {
+        // Server Action이 예외를 던지면(배포 스큐로 액션 ID 소멸·네트워크 단절 등)
+        // 잡지 않으면 에러 바운더리가 폼을 통째로 언마운트해 작성 내용이 사라진다.
+        // 여기서 잡아 폼·입력을 그대로 보존하고 재시도를 유도한다. ("작성한 일기 유실" 차단)
+        setSubmitError(
+          "저장 중 문제가 생겼어요. 작성한 내용은 그대로 있으니 잠시 후 다시 저장해주세요.",
+        );
+      }
     });
   };
 
