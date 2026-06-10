@@ -31,22 +31,40 @@ async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   ]);
 }
 
+// 유료(prepay) 결제 크레딧 소진은 429 RESOURCE_EXHAUSTED로 오지만, 분당 rate-limit·
+// 과부하와 달리 재시도해도 풀리지 않는 영구 장애다(운영자가 충전해야 함). 구분해 처리한다.
+// 실제 메시지 예: "Your prepayment credits are depleted. ... manage your project and billing."
+function isBillingDepleted(raw: string): boolean {
+  return /prepay|billing|depleted|insufficient.*credit|credit.*deplet/i.test(raw);
+}
+
 // 일시적 장애(503 과부하 / 429 한도 / 5xx)는 재시도 가치가 있다.
+// 단, 결제 크레딧 소진은 재시도해도 소용없으니 제외한다(괜한 backoff 지연만 발생).
 function isTransient(e: unknown): boolean {
   const raw = e instanceof Error ? e.message : String(e);
+  if (isBillingDepleted(raw)) return false;
   return /\b(503|500|502|504|429)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand|overloaded|deadline/i.test(
     raw,
   );
 }
 
 // SDK가 던지는 raw JSON 에러를 사용자에게 노출하지 않고 친근한 한국어로 정규화.
+// raw 원문은 서버 로그에 남긴다 — 친근한 메시지만 남으면 prod에서 "사용량이 많아요"가
+// 결제 소진인지 분당 한도인지 구분이 안 돼 진단이 불가능하다.
 function friendlyGeminiError(e: unknown): GeminiError {
   // 이미 우리가 만든 GeminiError(타임아웃·스키마 등)는 그대로 통과.
   if (e instanceof GeminiError) return e;
   const raw = e instanceof Error ? e.message : String(e);
+  console.error("[gemini] request failed:", raw);
   if (/\b(503|500|502|504)\b|UNAVAILABLE|high demand|overloaded/i.test(raw)) {
     return new GeminiError(
       "AI 서버가 잠시 혼잡해요. 잠시 후 다시 시도해주세요.",
+    );
+  }
+  // 결제 크레딧 소진 — 분당 한도가 아니라 잔액 0. 운영자 충전 전까지 풀리지 않는다.
+  if (isBillingDepleted(raw)) {
+    return new GeminiError(
+      "지금은 AI 기능을 사용할 수 없어요. 잠시 후 다시 시도해주세요.",
     );
   }
   if (/\b429\b|RESOURCE_EXHAUSTED|quota/i.test(raw)) {
