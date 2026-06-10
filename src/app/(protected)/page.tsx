@@ -7,6 +7,11 @@ import {
   getRecentDiaries,
   getTodayDiary,
 } from "@/lib/diary/queries";
+import {
+  KNOWN_MOOD_KEYS,
+  MOOD_COLOR,
+  type MoodKey,
+} from "@/components/diary/mood-data";
 
 // MIG-12 홈 재배치. 적은 일기 수에도 비어 보이지 않게:
 //   - 상단 헤더 (메모이즘 + 오늘 날짜)
@@ -60,6 +65,22 @@ export default async function HomePage() {
 
   const hasAny = counts.total > 0;
 
+  // 22시 리마인드 이후 밤 방문이 주 사용 맥락 — 시간대에 맞는 인사 (KST)
+  const kstHour = Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Seoul",
+      hour: "2-digit",
+      hour12: false,
+    }).format(new Date()),
+  );
+  const isNight = kstHour >= 21 || kstHour < 4;
+  const emptyTitle = isNight
+    ? "오늘도 수고했어요"
+    : "오늘 첫 줄, 시작해볼까?";
+  const emptySubtitle = isNight
+    ? "잠들기 전 잠깐, 오늘을 남겨볼까요? 사진만 있어도 AI가 정리해줘요."
+    : "사진만 있어도, 텍스트만 있어도 AI가 정리해줘요.";
+
   return (
     <div
       style={{
@@ -69,59 +90,67 @@ export default async function HomePage() {
         backgroundColor: "var(--bg)",
       }}
     >
-      {/* 헤더 */}
+      {/* 헤더 — iOS Large Title 위계 */}
       <header
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "var(--space-4) var(--space-5)",
-          paddingTop: "calc(var(--space-4) + env(safe-area-inset-top))",
+          padding: "var(--space-5) var(--space-5) var(--space-3)",
+          paddingTop: "calc(var(--space-5) + env(safe-area-inset-top))",
         }}
       >
-        <h1
+        <div
           style={{
-            fontFamily: "var(--font-serif)",
-            fontSize: "var(--text-xl)",
-            color: "var(--accent-rose-deep)",
-            margin: 0,
-            letterSpacing: "var(--tracking-tight)",
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
           }}
         >
-          메모이즘
-        </h1>
-        <span
-          style={{
-            fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-sm)",
-            color: "var(--fg-subtle)",
-          }}
-        >
-          {todayLabelFmt.format(new Date())}
-        </span>
+          <h1
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-3xl)",
+              fontWeight: 700,
+              color: "var(--fg)",
+              margin: 0,
+              letterSpacing: "var(--tracking-tight)",
+              lineHeight: 1.18,
+            }}
+          >
+            메모이즘
+          </h1>
+          <span
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-sm)",
+              color: "var(--fg-muted)",
+              fontWeight: 400,
+            }}
+          >
+            {todayLabelFmt.format(new Date())}
+          </span>
+        </div>
       </header>
 
       <div
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: "var(--space-5)",
-          padding: "var(--space-2) var(--space-5) var(--space-8)",
+          gap: "var(--space-6)",
+          padding: "var(--space-3) var(--space-5) var(--space-8)",
         }}
       >
         {/* 오늘의 일기 위젯 */}
         {todayDiary ? (
           <Link
             href={`/diary/${todayDiary.id}`}
+            className="pressable"
             style={{
               display: "flex",
               gap: "var(--space-4)",
               alignItems: "stretch",
               padding: "var(--space-4) var(--space-5)",
-              backgroundColor: "var(--surface-raised, var(--surface))",
-              border: "1px solid var(--border)",
+              backgroundColor: "var(--surface)",
               borderRadius: "var(--radius-lg)",
-              boxShadow: "var(--shadow-paper, var(--shadow-xs))",
+              boxShadow: "var(--shadow-xs)",
               textDecoration: "none",
               color: "inherit",
             }}
@@ -131,19 +160,18 @@ export default async function HomePage() {
                 style={{
                   fontFamily: "var(--font-sans)",
                   fontSize: "var(--text-xs)",
-                  color: "var(--accent-rose-deep)",
-                  letterSpacing: "var(--tracking-wider)",
-                  fontWeight: 700,
+                  color: "var(--tint)",
+                  fontWeight: 600,
                   margin: 0,
                   marginBottom: 4,
-                  textTransform: "uppercase",
+                  letterSpacing: 0,
                 }}
               >
                 오늘의 일기
               </p>
               <p
                 style={{
-                  fontFamily: "var(--font-serif)",
+                  fontFamily: "var(--font-sans)",
                   fontSize: "var(--text-md)",
                   fontWeight: 600,
                   margin: 0,
@@ -151,21 +179,22 @@ export default async function HomePage() {
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
+                  letterSpacing: "var(--tracking-tight)",
                 }}
               >
                 {todayDiary.title || "(제목 없음)"}
               </p>
               <p
                 style={{
-                  fontFamily: "var(--font-serif)",
-                  fontSize: "var(--text-sm)",
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-base)",
                   color: "var(--fg-muted)",
                   margin: "var(--space-2) 0 0 0",
                   display: "-webkit-box",
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: "vertical",
                   overflow: "hidden",
-                  lineHeight: "var(--leading-relaxed)",
+                  lineHeight: 1.45,
                 }}
               >
                 {snippet(todayDiary.content)}
@@ -176,123 +205,136 @@ export default async function HomePage() {
                 aria-hidden
                 style={{
                   position: "relative",
-                  width: 72,
-                  height: 72,
+                  width: 64,
+                  height: 64,
                   flexShrink: 0,
                   overflow: "hidden",
                   borderRadius: "var(--radius-md)",
                   alignSelf: "center",
-                  backgroundColor: "var(--bg)",
+                  backgroundColor: "var(--fill-2)",
                 }}
               >
                 <Image
                   src={todayDiary.thumbnailUrl}
                   alt=""
                   fill
-                  sizes="72px"
+                  sizes="64px"
                   style={{ objectFit: "cover" }}
                 />
               </div>
             )}
           </Link>
         ) : (
-          <Link
-            href="/diary/new"
+          /* 빈 상태 — Empty State 패턴. dashed border 없음 */
+          <div
             style={{
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
               gap: "var(--space-2)",
               padding: "var(--space-8) var(--space-5)",
-              backgroundColor: "var(--surface)",
-              border: "1px dashed var(--border-strong, var(--border))",
+              /* 옅은 코랄 워시 — "오늘을 위한 자리"라는 온기 (4%) */
+              backgroundColor:
+                "color-mix(in srgb, var(--tint) 4%, var(--surface))",
               borderRadius: "var(--radius-lg)",
-              textDecoration: "none",
-              color: "inherit",
+              boxShadow: "var(--shadow-xs)",
               textAlign: "center",
             }}
           >
-            <span aria-hidden style={{ fontSize: 28, lineHeight: 1 }}>
-              ✍️
+            <span aria-hidden style={{ color: "var(--fg-placeholder)", lineHeight: 0 }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/>
+                <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
+              </svg>
             </span>
             <p
               style={{
                 fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-xs)",
-                color: "var(--fg-subtle)",
-                letterSpacing: "var(--tracking-wider)",
+                fontSize: "var(--text-md)",
                 fontWeight: 600,
-                textTransform: "uppercase",
-                margin: 0,
-              }}
-            >
-              오늘의 일기
-            </p>
-            <p
-              style={{
-                fontFamily: "var(--font-serif)",
-                fontSize: "var(--text-lg)",
                 color: "var(--fg)",
                 margin: 0,
+                letterSpacing: "var(--tracking-tight)",
               }}
             >
-              오늘 첫 줄, 시작해볼까?
+              {emptyTitle}
             </p>
             <p
               style={{
                 fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-sm)",
-                color: "var(--fg-subtle)",
+                fontSize: "var(--text-base)",
+                color: "var(--fg-muted)",
                 margin: 0,
+                lineHeight: 1.45,
               }}
             >
-              사진만 있어도, 텍스트만 있어도 AI가 정리해줘요.
+              {emptySubtitle}
             </p>
-          </Link>
+            <Link
+              href="/diary/new"
+              className="pressable"
+              style={{
+                display: "inline-block",
+                marginTop: "var(--space-2)",
+                padding: "10px 20px",
+                backgroundColor: "var(--tint-soft)",
+                color: "var(--tint)",
+                borderRadius: "var(--radius-md)",
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-base)",
+                fontWeight: 600,
+                textDecoration: "none",
+                minHeight: 44,
+                lineHeight: "24px",
+              }}
+            >
+              일기 쓰기
+            </Link>
+          </div>
         )}
 
         {/* 이번 달 요약 strip */}
         {hasAny && (
-          <section
-            aria-label="기록 요약"
-            style={{
-              display: "flex",
-              alignItems: "stretch",
-              backgroundColor: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-md)",
-              boxShadow: "var(--shadow-xs)",
-              overflow: "hidden",
-            }}
-          >
-            <SummaryStat label="이번 달" value={counts.thisMonth} />
+          <section aria-label="기록 요약">
             <div
-              aria-hidden
-              style={{ width: 1, backgroundColor: "var(--border)" }}
-            />
-            <SummaryStat label="모은 기록" value={counts.total} />
+              style={{
+                display: "flex",
+                alignItems: "stretch",
+                backgroundColor: "var(--surface)",
+                borderRadius: "var(--radius-md)",
+                overflow: "hidden",
+              }}
+            >
+              <SummaryStat label="이번 달" value={counts.thisMonth} />
+              <div
+                aria-hidden
+                style={{ width: 1, backgroundColor: "var(--separator)" }}
+              />
+              <SummaryStat label="모은 기록" value={counts.total} />
+            </div>
           </section>
         )}
 
         {/* 최근 일기 */}
         {otherRecent.length > 0 ? (
           <section>
+            {/* 섹션 제목: 카드 밖 좌측, 13px secondary */}
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: "var(--space-3)",
+                marginBottom: "var(--space-2)",
+                paddingLeft: 2,
               }}
             >
               <h2
                 style={{
                   fontFamily: "var(--font-sans)",
-                  fontSize: "var(--text-xs)",
-                  color: "var(--fg-subtle)",
-                  fontWeight: 700,
-                  letterSpacing: "var(--tracking-wider)",
-                  textTransform: "uppercase",
+                  fontSize: "var(--text-sm)",
+                  color: "var(--fg-muted)",
+                  fontWeight: 500,
+                  letterSpacing: 0,
                   margin: 0,
                 }}
               >
@@ -302,82 +344,119 @@ export default async function HomePage() {
                 href="/diary"
                 style={{
                   fontFamily: "var(--font-sans)",
-                  fontSize: "var(--text-xs)",
-                  color: "var(--accent-rose)",
+                  fontSize: "var(--text-sm)",
+                  color: "var(--tint)",
                   textDecoration: "none",
                   fontWeight: 600,
                 }}
               >
-                전체 보기 →
+                전체 보기
               </Link>
             </div>
+            {/* iOS list group — 흰 카드 하나에 행들 + inset divider */}
             <div
               style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "var(--space-3)",
+                backgroundColor: "var(--surface)",
+                borderRadius: "var(--radius-md)",
+                overflow: "hidden",
               }}
             >
-              {otherRecent.map((diary) => {
+              {otherRecent.map((diary, idx) => {
                 const date = new Date(diary.createdAt);
                 const previewTitle =
                   diary.title?.trim() ||
                   diary.content.split("\n")[0].slice(0, 40) ||
                   "(제목 없음)";
                 return (
-                  <Link
-                    key={diary.id}
-                    href={`/diary/${diary.id}`}
-                    style={{
-                      display: "block",
-                      padding: "var(--space-4) var(--space-5)",
-                      backgroundColor: "var(--surface)",
-                      borderRadius: "var(--radius-md)",
-                      border: "1px solid var(--border)",
-                      textDecoration: "none",
-                      color: "inherit",
-                      boxShadow: "var(--shadow-xs)",
-                    }}
-                  >
-                    <div
+                  <div key={diary.id}>
+                    <Link
+                      href={`/diary/${diary.id}`}
+                      className="pressable"
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: "var(--space-2)",
-                        fontFamily: "var(--font-sans)",
-                        fontSize: "var(--text-xs)",
-                        color: "var(--fg-subtle)",
-                        letterSpacing: "var(--tracking-wide)",
+                        gap: "var(--space-3)",
+                        padding: "var(--space-3) var(--space-4)",
+                        textDecoration: "none",
+                        color: "inherit",
+                        minHeight: 52,
                       }}
                     >
-                      <span aria-hidden style={{ fontSize: 15, lineHeight: 1 }}>
-                        📝
-                      </span>
-                      <time
-                        dateTime={date.toISOString()}
-                        style={{ fontWeight: 600 }}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontFamily: "var(--font-sans)",
+                            fontSize: "var(--text-sm)",
+                            color: "var(--fg-muted)",
+                            fontWeight: 400,
+                            marginBottom: 2,
+                          }}
+                        >
+                          {/* mood dot — 감정의 자리 (미설정은 회색) */}
+                          <span
+                            aria-hidden
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: "50%",
+                              backgroundColor:
+                                diary.mood && KNOWN_MOOD_KEYS.has(diary.mood)
+                                  ? MOOD_COLOR[diary.mood as MoodKey]
+                                  : "var(--fg-quaternary)",
+                              flexShrink: 0,
+                            }}
+                          />
+                          <time dateTime={date.toISOString()}>
+                            {dayFmt.format(date)}
+                          </time>
+                          <span style={{ color: "var(--fg-placeholder)" }}>
+                            ·
+                          </span>
+                          <span>{weekdayFmt.format(date)}요일</span>
+                        </div>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontFamily: "var(--font-sans)",
+                            fontSize: "var(--text-base)",
+                            fontWeight: 600,
+                            lineHeight: 1.45,
+                            color: "var(--fg)",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 1,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {diary.title?.trim() || snippet(diary.content) || previewTitle}
+                        </p>
+                      </div>
+                      <span
+                        aria-hidden
+                        style={{
+                          fontSize: 13,
+                          color: "var(--fg-placeholder)",
+                          flexShrink: 0,
+                        }}
                       >
-                        {dayFmt.format(date)}
-                      </time>
-                      <span style={{ opacity: 0.6 }}>·</span>
-                      <span>{weekdayFmt.format(date)}요일</span>
-                    </div>
-                    <p
-                      style={{
-                        margin: "var(--space-2) 0 0 0",
-                        fontFamily: "var(--font-serif)",
-                        fontSize: "var(--text-base)",
-                        lineHeight: "var(--leading-relaxed)",
-                        color: "var(--fg)",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {snippet(diary.content) || previewTitle}
-                    </p>
-                  </Link>
+                        ›
+                      </span>
+                    </Link>
+                    {/* inset divider — 마지막 행 제외 */}
+                    {idx < otherRecent.length - 1 && (
+                      <div
+                        aria-hidden
+                        style={{
+                          height: 1,
+                          backgroundColor: "var(--separator)",
+                          marginLeft: "var(--space-4)",
+                        }}
+                      />
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -387,12 +466,12 @@ export default async function HomePage() {
             // 오늘 일기는 있지만 그 외 기록이 없는 경우 — 잔잔한 격려
             <p
               style={{
-                fontFamily: "var(--font-serif)",
-                fontSize: "var(--text-sm)",
-                color: "var(--fg-subtle)",
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-base)",
+                color: "var(--fg-muted)",
                 textAlign: "center",
                 margin: "var(--space-4) 0",
-                lineHeight: "var(--leading-relaxed)",
+                lineHeight: 1.7,
               }}
             >
               오늘의 한 줄이 첫 페이지예요.
@@ -420,11 +499,12 @@ function SummaryStat({ label, value }: { label: string; value: number }) {
     >
       <span
         style={{
-          fontFamily: "var(--font-serif)",
+          fontFamily: "var(--font-sans)",
           fontSize: "var(--text-2xl)",
-          fontWeight: 600,
+          fontWeight: 700,
           color: "var(--fg)",
           lineHeight: 1.1,
+          letterSpacing: "var(--tracking-tight)",
         }}
       >
         {value}
@@ -432,8 +512,8 @@ function SummaryStat({ label, value }: { label: string; value: number }) {
           style={{
             fontFamily: "var(--font-sans)",
             fontSize: "var(--text-sm)",
-            color: "var(--fg-subtle)",
-            fontWeight: 500,
+            color: "var(--fg-muted)",
+            fontWeight: 400,
             marginLeft: 2,
           }}
         >
@@ -444,9 +524,9 @@ function SummaryStat({ label, value }: { label: string; value: number }) {
         style={{
           fontFamily: "var(--font-sans)",
           fontSize: "var(--text-xs)",
-          color: "var(--fg-subtle)",
-          letterSpacing: "var(--tracking-wider)",
-          fontWeight: 600,
+          color: "var(--fg-muted)",
+          fontWeight: 500,
+          letterSpacing: 0,
         }}
       >
         {label}

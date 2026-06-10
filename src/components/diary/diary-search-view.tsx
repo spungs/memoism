@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
-import { MOOD_EMOJI, type MoodKey } from "./mood-data";
+import { MoodBadge } from "./mood-badge";
+import { KNOWN_MOOD_KEYS, type MoodKey } from "./mood-data";
 
 export interface SearchResultItem {
   id: string;
@@ -24,9 +25,9 @@ interface Props {
 
 const DEBOUNCE_MS = 350;
 
-const monthDayFmt = new Intl.DateTimeFormat("ko-KR", {
+const dateFmt = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
-  month: "short",
+  month: "long",
   day: "numeric",
 });
 
@@ -60,7 +61,7 @@ export function DiarySearchView({ onActiveChange }: Props) {
     onActiveChange(true);
     setTouched(true);
     const handle = setTimeout(async () => {
-      if (lastSearchedRef.current === trimmed) return; // 같은 검색어 재요청 방지
+      if (lastSearchedRef.current === trimmed) return;
       lastSearchedRef.current = trimmed;
       setLoading(true);
       setError(null);
@@ -95,26 +96,25 @@ export function DiarySearchView({ onActiveChange }: Props) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      {/* 검색창 — pill, fill-2 배경, 테두리 없음 */}
       <div
         style={{
           position: "relative",
           display: "flex",
           alignItems: "center",
-          backgroundColor: "var(--surface)",
-          border: "1px solid var(--border)",
+          backgroundColor: "var(--fill-2)",
           borderRadius: "var(--radius-pill)",
+          height: 40,
           padding: "0 var(--space-3)",
           gap: "var(--space-2)",
         }}
       >
-        <Search size={16} aria-hidden style={{ color: "var(--fg-subtle)", flexShrink: 0 }} />
+        <Search size={15} aria-hidden style={{ color: "var(--fg-placeholder)", flexShrink: 0 }} />
         <input
           ref={inputRef}
           type="search"
           // 비제어 입력: value를 React가 다시 써넣지 않으므로 한글 IME 조합이
-          // 깨지지 않는다. 조합 중 글자까지 query에 반영하려고 onChange와
-          // onCompositionUpdate 양쪽에서 동기화 → blur로 조합 확정돼도 값이
-          // 그대로라 재검색이 일어나지 않음.
+          // 깨지지 않는다.
           defaultValue=""
           onChange={(e) => setQuery(e.target.value)}
           onCompositionUpdate={(e) => setQuery(e.currentTarget.value)}
@@ -125,10 +125,10 @@ export function DiarySearchView({ onActiveChange }: Props) {
             border: "none",
             outline: "none",
             backgroundColor: "transparent",
-            padding: "10px 0",
             fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-sm)",
+            fontSize: "var(--text-base)",
             color: "var(--fg)",
+            height: "100%",
           }}
         />
         {query && (
@@ -140,17 +140,18 @@ export function DiarySearchView({ onActiveChange }: Props) {
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              width: 24,
-              height: 24,
+              width: 20,
+              height: 20,
               border: "none",
-              background: "transparent",
+              background: "var(--fg-placeholder)",
               borderRadius: "50%",
               cursor: "pointer",
-              color: "var(--fg-subtle)",
+              color: "var(--surface)",
               flexShrink: 0,
+              padding: 0,
             }}
           >
-            <X size={14} aria-hidden />
+            <X size={11} aria-hidden />
           </button>
         )}
       </div>
@@ -162,8 +163,8 @@ export function DiarySearchView({ onActiveChange }: Props) {
             <p
               style={{
                 fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-sm)",
-                color: "var(--fg-subtle)",
+                fontSize: "var(--text-base)",
+                color: "var(--fg-muted)",
                 textAlign: "center",
                 padding: "var(--space-6) 0",
                 margin: 0,
@@ -178,10 +179,9 @@ export function DiarySearchView({ onActiveChange }: Props) {
               role="alert"
               style={{
                 fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-sm)",
+                fontSize: "var(--text-base)",
                 color: "var(--danger)",
-                backgroundColor:
-                  "color-mix(in srgb, var(--danger) 10%, transparent)",
+                backgroundColor: "color-mix(in srgb, var(--danger) 10%, transparent)",
                 padding: "var(--space-3)",
                 borderRadius: "var(--radius-md)",
                 margin: 0,
@@ -192,30 +192,53 @@ export function DiarySearchView({ onActiveChange }: Props) {
           )}
 
           {!loading && !error && items.length === 0 && (
-            <p
+            <div
               style={{
-                fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-sm)",
-                color: "var(--fg-subtle)",
                 textAlign: "center",
                 padding: "var(--space-8) 0",
-                margin: 0,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "var(--space-2)",
               }}
             >
-              일치하는 일기를 찾지 못했어요.
-            </p>
+              <span aria-hidden style={{ color: "var(--fg-placeholder)", lineHeight: 0 }}>
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                  <circle cx="11" cy="11" r="7" />
+                  <line x1="21" y1="21" x2="16.2" y2="16.2" />
+                </svg>
+              </span>
+              <p
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-md)",
+                  fontWeight: 600,
+                  color: "var(--fg)",
+                  margin: 0,
+                }}
+              >
+                일치하는 일기가 없어요
+              </p>
+              <p
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-base)",
+                  color: "var(--fg-muted)",
+                  margin: 0,
+                }}
+              >
+                다른 단어로 검색해볼까요?
+              </p>
+            </div>
           )}
 
           {!loading && !error && items.length > 0 && (
             <div
-              // 결과 영역에 마우스가 진입하면 입력창의 한글 IME 조합을 미리 확정한다.
-              // mouseenter는 이동 기반이라 IME에 흡수되지 않으므로, 뒤이은 결과 클릭이
-              // 조합 확정에 소비돼 씹히는 일을 막는다(데스크톱 웹 한정).
               onMouseEnter={() => inputRef.current?.blur()}
               style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-                gap: "var(--space-3)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--space-2)",
               }}
             >
               {items.map((item) => (
@@ -233,15 +256,7 @@ function SearchResultCard({ item }: { item: SearchResultItem }) {
   const router = useRouter();
   const href = `/diary/${item.id}`;
   const date = new Date(item.createdAt);
-  const moodEmoji =
-    item.mood && item.mood in MOOD_EMOJI
-      ? MOOD_EMOJI[item.mood as MoodKey]
-      : "📝";
 
-  // 한글 IME 조합 중 입력창이 포커스를 쥔 상태에서 결과를 클릭하면, 첫 click이
-  // 조합 확정에 소비돼 네비게이션이 씹힌다(데스크톱 웹 한정). click보다 먼저
-  // 발생하는 mousedown에서 이동시켜 한 번에 상세로 가게 한다. 수정키·중클릭·우클릭은
-  // 기본 동작(새 탭 등)에 맡긴다.
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
@@ -252,91 +267,109 @@ function SearchResultCard({ item }: { item: SearchResultItem }) {
     <Link
       href={href}
       onMouseDown={handleMouseDown}
+      className="pressable"
       style={{
         display: "flex",
-        flexDirection: "column",
+        alignItems: "center",
+        gap: "var(--space-3)",
         backgroundColor: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: "var(--radius-md)",
+        borderRadius: "var(--radius-lg)",
         overflow: "hidden",
         textDecoration: "none",
         color: "inherit",
-        boxShadow: "var(--shadow-xs)",
+        padding: "var(--space-3) var(--space-4)",
+        minHeight: 44,
       }}
     >
-      <div
-        style={{
-          position: "relative",
-          width: "100%",
-          aspectRatio: "1 / 1",
-          backgroundColor: "var(--paper-2)",
-        }}
-      >
-        {item.thumbnailUrl ? (
+      {/* 썸네일 */}
+      {item.thumbnailUrl ? (
+        <div
+          style={{
+            position: "relative",
+            flexShrink: 0,
+            width: 64,
+            height: 64,
+            borderRadius: "var(--radius-md)",
+            overflow: "hidden",
+            backgroundColor: "var(--fill-2)",
+          }}
+        >
           <Image
             src={item.thumbnailUrl}
             alt=""
             fill
-            sizes="(max-width: 720px) 50vw, 200px"
+            sizes="64px"
             style={{ objectFit: "cover" }}
           />
-        ) : (
-          <div
+        </div>
+      ) : null}
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* 메타: mood badge + 날짜 */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            marginBottom: "var(--space-1)",
+          }}
+        >
+          {item.mood && KNOWN_MOOD_KEYS.has(item.mood as MoodKey) ? (
+            <MoodBadge mood={item.mood} size="sm" />
+          ) : (
+            // 감정 미설정도 자리를 비우지 않는다 — 회색 dot (month-view와 동일 어휘)
+            <span
+              aria-hidden
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                backgroundColor: "var(--fg-quaternary)",
+                flexShrink: 0,
+              }}
+            />
+          )}
+          <span
             style={{
-              position: "absolute",
-              inset: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontFamily: "var(--font-serif)",
-              fontSize: "var(--text-sm)",
-              color: "var(--fg-subtle)",
-              padding: "var(--space-3)",
-              textAlign: "center",
-              lineHeight: "var(--leading-snug)",
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-xs)",
+              color: "var(--fg-placeholder)",
             }}
           >
-            {snippet(item.title || item.content, 40)}
-          </div>
-        )}
-      </div>
-      <div
-        style={{
-          padding: "var(--space-2) var(--space-3) var(--space-3)",
-          display: "flex",
-          flexDirection: "column",
-          gap: 2,
-        }}
-      >
+            {dateFmt.format(date)}
+          </span>
+        </div>
+        {/* 제목 */}
         <p
           style={{
             fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-xs)",
-            color: "var(--fg-subtle)",
-            margin: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-          }}
-        >
-          <span aria-hidden style={{ fontSize: 12 }}>
-            {moodEmoji}
-          </span>
-          {monthDayFmt.format(date)}
-        </p>
-        <p
-          style={{
-            fontFamily: "var(--font-serif)",
-            fontSize: "var(--text-sm)",
+            fontSize: "var(--text-md)",
+            fontWeight: 600,
             color: "var(--fg)",
+            letterSpacing: "var(--tracking-tight)",
             margin: 0,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
-            fontWeight: 600,
           }}
         >
           {item.title || "(제목 없음)"}
+        </p>
+        {/* 본문 미리보기 */}
+        <p
+          style={{
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-base)",
+            color: "var(--fg-muted)",
+            margin: "var(--space-1) 0 0",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+            lineHeight: "var(--leading-normal)",
+          }}
+        >
+          {snippet(item.content)}
         </p>
       </div>
     </Link>

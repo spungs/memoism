@@ -1,115 +1,120 @@
 ---
-version: alpha
+version: 2.0-apple
 name: Memoism Design System
-description: 스쳐 지나가는 일상을 기록하는 AI 일기 도우미. 종이와 잉크의 메타포로 디지털 일기의 물성을 회복한다.
+description: 스쳐 지나가는 일상을 기록하는 AI 일기 도우미. Apple HIG의 조용한 미니멀리즘 위에 종이의 온기를 한 방울 — 콘텐츠(일기)가 주인공, UI는 물러난다.
 
 colors:
-  paper:
-    "0": "#FBF6EC"
-    "1": "#F5EEDF"
-    "2": "#ECE2CD"
-    "3": "#E0D2B5"
-  ink:
-    "1": "#2A2118"
-    "2": "#4A3D2E"
-    "3": "#7A6A55"
-    "4": "#A89682"
-    "5": "#C8B89F"
-  accent:
-    rose: "#C97B6B"
-    roseSoft: "#E5B5A8"
-    roseDeep: "#9E5849"
-    sage: "#8A9A7B"
-    sageSoft: "#C4D0B5"
-    lilac: "#A89BB8"
-    amber: "#D9A05B"
+  bg:
+    base: "#F4F3F1"
+    card: "#FFFFFF"
+    cardElevated: "#FFFFFF"
+  fill:
+    "1": "rgba(120,116,108,0.16)"
+    "2": "rgba(120,116,108,0.10)"
+    "3": "rgba(120,116,108,0.06)"
+  label:
+    primary: "#1C1B1A"
+    secondary: "rgba(60,56,50,0.60)"
+    tertiary: "rgba(60,56,50,0.34)"
+    quaternary: "rgba(60,56,50,0.18)"
+  separator: "rgba(60,56,50,0.14)"
+  tint:
+    base: "#C44A38"
+    pressed: "#A23B2C"
+    soft: "rgba(196,74,56,0.11)"
+    on: "#FFFFFF"
   mood:
-    joy: "#E8B86D"
-    calm: "#A6C0B4"
-    sad: "#8FA3BD"
-    love: "#D89B95"
-    anger: "#C47A6F"
-    tired: "#B0A89A"
-  semantic:
-    bg: "{colors.paper.0}"
-    surface: "{colors.paper.1}"
-    surfaceRaised: "#FFFCF4"
-    border: "{colors.paper.2}"
-    borderStrong: "{colors.ink.5}"
-    fg: "{colors.ink.1}"
-    fgMuted: "{colors.ink.2}"
-    fgSubtle: "{colors.ink.3}"
-    fgPlaceholder: "{colors.ink.4}"
-    brand: "{colors.accent.rose}"
-    brandDeep: "{colors.accent.roseDeep}"
+    joy: "#E9A13B"
+    calm: "#4FB6A4"
+    sad: "#6B8FC9"
+    love: "#E2768C"
+    anger: "#C04A57"
+    tired: "#9C948A"
   status:
-    success: "#7A9A6E"
-    warning: "#D9A05B"
-    danger: "#B86A5C"
-    info: "#8FA3BD"
+    success: "#34C759"
+    warning: "#FF9500"
+    danger: "#FF3B30"
+    info: "#007AFF"
+  semantic:
+    bg: "{colors.bg.base}"
+    surface: "{colors.bg.card}"
+    surfaceRaised: "{colors.bg.card}"
+    border: "{colors.separator}"
+    fg: "{colors.label.primary}"
+    fgMuted: "rgba(60,56,50,0.62)"
+    fgSubtle: "rgba(60,56,50,0.46)"
+    fgPlaceholder: "{colors.label.tertiary}"
+    brand: "{colors.tint.base}"
+    brandDeep: "{colors.tint.pressed}"
 
 typography:
   fonts:
-    serif: "'Gowun Batang', 'Noto Serif KR', Georgia, serif"
-    sans: "'Pretendard', 'Gowun Dodum', -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
-    hand: "'Gaegu', 'Gowun Dodum', cursive"
+    sans: "-apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', 'Segoe UI', Roboto, sans-serif"
     mono: "ui-monospace, 'SF Mono', 'JetBrains Mono', monospace"
   scale:
-    xs: 11px
+    xs: 12px
     sm: 13px
     base: 15px
     md: 17px
     lg: 20px
-    xl: 24px
-    "2xl": 30px
-    "3xl": 38px
-    display: 48px
+    xl: 22px
+    "2xl": 28px
+    "3xl": 34px
+    display: 40px
   lineHeight:
-    tight: 1.25
-    snug: 1.4
-    normal: 1.6
-    relaxed: 1.85
+    tight: 1.18
+    snug: 1.3
+    normal: 1.45
+    relaxed: 1.7
   tracking:
     tight: -0.02em
-    normal: 0
-    wide: 0.04em
-    wider: 0.12em
+    normal: -0.004em
+    wide: 0.01em
+    wider: 0.05em
   presets:
-    display:
-      fontFamily: "{typography.fonts.serif}"
-      fontSize: "{typography.scale.display}"
-      lineHeight: "{typography.lineHeight.tight}"
-      letterSpacing: "{typography.tracking.tight}"
-      color: "{colors.semantic.fg}"
-    h1:
-      fontFamily: "{typography.fonts.serif}"
+    largeTitle:
+      fontFamily: "{typography.fonts.sans}"
       fontSize: "{typography.scale.3xl}"
+      fontWeight: 700
       lineHeight: "{typography.lineHeight.tight}"
       letterSpacing: "{typography.tracking.tight}"
-    h2:
-      fontFamily: "{typography.fonts.serif}"
+    title1:
+      fontFamily: "{typography.fonts.sans}"
       fontSize: "{typography.scale.2xl}"
-      lineHeight: "{typography.lineHeight.snug}"
-    h3:
+      fontWeight: 700
+      lineHeight: "{typography.lineHeight.tight}"
+      letterSpacing: "{typography.tracking.tight}"
+    title2:
       fontFamily: "{typography.fonts.sans}"
       fontSize: "{typography.scale.xl}"
+      fontWeight: 700
+      lineHeight: "{typography.lineHeight.snug}"
+      letterSpacing: "{typography.tracking.tight}"
+    headline:
+      fontFamily: "{typography.fonts.sans}"
+      fontSize: "{typography.scale.md}"
       fontWeight: 600
       lineHeight: "{typography.lineHeight.snug}"
     body:
-      fontFamily: "{typography.fonts.serif}"
-      fontSize: "{typography.scale.base}"
+      fontFamily: "{typography.fonts.sans}"
+      fontSize: "{typography.scale.md}"
+      fontWeight: 400
       lineHeight: "{typography.lineHeight.relaxed}"
-      color: "{colors.semantic.fgMuted}"
-    ui:
+      color: "{colors.label.primary}"
+    subheadline:
+      fontFamily: "{typography.fonts.sans}"
+      fontSize: "{typography.scale.base}"
+      lineHeight: "{typography.lineHeight.normal}"
+    footnote:
       fontFamily: "{typography.fonts.sans}"
       fontSize: "{typography.scale.sm}"
       lineHeight: "{typography.lineHeight.normal}"
+      color: "{colors.label.secondary}"
     caption:
       fontFamily: "{typography.fonts.sans}"
       fontSize: "{typography.scale.xs}"
       lineHeight: "{typography.lineHeight.normal}"
-      letterSpacing: "{typography.tracking.wider}"
-      color: "{colors.semantic.fgSubtle}"
+      color: "{colors.label.tertiary}"
 
 spacing:
   "1": 4px
@@ -125,26 +130,31 @@ spacing:
   "20": 80px
 
 rounded:
-  sm: 6px
-  md: 10px
+  sm: 8px
+  md: 12px
   lg: 16px
-  xl: 24px
+  xl: 22px
   pill: 999px
 
 elevation:
-  xs: "0 1px 2px rgba(74,61,46,0.06)"
-  sm: "0 2px 6px rgba(74,61,46,0.08)"
-  md: "0 4px 16px rgba(74,61,46,0.10)"
-  lg: "0 12px 32px rgba(74,61,46,0.14)"
-  paper: "0 1px 0 rgba(255,252,244,0.6) inset, 0 2px 8px rgba(74,61,46,0.08)"
+  xs: "0 1px 2px rgba(0,0,0,0.04)"
+  sm: "0 2px 8px rgba(0,0,0,0.06)"
+  md: "0 8px 24px rgba(0,0,0,0.10)"
+  lg: "0 16px 48px rgba(0,0,0,0.16)"
+
+material:
+  bar: "background: rgba(244,243,241,0.82); backdrop-filter: blur(20px) saturate(180%)"
+  barStrong: "rgba(244,243,241,0.93) — 스크롤 중 .glass.is-scrolled (콘텐츠에 반응하는 재질)"
+  overlayDim: "rgba(0,0,0,0.4)"
 
 motion:
   ease:
-    out: "cubic-bezier(0.22,1,0.36,1)"
-    inOut: "cubic-bezier(0.65,0,0.35,1)"
+    out: "cubic-bezier(0.32,0.72,0,1)"
+    inOut: "cubic-bezier(0.45,0,0.25,1)"
+    bounce: "cubic-bezier(0.34,1.56,0.64,1)"
   duration:
-    fast: 140ms
-    base: 240ms
+    fast: 150ms
+    base: 250ms
     slow: 420ms
 
 layout:
@@ -152,257 +162,308 @@ layout:
     mobile: 390px
     tablet: 768px
     page: 1100px
+  touchTarget: 44px
+  pageGutter: "{spacing.5}"
 
 components:
-  diaryCard:
-    backgroundColor: "{colors.semantic.surface}"
-    border: "1px solid {colors.semantic.border}"
+  tabBar:
+    height: 52px
+    material: "{material.bar}"
+    borderTop: "1px solid {colors.separator}"
+    label: "11px / weight 500 / tracking 0"
+    active: "{colors.tint.base}"
+    inactive: "{colors.label.tertiary}"
+    composeButton:
+      size: 46px
+      rounded: "{rounded.pill}"
+      backgroundColor: "{colors.tint.base}"
+      pressed: "scale(0.92) + {colors.tint.pressed}"
+  largeTitleHeader:
+    title: "{typography.presets.largeTitle}"
+    subtitle: "{typography.presets.footnote}"
+  listGroup:
+    backgroundColor: "{colors.bg.card}"
     rounded: "{rounded.md}"
+    rowHeight: 48px
+    rowPaddingX: "{spacing.4}"
+    divider: "1px {colors.separator}, 좌측 inset {spacing.4}"
+    chevron: "› {colors.label.tertiary}"
+    pressedFill: "{colors.fill.3}"
+    sectionHeader: "13px / {colors.label.secondary} / 카드 밖 좌측 {spacing.4}"
+  diaryCard:
+    backgroundColor: "{colors.bg.card}"
+    rounded: "{rounded.lg}"
     elevation: "{elevation.xs}"
-    padding: "{spacing.4} {spacing.5}"
-    accentBar:
-      width: 3px
-      colorSource: "{colors.mood}"
-    thumbnail:
-      size: 80px
-      rounded: "{rounded.md}"
+    border: none
+    padding: "{spacing.4}"
+    moodDot: "8px 원형, mood 색"
+    thumbnail: "64px, {rounded.md}"
+  buttonPrimary:
+    backgroundColor: "{colors.tint.base}"
+    color: "{colors.tint.on}"
+    rounded: "{rounded.md}"
+    height: 50px
+    fontWeight: 600
+    pressed: "{colors.tint.pressed} + scale(0.98)"
+  buttonTinted:
+    backgroundColor: "{colors.tint.soft}"
+    color: "{colors.tint.base}"
+    rounded: "{rounded.md}"
+    fontWeight: 600
+  buttonPlain:
+    color: "{colors.tint.base}"
+    fontWeight: 600
+  searchField:
+    backgroundColor: "{colors.fill.2}"
+    rounded: "{rounded.pill}"
+    height: 40px
+  sheet:
+    rounded: "20px 20px 0 0"
+    grabber: "36×5px {colors.fill.1} 캡슐, 상단 중앙"
+    dim: "{material.overlayDim}"
+    elevation: "{elevation.lg}"
+  switch:
+    size: "51×31px"
+    on: "{colors.status.success}"
+    off: "{colors.fill.1}"
+    knob: "27px 흰 원 + {elevation.sm}"
   moodBadge:
     rounded: "{rounded.pill}"
-    border: "1.5px solid {colors.mood}"
-    backgroundColor: "color-mix(in srgb, {colors.mood} 12%, transparent)"
-    fontFamily: "{typography.fonts.sans}"
+    backgroundColor: "color-mix(in srgb, {colors.mood} 14%, transparent)"
+    color: "mood 색을 25% 어둡게"
+    fontSize: 12px
     fontWeight: 600
-    letterSpacing: "{typography.tracking.wide}"
   aiChip:
     rounded: "{rounded.pill}"
-    backgroundColor: "color-mix(in srgb, {colors.accent.rose} 14%, transparent)"
-    color: "{colors.accent.roseDeep}"
-    fontSize: 10px
-    fontWeight: 700
-    label: "✨ AI"
-  buttonPrimary:
-    backgroundColor: "{colors.semantic.fg}"
-    color: "{colors.semantic.bg}"
-    rounded: "{rounded.md}"
-    padding: "{spacing.3} {spacing.4}"
-    elevation: "{elevation.sm}"
-    fontFamily: "{typography.fonts.sans}"
+    backgroundColor: "{colors.fill.2}"
+    color: "{colors.label.secondary}"
+    fontSize: 11px
     fontWeight: 600
-  inputBare:
-    backgroundColor: transparent
-    border: none
-    outline: none
-    fontFamily: "{typography.fonts.serif}"
-    color: "{colors.semantic.fg}"
+    label: "✨ AI"
   reviewGateStory:
-    backgroundColor: "color-mix(in srgb, #FFF4CC 30%, transparent)"
-    border: "1px solid color-mix(in srgb, #FFF4CC 60%, transparent)"
+    backgroundColor: "rgba(255,204,0,0.10)"
     rounded: "{rounded.md}"
     padding: "{spacing.4}"
-    note: "AI 생성 영역을 *연한 노란 종이* 색으로 분리해 사실(Fact)과 이야기(Story)를 시각적으로 구분"
+    note: "AI 생성 영역을 연한 노랑으로 분리해 사실(Fact)과 이야기(Story)를 시각적으로 구분"
 ---
 
-# Memoism Design System
+# Memoism Design System — Apple Edition
 
 > *스쳐 지나가는 일상을 기록하는 AI 일기 도우미.*
-> *종이·잉크·따뜻한 sepia. 손글씨의 물성, 디지털의 가벼움.*
+> **Apple HIG의 조용한 미니멀리즘** + 종이의 온기 한 방울. 콘텐츠(일기)가 주인공, UI는 물러난다.
 
-이 문서는 [Google `DESIGN.md` spec](https://github.com/google-labs-code/design.md)을 따른다. AI 에이전트가 UI를 만들거나 검토할 때 일관된 시각 언어를 유지하기 위한 단일 진실 출처(single source of truth)다. 토큰은 `src/app/globals.css`의 CSS variables와 1:1 매핑된다.
+이 문서는 [Google `DESIGN.md` spec](https://github.com/google-labs-code/design.md) 포맷을 따르는 **단일 진실 출처**다. 토큰은 `src/app/globals.css`의 CSS variables와 1:1 매핑된다. HIG 원문 근거는 [`docs/APPLE_DESIGN.md`](./docs/APPLE_DESIGN.md) 참고.
 
 ---
 
 ## 1. Overview
 
-**Memoism은 "AI 일기 도우미"** 다. 페르소나는 *바쁘고 매일 일기 쓸 체력은 없지만 흘러가는 시간을 잡고 싶은* 30대 직장인. 핵심 가치는 두 가지:
+**Memoism은 "AI 일기 도우미"** 다. 페르소나는 *바쁘고 매일 일기 쓸 체력은 없지만 흘러가는 시간을 잡고 싶은* 30대 직장인.
 
-- **회고할 데이터가 존재한다** — 사진·텍스트만 던지면 AI가 일기로 정리, 1년 뒤에도 검색·재방문 가능
-- **가벼운 방법** — 의무감·죄책감을 강요하지 않음. "오늘 첫 줄, 시작해볼까?" 같은 권유 톤
+### 디자인 방향 (v2 — Apple Edition)
 
-### 브랜드 톤
-
-- **따뜻함** — 차가운 청회색 톤 X, 베이지 종이·갈색 잉크의 sepia 분위기
-- **사적임** — 화려한 UI X, 책장 한 권을 펼친 듯한 *조용한 페이지*
-- **친밀함** — 한국어 손글씨 폰트(Gaegu)와 격조 있는 명조체(Gowun Batang) 공존
-- **AI를 거든 손길** — 자동 생성이지만 결과는 늘 *내 일기*. AI 영역은 ✨로 식별되지만 *마커가 본문을 압도하지 않게* 절제
+- **Deference** — UI가 일기·사진에 양보한다. 배경은 조용한 웜 뉴트럴(`#F4F3F1`), 카드는 순백, 장식은 없다.
+- **하나의 틴트** — 코랄(`#C44A38`) 단 한 색이 모든 인터랙티브 요소를 표시한다. 색이 보이면 "누를 수 있다"는 뜻. (배경 위 대비 ≈4.6:1, WCAG AA)
+- **알파 위계** — 텍스트 위계는 회색 단계가 아니라 라벨 알파(100% → 60% → 34% → 18%)로.
+- **재질(Material)** — 떠 있는 바(탭바·헤더)는 그림자가 아니라 블러 유리. 카드는 그림자 대신 배경 대비 + 헤어라인.
+- **온기 유지** — 배경·fill·라벨에 웜 그레이 베이스. 차가운 블루 그레이 금지. 종이 일기장의 정서는 *틴트와 카피*로 잇는다.
 
 ### 사용 맥락
 
-- **모바일 우선 PWA** — `--container-mobile: 390px` 기본
-- **밤 시간 사용** — 22:00 KST 푸시. 어두운 환경에서 광원 X
-- **사진 다중** — 사진은 *세로 누적이 아닌 수평 캐러셀*로 본문 접근 부담 줄임
+- **모바일 우선 PWA** — `--container-mobile: 390px`
+- **밤 사용** — 22:00 푸시. 광원처럼 쨍한 화이트 면적을 줄이고 웜 뉴트럴로 받친다
+- **사진 다중** — 수평 캐러셀 (세로 누적 금지)
 
 ---
 
 ## 2. Colors
 
-색은 **종이(paper) + 잉크(ink)** 두 축이 기본. 액센트(accent)는 강조와 브랜드, 무드(mood)는 일기의 감정 분류용. *상태색(success/warning/danger/info)* 은 따로 정의되어 있지만 같은 sepia 팔레트 안에서 살짝 채도만 옮긴 형태로 — UI가 *전체적으로 같은 종이*에 그려진 느낌.
+### 배경 (2층 구조)
+- `bg.base` `#F4F3F1` — 페이지 배경 (iOS systemGroupedBackground의 웜 버전)
+- `bg.card` `#FFFFFF` — 카드·리스트 그룹·입력 시트
 
-### Paper (배경 4단계)
-- `paper.0` `#FBF6EC` — 메인 배경
-- `paper.1` `#F5EEDF` — surface (카드, 헤더)
-- `paper.2` `#ECE2CD` — border, muted
-- `paper.3` `#E0D2B5` — disabled, divider 강조
+### 라벨 (알파 4단)
+- `label.primary` `#1C1B1A` — 제목·본문
+- `label.secondary` `rgba(60,56,50,0.60)` — 보조 텍스트·미리보기
+- `label.tertiary` `rgba(60,56,50,0.34)` — placeholder·비활성·캡션
+- `label.quaternary` `rgba(60,56,50,0.18)` — 장식적 아이콘
 
-### Ink (전경 5단계, 어두움 → 밝음)
-- `ink.1` `#2A2118` — fg (본문)
-- `ink.2` `#4A3D2E` — fgMuted (서브 본문)
-- `ink.3` `#7A6A55` — fgSubtle (캡션·메타)
-- `ink.4` `#A89682` — placeholder
-- `ink.5` `#C8B89F` — border-strong
+### Fill (면 분리·컨트롤 배경)
+- `fill.1` 16% — 스위치 off 트랙, 진한 컨트롤
+- `fill.2` 10% — 검색창, 인풋, 세그먼트 트랙
+- `fill.3` 6% — 행 pressed 하이라이트
 
-### Accent
-- `rose` `#C97B6B` — 메인 브랜드 (CTA, 강조)
-- `roseSoft` `#E5B5A8` — secondary accent
-- `roseDeep` `#9E5849` — 헤더 로고 "메모이즘", AI chip 텍스트
-- `sage` `#8A9A7B` — 보조
-- `amber` `#D9A05B` — 따뜻한 알림
+### 틴트 (단 하나)
+- `tint.base` `#C44A38` — 코랄. CTA·링크·활성 탭·선택 상태 전부
+- `tint.pressed` `#A23B2C` — pressed
+- `tint.soft` 11% — tinted 버튼 배경, 선택 칩 배경
 
-### Mood (감정 6종, 사용자 일기 분류)
-- `joy` 노란 황금 / `calm` 청록 / `sad` 푸른 회색 / `love` 분홍 / `anger` 빨간 갈색 / `tired` 잿빛 베이지
+### Mood (감정 6종 — 분류 전용)
+joy `#E9A13B` · calm `#4FB6A4` · sad `#6B8FC9` · love `#E2768C` · anger `#C04A57` · tired `#9C948A`
+MoodPicker / MoodBadge / 캘린더 dot에서만. **본문·CTA에 mood 색 금지.**
 
-Mood 색은 *MoodPicker / MoodBadge / DiaryCard accentBar*에서만 사용. 본문·CTA에 mood 색을 사용하지 말 것 — 감정 분류의 의미가 흐려진다.
+### Status — iOS 시스템색 그대로
+success `#34C759` · warning `#FF9500` · danger `#FF3B30` · info `#007AFF`
 
-### Dark mode
-
-`.dark`에서 paper ↔ ink가 *역전* (배경은 ink, 전경은 paper). accent는 `roseSoft`로 더 옅게. 메모이즘은 *밤에 켜는 종이등불* 같은 분위기.
+### Dark mode (활성)
+`.dark`: bg `#000000` → 카드 `#1C1C1E` → elevated `#2C2C2E`, 라벨 `rgba(235,235,245, 1/0.6/0.3/0.18)`, 틴트는 한 단계 밝게 `#E8705C`.
+적용: `localStorage('memoism-theme')` = `auto | light | dark`. `layout.tsx`의 pre-paint 스크립트가 첫 페인트 전에 `.dark`를 적용하고(플래시 방지), 설정 > 화면 > 테마 세그먼트(`ThemeToggle`)로 전환한다. 자동 모드는 `prefers-color-scheme`를 실시간 추적.
 
 ---
 
 ## 3. Typography
 
-3개 폰트 패밀리. *각자 역할이 분명*하게 분리되어 있음:
+**전부 산세리프 하나.** SF Pro의 한국어 대응 = Pretendard (Apple 기기에선 `-apple-system`이 우선 적용돼 SF + Apple SD Gothic Neo로 렌더링).
+명조(Gowun Batang)·손글씨(Gaegu)는 **v2에서 제거** — Apple은 UI에 세리프를 쓰지 않는다.
 
-| Family | 용도 |
-|---|---|
-| **Gowun Batang** (명조) | 일기 본문, h1~h2, display — 격조와 손글씨의 중간 |
-| **Pretendard** (산세리프) | UI 라벨, 버튼, 캡션, 메타 정보 — 가독성 우선 |
-| **Gaegu** (손글씨) | *드물게* 사용. 메모·앱 인트로의 *물성 강조* 순간만 |
+### Scale (iOS Dynamic Type 매핑)
+| 토큰 | px | iOS 대응 |
+|---|---|---|
+| `display` | 40 | (웹 전용 히어로) |
+| `3xl` | 34 | Large Title |
+| `2xl` | 28 | Title 1 |
+| `xl` | 22 | Title 2 |
+| `lg` | 20 | Title 3 |
+| `md` | 17 | **Body / Headline** |
+| `base` | 15 | Subheadline (UI 기본) |
+| `sm` | 13 | Footnote |
+| `xs` | 12 | Caption |
 
-### Scale (11~48px, 9단계)
-xs 11 · sm 13 · base 15 · md 17 · lg 20 · xl 24 · 2xl 30 · 3xl 38 · display 48
-
-### 프리셋 (즉시 적용 가능)
-- `display` — 랜딩·인트로 거대 제목 (display + serif)
-- `h1` — 일기 제목, 페이지 제목
-- `h2` — 섹션 제목
-- `h3` — 카드 제목 (sans)
-- `body` — 일기 본문 (serif, leading 1.85)
-- `ui` — 버튼·라벨 (sans, 13px)
-- `caption` — 날짜·메타 (sans, 11px, tracking 0.12em)
-
-본문은 **반드시 serif + leading-relaxed (1.85)**. UI 컴포넌트는 sans. 손글씨(Gaegu)는 별도 강조 외 X.
+### 규칙
+- 큰 제목일수록 자간을 좁힌다 (`tracking.tight` -0.02em). **양수 자간 큰 제목 금지.**
+- 위계는 사이즈보다 **weight(400/600/700) + 라벨 알파** 먼저.
+- 일기 본문: 17px / line-height 1.7 / `label.primary`.
+- UI 라벨·버튼: 15px / weight 500~600.
+- 메타·날짜: 13px / `label.secondary`. 캡션: 12px / `label.tertiary`.
 
 ---
 
 ## 4. Layout
 
-**모바일 우선**. 데스크탑은 모바일 너비를 중앙 정렬한 *책의 한 페이지* 형태.
-
-- `container.mobile` 390px — 기본 앱 shell
-- `container.tablet` 768px — 태블릿 대응
-- `container.page` 1100px — 데스크탑 최대 (외부 여백)
-
-### Spacing (4px base, 11단계)
-1·2·3·4·5·6·8·10·12·16·20
-
-- 카드 내부 padding: `spacing.4` ~ `spacing.5`
-- 섹션 간 gap: `spacing.5` ~ `spacing.6`
-- 페이지 좌우 padding: `spacing.5`
-- 큰 여백 (히어로): `spacing.8` ~ `spacing.12`
-
-기본은 *덜 빽빽하게*. 일기 앱이라 호흡이 있어야.
+- **터치 타겟 최소 44×44px** — 아이콘 버튼도 히트 영역은 44 확보
+- 페이지 좌우 패딩 `spacing.5`(20px), 그룹 리스트는 양옆 16~20 마진의 흰 카드
+- 섹션 간 gap `spacing.6`~`spacing.8` — 호흡 있게
+- Safe area `env(safe-area-inset-*)` 항상 보정
+- 리스트 행: 높이 48~52, 좌우 패딩 16, 구분선은 좌측 16 inset 헤어라인
 
 ---
 
-## 5. Elevation & Depth
+## 5. Elevation & Materials
 
-**Warm sepia shadow**. 일반적인 회색 그림자가 아니라 잉크 색(`#4A3D2E`)을 옅게 깔아 종이가 종이 위에 놓인 느낌.
-
-- `xs` — 카드 기본
-- `sm` — 버튼 hover
-- `md` — 다이얼로그
-- `lg` — bottom sheet
-- `paper` — *살짝 들려 있는 종이* (inset highlight + 부드러운 그림자). 강조 카드.
-
-그림자 강도를 *세게 쓰지 말 것*. 종이 위 종이는 살짝만 떠 있다.
+- **리스트·카드: 그림자 거의 없음** — 흰 카드 vs 웜 뉴트럴 배경의 대비가 곧 분리. 필요하면 `elevation.xs`까지만
+- **떠 있는 바(탭바·sticky 헤더): 블러 재질** — `rgba(244,243,241,0.82)` + `backdrop-filter: blur(20px) saturate(180%)` + 1px 헤어라인. 글로벌 유틸 `.glass` 사용
+- **스크롤 반응 재질** — 스크롤 중에는 `.glass.is-scrolled`(0.93 불투명)로 진해진다 (`useScrolled` 훅). iOS 26 Liquid Glass의 "콘텐츠에 반응하는 재질" 저비용 근사
+- ⚠️ **글래스 요소 안에 `position: fixed` 모달·시트를 두지 말 것** — backdrop-filter가 containing block을 만들어 시트가 엉뚱한 곳에 박힌다. BottomSheet·AiBusyOverlay는 body 포털로 렌더된다
+- **시트·모달: `elevation.lg`** + dim `rgba(0,0,0,0.4)`
+- 그림자 색은 순수 검정 저알파 — 갈색 그림자(v1) 폐지
 
 ---
 
 ## 6. Shapes
 
-- `sm` 6px — 작은 chip, 캡션 박스
-- `md` 10px — 카드·버튼·입력 *기본*
-- `lg` 16px — 큰 카드 (오늘의 일기 위젯), 모달
-- `xl` 24px — 시트, 큰 박스
-- `pill` 999px — chip (MoodBadge, AI chip), bottom nav 동그란 + 버튼
-
-*sharp corner(0px) 금지*. 종이는 살짝 둥글다.
+- `sm` 8px — 작은 썸네일, 칩 내부 요소
+- `md` 12px — 버튼·인풋·리스트 그룹 *기본*
+- `lg` 16px — 카드, 모달
+- `xl` 22px — 큰 히어로 카드
+- `pill` 999px — 검색창, 칩, 세그먼트, 스위치, FAB
+- 시트 상단: 20px
+- **0px 직각 금지. 한 화면에 radius 2~3종까지.**
 
 ---
 
 ## 7. Components
 
+### TabBar (하단 탭바)
+블러 유리(`.glass`) + 상단 헤어라인. 높이 52 + safe-area. 아이콘 22 + 라벨 11px(tracking 0, weight 500). 활성=틴트, 비활성=`label.tertiary`. ~~점 인디케이터~~ 제거. 가운데 + 버튼: 46px 틴트 원형, press 시 `scale(0.92)`+pressed 색 (스프링).
+
+### Large Title Header (페이지 헤더)
+34px/700/tight 산세리프 제목 + 13px secondary 부제. iOS 네비바의 Large Title 관습.
+
+### List Group (설정·메뉴)
+흰 카드(radius 12) 안에 행 48px. 행 사이 좌측 16 inset 헤어라인. 이동 행은 우측 `›`(tertiary). 행 press 시 `fill.3` 하이라이트. 섹션 제목은 카드 *밖* 좌측에 13px secondary.
+
 ### DiaryCard (일기 목록 카드)
-좌측에 mood accent 세로 바(3px) + 본문 영역 + 우측 80×80 썸네일(있을 때). 클릭 시 detail로. 카드 자체가 시각 단서라 *우측 화살표 아이콘 없음*.
+흰 카드 radius 16, 그림자 xs, **테두리 없음**. 좌측 세로 바(v1) → **mood dot 8px**로 교체. 제목 17/600 + 미리보기 15/secondary 2줄 + 메타 13/tertiary. 우측 64px 썸네일(radius 12). 화살표 아이콘 없음 (카드 전체가 탭 영역, press 시 살짝 어둡게).
 
-### MoodBadge (감정 뱃지)
-mood 색 1.5px border + 12% 채워진 배경. 이모지 + 한국어 라벨 (joy → "기쁨"). *모든 mood 색은 채도가 비슷*해서 강한 색이 하나도 튀지 않음 — 일기 목록에 한 화면 6개 mood가 섞여도 평온.
+### Buttons
+- **Filled**: 틴트 배경 + 흰 글자, radius 12, 높이 50(주요)/44(보조), weight 600. press: pressed 색 + scale 0.98
+- **Tinted**: `tint.soft` 배경 + 틴트 글자 — 보조 액션
+- **Plain**: 틴트 글자만 — 네비게이션 액션 (취소·완료)
+- destructive: `#FF3B30`
 
-### MoodPicker (감정 선택)
-6개를 **한 줄 수평 스크롤**로. 두 줄 X. 모바일 한 화면에서 다 보이지 않아도 자연스럽게 swipe. `.hide-scrollbar`로 스크롤바 숨김.
+### MoodBadge / MoodPicker
+mood 색 14% 배경 캡슐 + mood 진한 글자 12px/600. **테두리 없음** (v1의 1.5px border 폐지). Picker는 한 줄 수평 스크롤 유지, 선택 시 mood 색 배경 + 흰 글자 + scale 스프링.
 
 ### AI chip ("✨ AI")
-*베이지 배경에서 묻히지 않도록* `accent.rose` 14% 배경 + `roseDeep` 텍스트. AI가 만든 일기에 작게 부착. **본문을 압도하지 말 것** — 10px 폰트.
+`fill.2` 배경 + secondary 글자 11px — **무채색으로 후퇴** (본문을 절대 압도하지 않는다).
 
 ### Review Gate (검토 게이트)
-**Fact 영역** (사실 정보 — EXIF, 사진 개수, 날짜) 과 **Story 영역** (AI 생성 본문)을 *시각적으로 분리*. Story는 *연한 노란 종이*(`#FFF4CC` 30%) 배경 — *AI가 만든 것임을 색으로 표시*. 사용자는 본문을 그 자리에서 *수정 가능*.
+Fact(사실)·Story(AI 생성) 분리 유지. Story 영역은 연노랑 `rgba(255,204,0,0.10)` radius 12 — 시스템 옐로의 하이라이터 느낌. 사용자는 그 자리에서 수정 가능.
 
-### Carousel (사진 캐러셀)
-세로 grid가 아닌 **수평 스크롤 + scroll-snap**. 카드 너비 `min(78%, 280px)` — 다음 사진이 살짝 비치는 *peek 효과*. 일기 detail에서 사진 N장이 본문 접근을 막지 않게.
+### Search Field
+`fill.2` 배경 캡슐 40px, 좌측 돋보기(tertiary), 우측 원형 ✕.
 
-### BottomNav (하단 내비)
-5탭. 가운데 + 버튼이 작성 진입의 *글로벌 단축*. 홈에 별도 작성 CTA를 *추가로 두지 않음* (중복 회피).
+### Sheet (bottom sheet)
+상단 grabber(36×5 `fill.1` 캡슐) + radius 20 상단 + `elevation.lg` + dim 0.4. 등장: `ease.out` 420ms slide-up.
 
-### Today Widget (오늘의 일기)
-- 작성된 경우: 카드 (썸네일 + snippet)
-- 미작성: dashed border + "오늘 첫 줄, 시작해볼까?" *권유 톤* — 죄책감 강요 X
+### Carousel (사진)
+수평 스크롤 + scroll-snap 유지. 카드 radius 16. peek 효과 유지.
+
+### Empty State (빈 상태)
+아이콘(tertiary) + 17/600 한 줄 + 15/secondary 한 줄 + (선택) tinted 버튼. dashed border(v1) 폐지.
 
 ---
 
 ## 8. Do's and Don'ts
 
 ### ✅ Do
-- **종이·잉크 메타포 유지** — 배경은 paper, 전경은 ink. 화이트(`#FFF`)는 surface raised 용도 정도만 (`#FFFCF4`)
-- **모바일 우선 + 호흡 있게** — 빽빽한 dense UI X. 일기는 시간을 들여 보는 매체
-- **AI 영역은 *식별 가능하되 절제*하게** — 옅은 노란 배경 + 작은 ✨. 본문보다 *덜* 튀어야
-- **mood 색은 분류용에만** — CTA, 본문, 헤더에 mood 색 사용 X
-- **한국어 카피는 *권유형*** — "오늘 일기 써!" X → "오늘 첫 줄, 시작해볼까?" O
-- **그림자는 옅게** — sepia 톤, 강한 검정 그림자 X
-- **카드의 우측 화살표 등 *불필요한 affordance* 제거** — 카드 자체가 click 단서
+- **틴트는 코랄 하나** — 색이 보이면 인터랙티브라는 뜻이 되게
+- **위계는 알파로** — 회색 hex 단계 대신 라벨 알파 4단
+- **바는 블러, 카드는 대비** — 그림자는 시트·FAB에만
+- **터치 타겟 44px** — 모바일 우선, press 피드백은 `:active` 기준 (hover 의존 금지)
+- **한국어 카피는 권유형 유지** — "오늘 첫 줄, 시작해볼까?"
+- **모션은 목적 있을 때만** — 시트 슬라이드, press scale, 상태 전환. 장식 모션 금지. `prefers-reduced-motion` 존중
 
 ### ❌ Don't
-- **하루 한 편 원칙 깨지 마** — 오늘 일기 있을 때 "또 하나 더 기록하기" 같은 CTA 추가 X
-- **AI가 본문을 압도하게 만들지 마** — ✨ 마커가 본문보다 크거나 강한 색 사용 X
-- **mood 6개를 두 줄로 깨지 마** — 한 줄 수평 스크롤 고정
-- **smart quote(`""` 같은 곡선 따옴표) 카피에 쓰지 마** — `.env.local` 사고처럼 시스템 곳곳에서 깨질 위험
-- **sharp corner 0px 쓰지 마** — 종이는 둥글다
-- **검토 게이트를 *우회*하는 흐름 만들지 마** — AI 생성은 *반드시 사용자 검토 후* 저장
-- **사진을 일기 본문 위로 누적하지 마** — 수평 캐러셀로
+- **하루 한 편 원칙 깨지 마** — 오늘 일기 존재 시 추가 작성 CTA 금지
+- **검토 게이트 우회 금지** — AI 생성은 반드시 사용자 검토 후 저장
+- **mood 색을 CTA·본문에 쓰지 마** — 분류 전용
+- **세리프·손글씨 UI 금지** — v2는 전부 산세리프 (구 Gowun Batang/Gaegu 토큰은 deprecated 별칭)
+- **액센트 2색 이상 한 화면에 쓰지 마**
+- **카드마다 그림자 두르지 마** — iOS 리스트는 평평하다
+- **양수 자간 큰 제목 금지** — 큰 글자는 자간을 좁힌다
+- **smart quote 카피 금지** — 시스템 곳곳에서 깨질 위험
+- **사진 세로 누적 금지** — 수평 캐러셀
 
 ---
 
-## 부록 — 토큰 ↔ CSS variable 매핑
-
-DESIGN.md의 YAML 토큰은 `src/app/globals.css`의 CSS variables와 1:1 매핑된다. 변경 시 *둘 다 갱신* 필요. (V2에 자동 동기화 스크립트 검토)
+## 부록 A — 토큰 ↔ CSS variable 매핑
 
 | DESIGN.md 토큰 | CSS variable |
 |---|---|
-| `{colors.paper.0}` | `--paper-0`, `--bg`, `--background` |
-| `{colors.ink.1}` | `--ink-1`, `--fg`, `--foreground` |
-| `{colors.accent.rose}` | `--accent-rose`, `--brand`, `--primary` |
+| `{colors.bg.base}` | `--bg`, `--background` |
+| `{colors.bg.card}` | `--surface`, `--surface-raised`, `--card` |
+| `{colors.label.primary}` | `--fg`, `--foreground` |
+| `{colors.label.secondary}` | `--fg-muted`, `--fg-subtle` |
+| `{colors.label.tertiary}` | `--fg-placeholder` |
+| `{colors.fill.1~3}` | `--fill-1` ~ `--fill-3` |
+| `{colors.separator}` | `--border` (semantic), `--separator` |
+| `{colors.tint.base}` | `--tint`, `--brand`, `--primary` |
 | `{colors.mood.joy}` | `--mood-joy`, `--chart-1` |
 | `{spacing.4}` | `--space-4` |
 | `{rounded.md}` | `--radius-md`, `--radius` |
 | `{elevation.xs}` | `--shadow-xs` |
-| `{typography.fonts.serif}` | `--font-serif` |
 | `{motion.duration.fast}` | `--duration-fast` |
+
+## 부록 B — v1(종이·잉크) 레거시 별칭
+
+v1 토큰을 참조하는 기존 코드가 깨지지 않도록 globals.css에 **deprecated 별칭**이 남아 있다. 새 코드에서 사용 금지:
+
+| v1 변수 | 현재 값 |
+|---|---|
+| `--paper-0` | `--bg` |
+| `--paper-1` `--paper-2` `--paper-3` | 웜 뉴트럴 단계 (fill 대용) |
+| `--ink-1`~`--ink-5` | 라벨 알파 단계의 근사 불투명색 |
+| `--accent-rose` / `--accent-rose-deep` / `--accent-rose-soft` | `--tint` / `--tint-pressed` / 틴트 소프트 |
+| `--font-serif`, `--font-hand` | `--font-sans` (세리프 폐지) |
+| `--shadow-paper` | `--shadow-sm` |

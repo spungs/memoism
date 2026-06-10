@@ -27,6 +27,7 @@ export function MoodPicker({ value, onChange }: MoodPickerProps) {
           color: 'var(--fg-subtle)',
           letterSpacing: 'var(--tracking-wider)',
           fontWeight: 600,
+          textTransform: 'uppercase',
           margin: 0,
           marginBottom: 'var(--space-2)',
         }}
@@ -38,9 +39,7 @@ export function MoodPicker({ value, onChange }: MoodPickerProps) {
           display: 'flex',
           gap: 'var(--space-2)',
           overflowX: 'auto',
-          // hide scrollbar (Webkit + Firefox)
-          scrollbarWidth: 'none',
-          paddingBottom: 4,
+          paddingBottom: 2,
         }}
         className="hide-scrollbar"
       >
@@ -53,36 +52,33 @@ export function MoodPicker({ value, onChange }: MoodPickerProps) {
               onClick={() => onChange(isSelected ? null : mood.key)}
               aria-pressed={isSelected}
               aria-label={mood.label}
+              className="pressable"
               style={{
                 display: 'flex',
-                flexDirection: 'column',
                 alignItems: 'center',
-                gap: 4,
+                gap: 6,
                 flexShrink: 0,
-                padding: '8px 12px',
-                borderRadius: 'var(--radius-md)',
-                border: isSelected
-                  ? `2px solid ${mood.color}`
-                  : '2px solid transparent',
+                minHeight: 36,
+                padding: '0 12px',
+                borderRadius: 'var(--radius-pill)',
+                border: 'none',
                 backgroundColor: isSelected
-                  ? `color-mix(in srgb, ${mood.color} 15%, transparent)`
-                  : 'var(--surface)',
+                  ? mood.color
+                  : 'var(--fill-2)',
                 cursor: 'pointer',
-                transition: 'all var(--duration-fast) var(--ease-out)',
                 outline: 'none',
-                boxShadow: isSelected
-                  ? `0 0 0 1px color-mix(in srgb, ${mood.color} 25%, transparent)`
-                  : 'none',
+                transition: 'background-color var(--duration-fast) var(--ease-out), transform var(--duration-base) var(--ease-bounce)',
+                transform: isSelected ? 'scale(1.08)' : 'scale(1)',
               }}
             >
-              <span style={{ fontSize: 22, lineHeight: 1 }}>{mood.emoji}</span>
+              <span style={{ fontSize: 16, lineHeight: 1 }}>{mood.emoji}</span>
               <span
                 style={{
                   fontFamily: 'var(--font-sans)',
-                  fontSize: 10,
-                  color: isSelected ? mood.color : 'var(--fg-subtle)',
-                  fontWeight: isSelected ? 700 : 400,
-                  letterSpacing: 'var(--tracking-wide)',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 600,
+                  color: isSelected ? '#fff' : 'var(--fg-muted)',
+                  letterSpacing: 0,
                 }}
               >
                 {mood.label}

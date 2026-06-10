@@ -35,7 +35,7 @@ export function DiaryDetailActions({ diaryId }: DiaryDetailActionsProps) {
       style={{
         display: "inline-flex",
         alignItems: "center",
-        gap: "var(--space-1)",
+        gap: "var(--space-2)",
       }}
     >
       <Link
@@ -44,16 +44,17 @@ export function DiaryDetailActions({ diaryId }: DiaryDetailActionsProps) {
           display: "inline-flex",
           alignItems: "center",
           gap: 4,
-          padding: "6px 10px",
+          padding: "0 var(--space-2)",
+          height: 44,
           borderRadius: "var(--radius-md)",
           fontFamily: "var(--font-sans)",
-          fontSize: "var(--text-sm)",
-          fontWeight: 500,
-          color: "var(--fg)",
+          fontSize: "var(--text-base)",
+          fontWeight: 600,
+          color: "var(--tint)",
           textDecoration: "none",
         }}
       >
-        <Pencil size={14} aria-hidden />
+        <Pencil size={15} aria-hidden />
         수정
       </Link>
       <button
@@ -65,16 +66,16 @@ export function DiaryDetailActions({ diaryId }: DiaryDetailActionsProps) {
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          width: 32,
-          height: 32,
+          width: 44,
+          height: 44,
           borderRadius: "var(--radius-md)",
           border: "none",
           backgroundColor: "transparent",
-          color: pending ? "var(--fg-placeholder)" : "var(--fg-muted)",
+          color: pending ? "var(--fg-placeholder)" : "var(--danger)",
           cursor: pending ? "not-allowed" : "pointer",
         }}
       >
-        <Trash2 size={16} aria-hidden />
+        <Trash2 size={17} aria-hidden />
       </button>
 
       <ConfirmSheet

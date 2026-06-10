@@ -6,59 +6,61 @@ import { logoutAction, changePasswordAction, type ChangePasswordState } from "@/
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { PushToggle } from "@/components/settings/push-toggle";
+import { ThemeToggle } from "@/components/settings/theme-toggle";
 import { PageHeader } from "@/components/layout/page-header";
 
 const APP_VERSION = "v0.1.0";
 
-interface SettingsViewProps {
-  email: string;
-}
-
-const SECTION_HEADER_STYLE: React.CSSProperties = {
+// iOS 설정 앱 그룹 리스트 패턴
+// 섹션 레이블: 카드 밖 좌측 16px, 13px / secondary
+const SECTION_LABEL_STYLE: React.CSSProperties = {
   fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-xs)",
-  color: "var(--fg-subtle)",
-  letterSpacing: "var(--tracking-wider)",
-  fontWeight: 600,
-  textTransform: "uppercase",
+  fontSize: "var(--text-sm)",
+  fontWeight: 400,
+  color: "var(--fg-muted)",
   margin: "0 0 var(--space-2)",
-  paddingLeft: "var(--space-2)",
+  paddingLeft: "var(--space-4)",
+  letterSpacing: 0,
+  textTransform: "none",
 };
 
+// 흰 카드 radius 12, 테두리 없음, 그림자 없음
+const CARD_STYLE: React.CSSProperties = {
+  backgroundColor: "var(--surface)",
+  borderRadius: "var(--radius-md)",
+  overflow: "hidden",
+};
+
+// 행 48px, 좌우 패딩 16
 const ROW_STYLE: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  padding: "var(--space-4) var(--space-4)",
-  minHeight: 56,
+  padding: "0 var(--space-4)",
+  minHeight: 48,
   gap: "var(--space-3)",
 };
 
 const ROW_LABEL_STYLE: React.CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-base)",
+  fontWeight: 400,
   color: "var(--fg)",
 };
 
 const ROW_VALUE_STYLE: React.CSSProperties = {
   fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-subtle)",
+  fontSize: "var(--text-base)",
+  color: "var(--fg-muted)",
   display: "flex",
   alignItems: "center",
   gap: "var(--space-2)",
 };
 
-const CARD_STYLE: React.CSSProperties = {
-  backgroundColor: "var(--surface-raised)",
-  borderRadius: "var(--radius-lg)",
-  border: "1px solid var(--border)",
-  overflow: "hidden",
-};
-
+// 좌측 16px inset 헤어라인
 const DIVIDER_STYLE: React.CSSProperties = {
   height: 1,
-  backgroundColor: "var(--border)",
+  backgroundColor: "var(--separator)",
   marginLeft: "var(--space-4)",
 };
 
@@ -67,6 +69,10 @@ function getInitials(email: string): string {
   const cleaned = local.replace(/[^a-zA-Z0-9가-힣]/g, "");
   if (cleaned.length === 0) return "?";
   return cleaned.slice(0, 2).toUpperCase();
+}
+
+interface SettingsViewProps {
+  email: string;
 }
 
 export function SettingsView({ email }: SettingsViewProps) {
@@ -130,176 +136,171 @@ export function SettingsView({ email }: SettingsViewProps) {
   return (
     <div
       style={{
-        backgroundColor: "var(--paper-0)",
+        backgroundColor: "var(--bg)",
         minHeight: "100svh",
-        padding: "0 var(--space-5) var(--space-10)",
+        paddingBottom: "var(--space-10)",
       }}
     >
       <PageHeader title="설정" />
 
-      <section
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--space-4)",
-          padding: "var(--space-5)",
-          marginBottom: "var(--space-8)",
-          ...CARD_STYLE,
-        }}
-      >
+      {/* 계정 프로필 카드 — 그룹 상단 */}
+      <div style={{ padding: "0 var(--space-5)", marginBottom: "var(--space-8)" }}>
         <div
-          aria-hidden
           style={{
-            width: 48,
-            height: 48,
-            borderRadius: "var(--radius-pill)",
-            backgroundColor: "var(--accent-rose)",
-            color: "#fff",
+            ...CARD_STYLE,
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-base)",
-            fontWeight: 700,
-            letterSpacing: "var(--tracking-wide)",
-            flexShrink: 0,
+            gap: "var(--space-4)",
+            padding: "var(--space-4)",
           }}
         >
-          {getInitials(email)}
-        </div>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <p
+          <div
+            aria-hidden
             style={{
+              width: 44,
+              height: 44,
+              borderRadius: "var(--radius-pill)",
+              backgroundColor: "var(--tint)",
+              color: "var(--on-tint)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
               fontFamily: "var(--font-sans)",
               fontSize: "var(--text-base)",
-              color: "var(--fg)",
-              margin: 0,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
+              fontWeight: 600,
+              flexShrink: 0,
             }}
           >
-            {email}
-          </p>
-          <p
-            style={{
-              fontFamily: "var(--font-sans)",
-              fontSize: "var(--text-xs)",
-              color: "var(--fg-subtle)",
-              margin: "2px 0 0",
-            }}
-          >
-            로그인된 계정
-          </p>
+            {getInitials(email)}
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-base)",
+                fontWeight: 500,
+                color: "var(--fg)",
+                margin: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {email}
+            </p>
+            <p
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                color: "var(--fg-muted)",
+                margin: "2px 0 0",
+              }}
+            >
+              로그인된 계정
+            </p>
+          </div>
         </div>
-      </section>
+      </div>
 
-      <section style={{ marginBottom: "var(--space-6)" }}>
-        <h2 style={SECTION_HEADER_STYLE}>계정</h2>
+      {/* 계정 그룹 */}
+      <div style={{ padding: "0 var(--space-5)", marginBottom: "var(--space-6)" }}>
+        <p style={SECTION_LABEL_STYLE}>계정</p>
         <div style={CARD_STYLE}>
-          <button
-            type="button"
+          <RowButton
+            label="비밀번호 변경"
             onClick={() => setPasswordOpen(true)}
-            style={{ ...ROW_STYLE, width: "100%", background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}
-          >
-            <span style={ROW_LABEL_STYLE}>비밀번호 변경</span>
-            <Chevron />
-          </button>
+          />
         </div>
-      </section>
+      </div>
 
-      <section style={{ marginBottom: "var(--space-6)" }}>
-        <h2 style={SECTION_HEADER_STYLE}>알림</h2>
+      {/* 알림 그룹 */}
+      <div style={{ padding: "0 var(--space-5)", marginBottom: "var(--space-6)" }}>
+        <p style={SECTION_LABEL_STYLE}>알림</p>
         <div style={CARD_STYLE}>
           <PushToggle />
         </div>
-      </section>
+      </div>
 
-      <section style={{ marginBottom: "var(--space-6)" }}>
-        <h2 style={SECTION_HEADER_STYLE}>데이터</h2>
+      {/* 화면 그룹 */}
+      <div style={{ padding: "0 var(--space-5)", marginBottom: "var(--space-6)" }}>
+        <p style={SECTION_LABEL_STYLE}>화면</p>
         <div style={CARD_STYLE}>
-          <button
-            type="button"
+          <ThemeToggle />
+        </div>
+      </div>
+
+      {/* 데이터 그룹 */}
+      <div style={{ padding: "0 var(--space-5)", marginBottom: "var(--space-6)" }}>
+        <p style={SECTION_LABEL_STYLE}>데이터</p>
+        <div style={CARD_STYLE}>
+          <RowButton
+            label={exporting ? "내보내는 중..." : "데이터 내보내기"}
             onClick={handleExport}
             disabled={exporting}
-            style={{
-              ...ROW_STYLE,
-              width: "100%",
-              background: "transparent",
-              border: "none",
-              cursor: exporting ? "default" : "pointer",
-              textAlign: "left",
-              opacity: exporting ? 0.6 : 1,
-            }}
-          >
-            <span style={ROW_LABEL_STYLE}>
-              {exporting ? "내보내는 중..." : "데이터 내보내기"}
-            </span>
-            <Chevron />
-          </button>
+          />
           <div style={DIVIDER_STYLE} />
-          <button
-            type="button"
+          <RowButton
+            label="계정 탈퇴"
             onClick={() => setDeleteOpen(true)}
-            style={{
-              ...ROW_STYLE,
-              width: "100%",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              textAlign: "left",
-            }}
-          >
-            <span style={{ ...ROW_LABEL_STYLE, color: "var(--danger)" }}>
-              계정 탈퇴
-            </span>
-            <Chevron />
-          </button>
+            danger
+          />
         </div>
         {exportError && (
           <p
             role="alert"
             style={{
               fontFamily: "var(--font-sans)",
-              fontSize: "var(--text-xs)",
+              fontSize: "var(--text-sm)",
               color: "var(--danger)",
               margin: "var(--space-2) 0 0",
-              paddingLeft: "var(--space-2)",
+              paddingLeft: "var(--space-4)",
             }}
           >
             {exportError}
           </p>
         )}
-      </section>
+      </div>
 
-      <section style={{ marginBottom: "var(--space-8)" }}>
-        <h2 style={SECTION_HEADER_STYLE}>정보</h2>
+      {/* 정보 그룹 */}
+      <div style={{ padding: "0 var(--space-5)", marginBottom: "var(--space-8)" }}>
+        <p style={SECTION_LABEL_STYLE}>정보</p>
         <div style={CARD_STYLE}>
-          <div style={ROW_STYLE}>
+          <div style={{ ...ROW_STYLE }}>
             <span style={ROW_LABEL_STYLE}>버전</span>
             <span style={ROW_VALUE_STYLE}>{APP_VERSION}</span>
           </div>
         </div>
-      </section>
+      </div>
 
-      <button
-        type="button"
-        onClick={() => setLogoutOpen(true)}
-        style={{
-          width: "100%",
-          height: 52,
-          fontFamily: "var(--font-sans)",
-          fontSize: "var(--text-base)",
-          fontWeight: 600,
-          color: "var(--danger)",
-          backgroundColor: "transparent",
-          border: "1.5px solid color-mix(in srgb, var(--danger) 30%, transparent)",
-          borderRadius: "var(--radius-lg)",
-          cursor: "pointer",
-        }}
-      >
-        로그아웃
-      </button>
+      {/* 로그아웃 — 별도 그룹, danger 글자 */}
+      <div style={{ padding: "0 var(--space-5)" }}>
+        <div style={CARD_STYLE}>
+          <button
+            type="button"
+            onClick={() => setLogoutOpen(true)}
+            className="pressable"
+            style={{
+              ...ROW_STYLE,
+              width: "100%",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              justifyContent: "center",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-base)",
+                fontWeight: 500,
+                color: "var(--danger)",
+              }}
+            >
+              로그아웃
+            </span>
+          </button>
+        </div>
+      </div>
 
       <ConfirmSheet
         isOpen={logoutOpen}
@@ -334,7 +335,48 @@ export function SettingsView({ email }: SettingsViewProps) {
   );
 }
 
-function Chevron() {
+// 이동 행 — 우측 chevron, press 시 fill-3 하이라이트
+function RowButton({
+  label,
+  onClick,
+  disabled,
+  danger,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="pressable"
+      style={{
+        ...ROW_STYLE,
+        width: "100%",
+        background: "transparent",
+        border: "none",
+        cursor: disabled ? "default" : "pointer",
+        textAlign: "left",
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <span
+        style={{
+          ...ROW_LABEL_STYLE,
+          color: danger ? "var(--danger)" : "var(--fg)",
+        }}
+      >
+        {label}
+      </span>
+      <ChevronIcon />
+    </button>
+  );
+}
+
+function ChevronIcon() {
   return (
     <svg
       aria-hidden
@@ -342,10 +384,11 @@ function Chevron() {
       height="16"
       viewBox="0 0 24 24"
       fill="none"
-      stroke="var(--ink-4)"
+      stroke="var(--fg-placeholder)"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      style={{ flexShrink: 0 }}
     >
       <polyline points="9 18 15 12 9 6" />
     </svg>
@@ -372,11 +415,13 @@ function PasswordSheet({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
       <div style={{ padding: "var(--space-4) var(--space-5) 0" }}>
         <p
           style={{
-            fontFamily: "var(--font-serif)",
-            fontSize: "var(--text-lg)",
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-md)",
+            fontWeight: 600,
             color: "var(--fg)",
             margin: "0 0 var(--space-5)",
             textAlign: "center",
+            letterSpacing: "var(--tracking-tight)",
           }}
         >
           비밀번호 변경
@@ -385,7 +430,7 @@ function PasswordSheet({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
         <form
           ref={formRef}
           action={formAction}
-          style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}
+          style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}
         >
           <PasswordField
             name="currentPassword"
@@ -443,13 +488,14 @@ function PasswordSheet({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
               disabled={pending}
               style={{
                 flex: 1,
-                padding: "var(--space-4)",
-                borderRadius: "var(--radius-lg)",
-                border: "1.5px solid var(--border)",
-                backgroundColor: "transparent",
+                height: 50,
+                borderRadius: "var(--radius-md)",
+                border: "none",
+                backgroundColor: "var(--fill-2)",
                 color: "var(--fg-muted)",
                 fontFamily: "var(--font-sans)",
                 fontSize: "var(--text-base)",
+                fontWeight: 500,
                 cursor: pending ? "default" : "pointer",
               }}
             >
@@ -458,13 +504,14 @@ function PasswordSheet({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
             <button
               type="submit"
               disabled={pending}
+              className="pressable"
               style={{
                 flex: 1,
-                padding: "var(--space-4)",
-                borderRadius: "var(--radius-lg)",
+                height: 50,
+                borderRadius: "var(--radius-md)",
                 border: "none",
-                backgroundColor: pending ? "var(--accent-rose-soft)" : "var(--accent-rose)",
-                color: "#fff",
+                backgroundColor: pending ? "var(--tint-soft)" : "var(--tint)",
+                color: pending ? "var(--tint)" : "var(--on-tint)",
                 fontFamily: "var(--font-sans)",
                 fontSize: "var(--text-base)",
                 fontWeight: 600,
@@ -494,7 +541,6 @@ function PasswordField({
   hint?: string;
 }) {
   const [focused, setFocused] = useState(false);
-  const borderColor = error ? "var(--danger)" : focused ? "var(--accent-rose)" : "var(--border)";
   return (
     <div>
       <label
@@ -502,12 +548,10 @@ function PasswordField({
         style={{
           display: "block",
           fontFamily: "var(--font-sans)",
-          fontSize: "var(--text-xs)",
-          color: "var(--fg-subtle)",
-          letterSpacing: "var(--tracking-wider)",
-          fontWeight: 600,
-          textTransform: "uppercase",
-          marginBottom: "var(--space-2)",
+          fontSize: "var(--text-sm)",
+          color: "var(--fg-muted)",
+          fontWeight: 400,
+          marginBottom: "var(--space-1)",
         }}
       >
         {label}
@@ -522,23 +566,24 @@ function PasswordField({
         aria-invalid={Boolean(error)}
         style={{
           width: "100%",
-          height: 48,
+          height: 50,
           padding: "0 var(--space-4)",
           fontFamily: "var(--font-sans)",
           fontSize: "var(--text-base)",
           color: "var(--fg)",
-          backgroundColor: "var(--surface-raised)",
-          border: `1px solid ${borderColor}`,
+          backgroundColor: focused ? "var(--fill-1)" : "var(--fill-2)",
+          border: error ? "1.5px solid var(--danger)" : "none",
           borderRadius: "var(--radius-md)",
           outline: "none",
+          transition: `background-color var(--duration-fast) var(--ease-out)`,
         }}
       />
       {error ? (
-        <p style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-xs)", color: "var(--danger)", margin: "var(--space-2) 0 0" }}>
+        <p style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", color: "var(--danger)", margin: "var(--space-1) 0 0" }}>
           {error}
         </p>
       ) : hint ? (
-        <p style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-xs)", color: "var(--fg-subtle)", margin: "var(--space-2) 0 0" }}>
+        <p style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", color: "var(--fg-muted)", margin: "var(--space-1) 0 0" }}>
           {hint}
         </p>
       ) : null}

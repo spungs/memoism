@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * 도는 링 스피너. 전역 `@keyframes spin`(globals.css) 재사용.
@@ -54,7 +55,10 @@ export function AiBusyOverlay({ label, onCancel }: Props) {
     };
   }, []);
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  // body 포털 — 조상에 backdrop-filter/transform이 있어도 전체 화면을 확실히 덮는다.
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -67,8 +71,8 @@ export function AiBusyOverlay({ label, onCancel }: Props) {
         alignItems: "center",
         justifyContent: "center",
         padding: "var(--space-6)",
-        backgroundColor: "rgba(42, 33, 24, 0.4)",
-        animation: "memo-overlay-fade-in 200ms var(--ease-out)",
+        backgroundColor: "var(--overlay-dim)",
+        animation: "memo-overlay-fade-in 250ms var(--ease-out)",
       }}
     >
       <div
@@ -80,19 +84,20 @@ export function AiBusyOverlay({ label, onCancel }: Props) {
           width: "100%",
           maxWidth: 300,
           padding: "var(--space-8) var(--space-6)",
-          backgroundColor: "var(--surface-raised)",
+          backgroundColor: "var(--surface)",
           borderRadius: "var(--radius-xl)",
-          boxShadow: "0 8px 32px rgba(74,61,46,0.18)",
+          boxShadow: "var(--shadow-lg)",
           textAlign: "center",
         }}
       >
-        <Spinner size={32} color="var(--accent-rose)" thickness={3} />
+        <Spinner size={32} color="var(--tint)" thickness={3} />
         <p
           style={{
             margin: 0,
-            fontFamily: "var(--font-serif)",
+            fontFamily: "var(--font-sans)",
             fontSize: "var(--text-md)",
-            lineHeight: "var(--leading-relaxed)",
+            fontWeight: 600,
+            lineHeight: "var(--leading-normal)",
             color: "var(--fg)",
             whiteSpace: "pre-line",
           }}
@@ -104,7 +109,7 @@ export function AiBusyOverlay({ label, onCancel }: Props) {
             margin: 0,
             fontFamily: "var(--font-sans)",
             fontSize: "var(--text-sm)",
-            color: "var(--fg-subtle)",
+            color: "var(--fg-muted)",
           }}
         >
           잠시만 기다려 주세요
@@ -113,16 +118,17 @@ export function AiBusyOverlay({ label, onCancel }: Props) {
           <button
             type="button"
             onClick={onCancel}
+            className="pressable"
             style={{
               marginTop: "var(--space-1)",
               minHeight: 44,
               padding: "10px 24px",
               borderRadius: "var(--radius-md)",
-              border: "1px solid var(--border)",
-              backgroundColor: "transparent",
-              color: "var(--fg-muted)",
+              border: "none",
+              backgroundColor: "var(--fill-2)",
+              color: "var(--fg)",
               fontFamily: "var(--font-sans)",
-              fontSize: "var(--text-sm)",
+              fontSize: "var(--text-base)",
               fontWeight: 600,
               cursor: "pointer",
             }}
@@ -138,6 +144,7 @@ export function AiBusyOverlay({ label, onCancel }: Props) {
           to   { opacity: 1; }
         }
       `}</style>
-    </div>
+    </div>,
+    document.body,
   );
 }

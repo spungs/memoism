@@ -28,11 +28,12 @@ export function ConfirmSheet({
       <div style={{ padding: "var(--space-4) var(--space-5) 0" }}>
         <p
           style={{
-            fontFamily: "var(--font-serif)",
-            fontSize: "var(--text-lg)",
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-md)",
+            fontWeight: 600,
             color: "var(--fg)",
             textAlign: "center",
-            margin: "0 0 var(--space-2)",
+            margin: "var(--space-2) 0 var(--space-1)",
             lineHeight: "var(--leading-snug)",
           }}
         >
@@ -44,7 +45,7 @@ export function ConfirmSheet({
             style={{
               fontFamily: "var(--font-sans)",
               fontSize: "var(--text-sm)",
-              color: "var(--fg-subtle)",
+              color: "var(--fg-muted)",
               textAlign: "center",
               margin: "0 0 var(--space-5)",
               lineHeight: "var(--leading-normal)",
@@ -66,18 +67,18 @@ export function ConfirmSheet({
             type="button"
             onClick={onConfirm}
             disabled={isLoading}
+            className="pressable"
             style={{
               width: "100%",
-              padding: "var(--space-4)",
-              borderRadius: "var(--radius-lg)",
+              minHeight: 50,
+              padding: "var(--space-3) var(--space-4)",
+              borderRadius: "var(--radius-md)",
               border: "none",
               backgroundColor:
-                confirmVariant === "danger"
-                  ? "var(--danger)"
-                  : "var(--accent-rose)",
-              color: "#fff",
+                confirmVariant === "danger" ? "var(--danger)" : "var(--tint)",
+              color: "var(--on-tint)",
               fontFamily: "var(--font-sans)",
-              fontSize: "var(--text-base)",
+              fontSize: "var(--text-md)",
               fontWeight: 600,
               cursor: isLoading ? "default" : "pointer",
               opacity: isLoading ? 0.7 : 1,
@@ -91,15 +92,18 @@ export function ConfirmSheet({
             type="button"
             onClick={onClose}
             disabled={isLoading}
+            className="pressable"
             style={{
               width: "100%",
-              padding: "var(--space-4)",
-              borderRadius: "var(--radius-lg)",
-              border: "1.5px solid var(--border)",
-              backgroundColor: "transparent",
-              color: "var(--fg-muted)",
+              minHeight: 50,
+              padding: "var(--space-3) var(--space-4)",
+              borderRadius: "var(--radius-md)",
+              border: "none",
+              backgroundColor: "var(--fill-2)",
+              color: "var(--fg)",
               fontFamily: "var(--font-sans)",
-              fontSize: "var(--text-base)",
+              fontSize: "var(--text-md)",
+              fontWeight: 600,
               cursor: isLoading ? "default" : "pointer",
             }}
           >

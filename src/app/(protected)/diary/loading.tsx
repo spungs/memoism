@@ -8,13 +8,15 @@ export default function DiaryLoading() {
       </header>
 
       {/* 일기 카드 목록 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         {[200, 160, 220, 140, 190, 170].map((w, i) => (
-          <div key={i} style={{ padding: 'var(--space-4)', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-            <div className="skeleton" style={{ width: w, height: 18, marginBottom: 8 }} />
-            <div className="skeleton" style={{ width: '90%', height: 14, marginBottom: 6 }} />
-            <div className="skeleton" style={{ width: '70%', height: 14, marginBottom: 10 }} />
-            <div className="skeleton" style={{ width: 60, height: 12 }} />
+          <div key={i} style={{ padding: 'var(--space-3) var(--space-4)', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-lg)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 8 }}>
+              <div className="skeleton" style={{ width: 8, height: 8, borderRadius: '50%' }} />
+              <div className="skeleton" style={{ width: 48, height: 12 }} />
+            </div>
+            <div className="skeleton" style={{ width: w, height: 18, marginBottom: 6 }} />
+            <div className="skeleton" style={{ width: '80%', height: 14 }} />
           </div>
         ))}
       </div>

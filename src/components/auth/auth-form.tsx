@@ -32,41 +32,9 @@ const COPY = {
   },
 } as const;
 
-const LABEL_STYLE: React.CSSProperties = {
-  display: "block",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-xs)",
-  color: "var(--fg-subtle)",
-  letterSpacing: "var(--tracking-wider)",
-  fontWeight: 600,
-  textTransform: "uppercase",
-  marginBottom: "var(--space-2)",
-};
-
-const ERROR_STYLE: React.CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
-  marginTop: "var(--space-2)",
-  marginBottom: 0,
-};
-
-const HINT_STYLE: React.CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-xs)",
-  color: "var(--fg-subtle)",
-  marginTop: "var(--space-2)",
-  marginBottom: 0,
-};
-
 function FieldInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   const [focused, setFocused] = useState(false);
   const invalid = props["aria-invalid"] === true || props["aria-invalid"] === "true";
-  const borderColor = invalid
-    ? "var(--danger)"
-    : focused
-      ? "var(--accent-rose)"
-      : "var(--border)";
   return (
     <input
       {...props}
@@ -80,17 +48,16 @@ function FieldInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
       }}
       style={{
         width: "100%",
-        height: 52,
+        height: 50,
         padding: "0 var(--space-4)",
         fontFamily: "var(--font-sans)",
         fontSize: "var(--text-base)",
         color: "var(--fg)",
-        backgroundColor: "var(--surface-raised)",
-        border: `1px solid ${borderColor}`,
-        borderRadius: "var(--radius-lg)",
+        backgroundColor: focused ? "var(--fill-1)" : "var(--fill-2)",
+        border: invalid ? "1.5px solid var(--danger)" : "none",
+        borderRadius: "var(--radius-md)",
         outline: "none",
-        transition: `border-color var(--duration-fast) var(--ease-out)`,
-        boxShadow: focused && !invalid ? "var(--shadow-xs)" : "none",
+        transition: `background-color var(--duration-fast) var(--ease-out)`,
       }}
     />
   );
@@ -113,24 +80,14 @@ export function AuthForm({ mode, action }: AuthFormProps) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-10)" }}>
+      {/* 워드마크 + 한 줄 소개 */}
       <header style={{ textAlign: "center" }}>
-        <p
-          aria-hidden
-          style={{
-            fontSize: 32,
-            lineHeight: 1,
-            margin: 0,
-            marginBottom: "var(--space-4)",
-          }}
-        >
-          🌸
-        </p>
         <h1
           style={{
-            fontFamily: "var(--font-serif)",
-            fontSize: "var(--text-3xl)",
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-2xl)",
             fontWeight: 700,
-            color: "var(--fg)",
+            color: "var(--tint)",
             letterSpacing: "var(--tracking-tight)",
             lineHeight: "var(--leading-tight)",
             margin: 0,
@@ -140,10 +97,11 @@ export function AuthForm({ mode, action }: AuthFormProps) {
         </h1>
         <p
           style={{
-            fontFamily: "var(--font-hand)",
-            fontSize: "var(--text-lg)",
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-base)",
+            fontWeight: 400,
             color: "var(--fg-muted)",
-            marginTop: "var(--space-3)",
+            marginTop: "var(--space-2)",
             marginBottom: 0,
           }}
         >
@@ -151,16 +109,14 @@ export function AuthForm({ mode, action }: AuthFormProps) {
         </p>
       </header>
 
+      {/* 인풋 스택 + CTA */}
       <form
         action={formAction}
         noValidate
         onReset={(e) => e.preventDefault()}
-        style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}
+        style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}
       >
         <div>
-          <label htmlFor="email" style={LABEL_STYLE}>
-            이메일
-          </label>
           <FieldInput
             id="email"
             name="email"
@@ -168,7 +124,7 @@ export function AuthForm({ mode, action }: AuthFormProps) {
             autoComplete="email"
             inputMode="email"
             required
-            placeholder="you@example.com"
+            placeholder="이메일"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             aria-invalid={Boolean(state.fieldErrors?.email)}
@@ -177,16 +133,23 @@ export function AuthForm({ mode, action }: AuthFormProps) {
             }
           />
           {state.fieldErrors?.email && (
-            <p id="email-error" role="alert" style={ERROR_STYLE}>
+            <p
+              id="email-error"
+              role="alert"
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                color: "var(--danger)",
+                marginTop: "var(--space-1)",
+                marginBottom: 0,
+              }}
+            >
               {state.fieldErrors.email}
             </p>
           )}
         </div>
 
         <div>
-          <label htmlFor="password" style={LABEL_STYLE}>
-            비밀번호
-          </label>
           <FieldInput
             key={passwordKey}
             id="password"
@@ -195,23 +158,31 @@ export function AuthForm({ mode, action }: AuthFormProps) {
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
             required
             minLength={mode === "signup" ? 8 : undefined}
-            placeholder={mode === "signup" ? "8자 이상" : "비밀번호"}
+            placeholder={mode === "signup" ? "비밀번호 (8자 이상)" : "비밀번호"}
             aria-invalid={Boolean(state.fieldErrors?.password)}
             aria-describedby={
               state.fieldErrors?.password ? "password-error" : undefined
             }
           />
-          {state.fieldErrors?.password ? (
-            <p id="password-error" role="alert" style={ERROR_STYLE}>
+          {state.fieldErrors?.password && (
+            <p
+              id="password-error"
+              role="alert"
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                color: "var(--danger)",
+                marginTop: "var(--space-1)",
+                marginBottom: 0,
+              }}
+            >
               {state.fieldErrors.password}
             </p>
-          ) : mode === "signup" ? (
-            <p style={HINT_STYLE}>8자 이상 입력해주세요.</p>
-          ) : null}
+          )}
         </div>
 
         {mode === "signup" && (
-          <div>
+          <div style={{ marginTop: "var(--space-1)" }}>
             <label
               htmlFor="consent"
               style={{
@@ -220,7 +191,7 @@ export function AuthForm({ mode, action }: AuthFormProps) {
                 gap: "var(--space-3)",
                 fontFamily: "var(--font-sans)",
                 fontSize: "var(--text-sm)",
-                color: "var(--fg)",
+                color: "var(--fg-muted)",
                 lineHeight: "var(--leading-relaxed)",
                 cursor: "pointer",
               }}
@@ -238,7 +209,7 @@ export function AuthForm({ mode, action }: AuthFormProps) {
                   marginTop: 3,
                   width: 18,
                   height: 18,
-                  accentColor: "var(--accent-rose)",
+                  accentColor: "var(--tint)",
                   flexShrink: 0,
                 }}
               />
@@ -251,7 +222,14 @@ export function AuthForm({ mode, action }: AuthFormProps) {
               <p
                 id="consent-error"
                 role="alert"
-                style={{ ...ERROR_STYLE, marginLeft: 30 }}
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-sm)",
+                  color: "var(--danger)",
+                  marginTop: "var(--space-1)",
+                  marginBottom: 0,
+                  paddingLeft: 30,
+                }}
               >
                 {state.fieldErrors.consent}
               </p>
@@ -266,9 +244,6 @@ export function AuthForm({ mode, action }: AuthFormProps) {
               fontFamily: "var(--font-sans)",
               fontSize: "var(--text-sm)",
               color: "var(--danger)",
-              backgroundColor: "color-mix(in srgb, var(--danger) 10%, transparent)",
-              padding: "var(--space-3) var(--space-4)",
-              borderRadius: "var(--radius-md)",
               margin: 0,
             }}
           >
@@ -276,35 +251,39 @@ export function AuthForm({ mode, action }: AuthFormProps) {
           </p>
         )}
 
+        {/* Filled tint CTA — 높이 50, radius 12, weight 600 */}
         <button
           type="submit"
           disabled={pending}
+          className="pressable"
           style={{
             width: "100%",
-            height: 52,
-            marginTop: "var(--space-3)",
+            height: 50,
+            marginTop: "var(--space-2)",
             fontFamily: "var(--font-sans)",
             fontSize: "var(--text-base)",
             fontWeight: 600,
-            color: "var(--paper-0)",
-            backgroundColor: pending ? "var(--accent-rose-soft)" : "var(--accent-rose)",
+            color: "var(--on-tint)",
+            backgroundColor: pending ? "var(--tint-soft)" : "var(--tint)",
             border: "none",
-            borderRadius: "var(--radius-lg)",
+            borderRadius: "var(--radius-md)",
             cursor: pending ? "default" : "pointer",
             transition: `background-color var(--duration-fast) var(--ease-out)`,
-            boxShadow: pending ? "none" : "var(--shadow-sm)",
           }}
         >
-          {pending ? copy.submitting : copy.submit}
+          <span style={{ color: pending ? "var(--tint)" : "var(--on-tint)" }}>
+            {pending ? copy.submitting : copy.submit}
+          </span>
         </button>
       </form>
 
+      {/* 전환 링크 — plain tint 텍스트 */}
       <p
         style={{
           textAlign: "center",
           fontFamily: "var(--font-sans)",
-          fontSize: "var(--text-sm)",
-          color: "var(--fg-subtle)",
+          fontSize: "var(--text-base)",
+          color: "var(--fg-muted)",
           margin: 0,
         }}
       >
@@ -312,7 +291,7 @@ export function AuthForm({ mode, action }: AuthFormProps) {
         <Link
           href={copy.altHref}
           style={{
-            color: "var(--accent-rose-deep)",
+            color: "var(--tint)",
             fontWeight: 600,
             textDecoration: "none",
           }}

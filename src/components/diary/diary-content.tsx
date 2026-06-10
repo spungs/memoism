@@ -26,7 +26,7 @@ export function DiaryContent({ children }: { children: string }) {
     <div
       className={PROSE_CLASSES}
       style={{
-        fontFamily: "var(--font-serif)",
+        fontFamily: "var(--font-sans)",
         fontSize: "var(--text-md)",
         lineHeight: "var(--leading-relaxed)",
         color: "var(--fg)",

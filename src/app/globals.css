@@ -1,13 +1,14 @@
-/* Webfonts — must precede other @imports because Tailwind inlines its imports */
-@import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&family=Gaegu:wght@300;400;700&display=swap');
+/* Webfonts — must precede other @imports because Tailwind inlines its imports.
+   Pretendard = SF Pro의 한국어 대응 (Apple 기기에선 -apple-system이 우선). */
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
 /* ====================================================
-   Memoism Design System — Foundations
-   메모이즘: 스쳐지나가는 일상들을 기록하기 위한 나만의 일기장
+   Memoism Design System v2 — Apple Edition
+   조용한 미니멀리즘 + 종이의 온기 한 방울.
+   토큰 정의는 DESIGN.md(단일 진실 출처)와 1:1 매핑.
    ==================================================== */
 
 @custom-variant dark (&:is(.dark *));
@@ -19,7 +20,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
-  --font-heading: var(--font-serif);
+  --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -51,125 +52,146 @@
   --color-card: var(--card);
 }
 
-/* Memoism palette exposed as Tailwind utilities (e.g. bg-paper-0, text-ink-2) */
+/* Memoism palette exposed as Tailwind utilities (e.g. bg-tint, text-mood-joy).
+   v1 paper/ink 이름은 deprecated 별칭 — 새 코드에서 사용 금지. */
 @theme {
-  --color-paper-0: #FBF6EC;
-  --color-paper-1: #F5EEDF;
-  --color-paper-2: #ECE2CD;
-  --color-paper-3: #E0D2B5;
+  --color-tint: #C44A38;
+  --color-tint-pressed: #A23B2C;
 
-  --color-ink-1: #2A2118;
-  --color-ink-2: #4A3D2E;
-  --color-ink-3: #7A6A55;
-  --color-ink-4: #A89682;
-  --color-ink-5: #C8B89F;
+  --color-fill-1: rgba(120, 116, 108, 0.16);
+  --color-fill-2: rgba(120, 116, 108, 0.10);
+  --color-fill-3: rgba(120, 116, 108, 0.06);
 
-  --color-rose: #C97B6B;
-  --color-rose-soft: #E5B5A8;
-  --color-rose-deep: #9E5849;
-  --color-sage: #8A9A7B;
-  --color-sage-soft: #C4D0B5;
-  --color-lilac: #A89BB8;
-  --color-amber: #D9A05B;
+  /* deprecated v1 aliases */
+  --color-paper-0: #F4F3F1;
+  --color-paper-1: #ECEAE7;
+  --color-paper-2: #E3E1DD;
+  --color-paper-3: #D7D4CF;
 
-  --color-mood-joy: #E8B86D;
-  --color-mood-calm: #A6C0B4;
-  --color-mood-sad: #8FA3BD;
-  --color-mood-love: #D89B95;
-  --color-mood-anger: #C47A6F;
-  --color-mood-tired: #B0A89A;
+  --color-ink-1: #1C1B1A;
+  --color-ink-2: #57534C;
+  --color-ink-3: #8A857D;
+  --color-ink-4: #ABA69E;
+  --color-ink-5: #C9C5BF;
 
-  --color-success: #7A9A6E;
-  --color-warning: #D9A05B;
-  --color-danger: #B86A5C;
-  --color-info: #8FA3BD;
+  --color-rose: #C44A38;
+  --color-rose-soft: #F0B7AC;
+  --color-rose-deep: #A23B2C;
+  --color-sage: #79A283;
+  --color-sage-soft: #D7E4D9;
+  --color-lilac: #A99BC9;
+  --color-amber: #FF9500;
 
-  --font-serif: 'Gowun Batang', 'Noto Serif KR', Georgia, serif;
-  --font-hand: 'Gaegu', 'Gowun Dodum', cursive;
+  --color-mood-joy: #E9A13B;
+  --color-mood-calm: #4FB6A4;
+  --color-mood-sad: #6B8FC9;
+  --color-mood-love: #E2768C;
+  --color-mood-anger: #C04A57;
+  --color-mood-tired: #9C948A;
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
+  --color-success: #34C759;
+  --color-warning: #FF9500;
+  --color-danger: #FF3B30;
+  --color-info: #007AFF;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
   --radius-lg: 16px;
-  --radius-xl: 24px;
+  --radius-xl: 22px;
   --radius-pill: 999px;
 }
 
 :root {
-  /* ---------- Color: Paper & Ink ---------- */
-  --paper-0: #FBF6EC;
-  --paper-1: #F5EEDF;
-  --paper-2: #ECE2CD;
-  --paper-3: #E0D2B5;
+  /* ---------- Color: Background layers ---------- */
+  --bg:             #F4F3F1;
+  --surface:        #FFFFFF;
+  --surface-raised: #FFFFFF;
 
-  --ink-1: #2A2118;
-  --ink-2: #4A3D2E;
-  --ink-3: #7A6A55;
-  --ink-4: #A89682;
-  --ink-5: #C8B89F;
+  /* ---------- Color: Labels (alpha hierarchy) ---------- */
+  --fg:             #1C1B1A;
+  --fg-muted:       rgba(60, 56, 50, 0.62);
+  --fg-subtle:      rgba(60, 56, 50, 0.46);
+  --fg-placeholder: rgba(60, 56, 50, 0.34);
+  --fg-quaternary:  rgba(60, 56, 50, 0.18);
 
-  /* ---------- Accents ---------- */
-  --accent-rose:      #C97B6B;
-  --accent-rose-soft: #E5B5A8;
-  --accent-rose-deep: #9E5849;
-  --accent-sage:      #8A9A7B;
-  --accent-sage-soft: #C4D0B5;
-  --accent-lilac:     #A89BB8;
-  --accent-amber:     #D9A05B;
+  /* ---------- Color: Fills & separators ---------- */
+  --fill-1:    rgba(120, 116, 108, 0.16);
+  --fill-2:    rgba(120, 116, 108, 0.10);
+  --fill-3:    rgba(120, 116, 108, 0.06);
+  --separator: rgba(60, 56, 50, 0.14);
+  --border-strong: rgba(60, 56, 50, 0.24);
 
-  /* ---------- Mood swatches ---------- */
-  --mood-joy:   #E8B86D;
-  --mood-calm:  #A6C0B4;
-  --mood-sad:   #8FA3BD;
-  --mood-love:  #D89B95;
-  --mood-anger: #C47A6F;
-  --mood-tired: #B0A89A;
+  /* ---------- Color: Tint (단 하나의 액센트) ----------
+     #C44A38: 배경(#F4F3F1) 위 대비 ≈4.6:1 — WCAG AA 충족 (구 #D65745는 3.2:1 미달) */
+  --tint:         #C44A38;
+  --tint-pressed: #A23B2C;
+  --tint-soft:    rgba(196, 74, 56, 0.11);
+  --on-tint:      #FFFFFF;
+  --brand:        var(--tint);
+  --brand-deep:   var(--tint-pressed);
 
-  /* ---------- Semantic ---------- */
-  --bg:              var(--paper-0);
-  --surface:         var(--paper-1);
-  --surface-raised:  #FFFCF4;
-  --border-strong:   var(--ink-5);
-  --fg:              var(--ink-1);
-  --fg-muted:        var(--ink-2);
-  --fg-subtle:       var(--ink-3);
-  --fg-placeholder:  var(--ink-4);
-  --brand:           var(--accent-rose);
-  --brand-deep:      var(--accent-rose-deep);
+  /* ---------- Mood swatches (분류 전용) ---------- */
+  --mood-joy:   #E9A13B;
+  --mood-calm:  #4FB6A4;
+  --mood-sad:   #6B8FC9;
+  --mood-love:  #E2768C;
+  --mood-anger: #C04A57;
+  --mood-tired: #9C948A;
 
-  /* ---------- Status ---------- */
-  --success: #7A9A6E;
-  --warning: #D9A05B;
-  --danger:  #B86A5C;
-  --info:    #8FA3BD;
+  /* ---------- Status (iOS system colors) ---------- */
+  --success: #34C759;
+  --warning: #FF9500;
+  --danger:  #FF3B30;
+  --info:    #007AFF;
+
+  /* ---------- Deprecated v1 aliases (종이·잉크) ----------
+     기존 컴포넌트 인라인 스타일 호환용. 새 코드에서 사용 금지. */
+  --paper-0: var(--bg);
+  --paper-1: #ECEAE7;
+  --paper-2: #E3E1DD;
+  --paper-3: #D7D4CF;
+  --ink-1: #1C1B1A;
+  --ink-2: #57534C;
+  --ink-3: #8A857D;
+  --ink-4: #ABA69E;
+  --ink-5: #C9C5BF;
+  --accent-rose:      var(--tint);
+  --accent-rose-soft: #F0B7AC;
+  --accent-rose-deep: var(--tint-pressed);
+  --accent-sage:      #79A283;
+  --accent-sage-soft: #D7E4D9;
+  --accent-lilac:     #A99BC9;
+  --accent-amber:     #FF9500;
 
   /* ---------- Typography ---------- */
-  --font-serif: 'Gowun Batang', 'Noto Serif KR', Georgia, serif;
-  --font-sans:  'Pretendard', 'Gowun Dodum', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-hand:  'Gaegu', 'Gowun Dodum', cursive;
-  --font-mono:  ui-monospace, 'SF Mono', 'JetBrains Mono', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', monospace;
+  /* deprecated — 세리프·손글씨 폐지, sans로 별칭 */
+  --font-serif: var(--font-sans);
+  --font-hand:  var(--font-sans);
 
-  /* Type scale */
-  --text-xs:      11px;
+  /* Type scale (iOS Dynamic Type 매핑: caption→largeTitle) */
+  --text-xs:      12px;
   --text-sm:      13px;
   --text-base:    15px;
   --text-md:      17px;
   --text-lg:      20px;
-  --text-xl:      24px;
-  --text-2xl:     30px;
-  --text-3xl:     38px;
-  --text-display: 48px;
+  --text-xl:      22px;
+  --text-2xl:     28px;
+  --text-3xl:     34px;
+  --text-display: 40px;
 
   /* Line heights */
-  --leading-tight:   1.25;
-  --leading-snug:    1.4;
-  --leading-normal:  1.6;
-  --leading-relaxed: 1.85;
+  --leading-tight:   1.18;
+  --leading-snug:    1.3;
+  --leading-normal:  1.45;
+  --leading-relaxed: 1.7;
 
-  /* Tracking */
+  /* Tracking — 큰 글자는 좁게, 양수 자간 금지 */
   --tracking-tight:  -0.02em;
-  --tracking-normal: 0;
-  --tracking-wide:   0.04em;
-  --tracking-wider:  0.12em;
+  --tracking-normal: -0.004em;
+  --tracking-wide:   0.01em;
+  --tracking-wider:  0.05em;
 
   /* ---------- Spacing (4px base) ---------- */
   --space-1:  4px;
@@ -184,92 +206,135 @@
   --space-16: 64px;
   --space-20: 80px;
 
-  /* ---------- Shadow (warm sepia) ---------- */
-  --shadow-xs:    0 1px 2px rgba(74,61,46,0.06);
-  --shadow-sm:    0 2px 6px rgba(74,61,46,0.08);
-  --shadow-md:    0 4px 16px rgba(74,61,46,0.10);
-  --shadow-lg:    0 12px 32px rgba(74,61,46,0.14);
-  --shadow-paper: 0 1px 0 rgba(255,252,244,0.6) inset, 0 2px 8px rgba(74,61,46,0.08);
+  /* ---------- Shadow — 시트·FAB 전용, 카드는 대비로 분리 ---------- */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.10);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.16);
+  --shadow-paper: var(--shadow-sm); /* deprecated alias */
 
-  /* ---------- Motion ---------- */
-  --ease-out:     cubic-bezier(0.22,1,0.36,1);
-  --ease-in-out:  cubic-bezier(0.65,0,0.35,1);
-  --duration-fast:  140ms;
-  --duration-base:  240ms;
-  --duration-slow:  420ms;
+  /* ---------- Materials ---------- */
+  --material-bar:        rgba(244, 243, 241, 0.82);
+  --material-bar-strong: rgba(244, 243, 241, 0.93); /* 스크롤 중 — 콘텐츠 위에서 더 불투명 */
+  --overlay-dim:  rgba(0, 0, 0, 0.4);
+
+  /* ---------- Motion (iOS spring 근사) ---------- */
+  --ease-out:    cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.25, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --duration-slow: 420ms;
 
   /* ---------- Layout ---------- */
   --container-mobile: 390px;
   --container-tablet: 768px;
   --container-page:  1100px;
+  --touch-target: 44px;
 
   /* ---------- shadcn token bridge → Memoism palette ---------- */
-  --background: var(--paper-0);
-  --foreground: var(--ink-1);
-  --card: #FFFCF4;
-  --card-foreground: var(--ink-1);
-  --popover: #FFFCF4;
-  --popover-foreground: var(--ink-1);
-  --primary: var(--accent-rose);
-  --primary-foreground: var(--paper-0);
-  --secondary: var(--paper-1);
-  --secondary-foreground: var(--ink-1);
-  --muted: var(--paper-2);
-  --muted-foreground: var(--ink-3);
-  --accent: var(--accent-rose-soft);
-  --accent-foreground: var(--ink-1);
+  --background: var(--bg);
+  --foreground: var(--fg);
+  --card: var(--surface);
+  --card-foreground: var(--fg);
+  --popover: var(--surface);
+  --popover-foreground: var(--fg);
+  --primary: var(--tint);
+  --primary-foreground: var(--on-tint);
+  --secondary: var(--fill-2);
+  --secondary-foreground: var(--fg);
+  --muted: var(--fill-2);
+  --muted-foreground: var(--fg-muted);
+  --accent: var(--fill-3);
+  --accent-foreground: var(--fg);
   --destructive: var(--danger);
-  --border: var(--paper-2);
-  --input: var(--paper-2);
-  --ring: var(--accent-rose);
+  --border: var(--separator);
+  --input: var(--fill-2);
+  --ring: var(--tint);
   --chart-1: var(--mood-joy);
   --chart-2: var(--mood-calm);
   --chart-3: var(--mood-sad);
   --chart-4: var(--mood-love);
   --chart-5: var(--mood-tired);
-  --radius: 10px;
-  --sidebar: var(--paper-1);
-  --sidebar-foreground: var(--ink-1);
-  --sidebar-primary: var(--accent-rose);
-  --sidebar-primary-foreground: var(--paper-0);
-  --sidebar-accent: var(--accent-rose-soft);
-  --sidebar-accent-foreground: var(--ink-1);
-  --sidebar-border: var(--paper-2);
-  --sidebar-ring: var(--accent-rose);
+  --radius: 12px;
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--fg);
+  --sidebar-primary: var(--tint);
+  --sidebar-primary-foreground: var(--on-tint);
+  --sidebar-accent: var(--fill-2);
+  --sidebar-accent-foreground: var(--fg);
+  --sidebar-border: var(--separator);
+  --sidebar-ring: var(--tint);
 }
 
 .dark {
-  --background: var(--ink-1);
-  --foreground: var(--paper-0);
-  --card: var(--ink-2);
-  --card-foreground: var(--paper-0);
-  --popover: var(--ink-2);
-  --popover-foreground: var(--paper-0);
-  --primary: var(--accent-rose-soft);
-  --primary-foreground: var(--ink-1);
-  --secondary: var(--ink-2);
-  --secondary-foreground: var(--paper-0);
-  --muted: var(--ink-2);
-  --muted-foreground: var(--ink-5);
-  --accent: var(--accent-rose-deep);
-  --accent-foreground: var(--paper-0);
-  --destructive: var(--danger);
-  --border: rgba(200, 184, 159, 0.18);
-  --input: rgba(200, 184, 159, 0.22);
-  --ring: var(--accent-rose-soft);
+  /* iOS dark grouped: black → #1C1C1E 카드 → #2C2C2E elevated */
+  --bg:             #000000;
+  --surface:        #1C1C1E;
+  --surface-raised: #2C2C2E;
+
+  --fg:             #F5F5F4;
+  --fg-muted:       rgba(235, 235, 245, 0.60);
+  --fg-subtle:      rgba(235, 235, 245, 0.44);
+  --fg-placeholder: rgba(235, 235, 245, 0.30);
+  --fg-quaternary:  rgba(235, 235, 245, 0.16);
+
+  --fill-1:    rgba(120, 120, 128, 0.36);
+  --fill-2:    rgba(120, 120, 128, 0.24);
+  --fill-3:    rgba(120, 120, 128, 0.14);
+  --separator: rgba(84, 84, 88, 0.6);
+  --border-strong: rgba(120, 120, 128, 0.5);
+
+  --tint:         #E8705C;
+  --tint-pressed: #D65745;
+  --tint-soft:    rgba(232, 112, 92, 0.16);
+  --on-tint:      #FFFFFF;
+
+  --material-bar:        rgba(18, 18, 20, 0.78);
+  --material-bar-strong: rgba(18, 18, 20, 0.92);
+  --overlay-dim:  rgba(0, 0, 0, 0.55);
+
+  --paper-0: var(--bg);
+  --paper-1: #2C2C2E;
+  --paper-2: #3A3A3C;
+  --paper-3: #48484A;
+  --ink-1: #F5F5F4;
+  --ink-2: #C9C7C3;
+  --ink-3: #8E8C88;
+  --ink-4: #6C6A66;
+  --ink-5: #484744;
+
+  --background: var(--bg);
+  --foreground: var(--fg);
+  --card: var(--surface);
+  --card-foreground: var(--fg);
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--fg);
+  --primary: var(--tint);
+  --primary-foreground: var(--on-tint);
+  --secondary: var(--fill-2);
+  --secondary-foreground: var(--fg);
+  --muted: var(--fill-2);
+  --muted-foreground: var(--fg-muted);
+  --accent: var(--fill-3);
+  --accent-foreground: var(--fg);
+  --destructive: #FF453A;
+  --border: var(--separator);
+  --input: var(--fill-2);
+  --ring: var(--tint);
   --chart-1: var(--mood-joy);
   --chart-2: var(--mood-calm);
   --chart-3: var(--mood-sad);
   --chart-4: var(--mood-love);
   --chart-5: var(--mood-tired);
-  --sidebar: var(--ink-2);
-  --sidebar-foreground: var(--paper-0);
-  --sidebar-primary: var(--accent-rose-soft);
-  --sidebar-primary-foreground: var(--ink-1);
-  --sidebar-accent: var(--accent-rose-deep);
-  --sidebar-accent-foreground: var(--paper-0);
-  --sidebar-border: rgba(200, 184, 159, 0.18);
-  --sidebar-ring: var(--accent-rose-soft);
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--fg);
+  --sidebar-primary: var(--tint);
+  --sidebar-primary-foreground: var(--on-tint);
+  --sidebar-accent: var(--fill-2);
+  --sidebar-accent-foreground: var(--fg);
+  --sidebar-border: var(--separator);
+  --sidebar-ring: var(--tint);
 }
 
 /* Base styles */
@@ -290,8 +355,10 @@ html {
     font-family: var(--font-sans);
     font-size: var(--text-base);
     line-height: var(--leading-normal);
+    letter-spacing: var(--tracking-normal);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
   html {
     @apply font-sans;
@@ -307,58 +374,90 @@ html {
   background-color: var(--bg);
 }
 
-/* Typography utilities */
+/* Typography utilities — iOS 텍스트 스타일 매핑 */
 .memo-display {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: var(--text-display);
+  font-weight: 700;
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-tight);
   color: var(--fg);
 }
 
 .memo-h1 {
-  font-family: var(--font-serif);
+  /* Large Title (34 / 700) */
+  font-family: var(--font-sans);
   font-size: var(--text-3xl);
+  font-weight: 700;
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-tight);
 }
 
 .memo-h2 {
-  font-family: var(--font-serif);
+  /* Title 1 (28 / 700) */
+  font-family: var(--font-sans);
   font-size: var(--text-2xl);
+  font-weight: 700;
   line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-tight);
 }
 
 .memo-h3 {
+  /* Title 2 (22 / 600) */
   font-family: var(--font-sans);
   font-size: var(--text-xl);
   font-weight: 600;
   line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-tight);
 }
 
 .memo-body {
-  font-family: var(--font-serif);
-  font-size: var(--text-base);
+  /* Body (17 / 1.7) — 일기 본문 */
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
   line-height: var(--leading-relaxed);
-  color: var(--fg-muted);
+  color: var(--fg);
 }
 
 .memo-ui {
+  /* Subheadline (15) — UI 기본 */
   font-family: var(--font-sans);
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   line-height: var(--leading-normal);
 }
 
 .memo-caption {
+  /* Caption (12 / tertiary) */
   font-family: var(--font-sans);
   font-size: var(--text-xs);
   line-height: var(--leading-normal);
-  letter-spacing: var(--tracking-wider);
+  letter-spacing: var(--tracking-wide);
   color: var(--fg-subtle);
 }
 
 .memo-hand {
-  font-family: var(--font-hand);
+  /* deprecated — 손글씨 폐지 */
+  font-family: var(--font-sans);
+}
+
+/* Materials — 떠 있는 바는 그림자가 아니라 블러 유리.
+   스크롤 중(.is-scrolled)엔 더 불투명해져 콘텐츠에 반응하는 재질처럼 행동한다. */
+.glass {
+  background-color: var(--material-bar);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  transition: background-color var(--duration-base) var(--ease-out);
+}
+.glass.is-scrolled {
+  background-color: var(--material-bar-strong);
+}
+
+/* Press feedback — 모바일 우선 (:active 기준) */
+.pressable {
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out);
+}
+.pressable:active {
+  transform: scale(0.97);
 }
 
 .no-scrollbar {
@@ -379,7 +478,7 @@ html {
 }
 
 .skeleton {
-  background-color: var(--paper-2);
+  background-color: var(--fill-2);
   border-radius: var(--radius-sm);
   animation: skeleton-pulse 1.6s ease-in-out infinite;
 }
@@ -398,4 +497,13 @@ input[type="search"]::-webkit-search-cancel-button,
 input[type="search"]::-webkit-search-decoration {
   -webkit-appearance: none;
   appearance: none;
+}
+
+/* 접근성 — 모션 최소화 선호 존중 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

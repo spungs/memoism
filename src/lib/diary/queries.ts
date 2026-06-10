@@ -82,6 +82,7 @@ export async function getRecentDiaries(userId: string, take = 3) {
       createdAt: true,
       content: true,
       source: true,
+      mood: true,
     },
   });
 }

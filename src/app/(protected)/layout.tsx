@@ -11,7 +11,7 @@ export default async function ProtectedLayout({
 
   return (
     <>
-      <main style={{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom))' }}>
+      <main style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom))' }}>
         {children}
       </main>
       <BottomNav />

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Send } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 
 type Role = "user" | "assistant";
 type RelatedDiary = { id: string; title: string; createdAt: string };
@@ -86,6 +86,8 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
     }
   }
 
+  const canSend = !!draft.trim() && !sending && !capExhausted;
+
   return (
     <div
       style={{
@@ -95,52 +97,57 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
         backgroundColor: "var(--bg)",
       }}
     >
+      {/* 헤더 — glass 블러 바 */}
       <header
+        className="glass"
         style={{
-          backgroundColor: "var(--surface)",
-          borderBottom: "1px solid var(--border)",
-          padding: "var(--space-4) var(--space-5)",
+          borderBottom: "1px solid var(--separator)",
+          padding: "12px var(--space-5)",
           flexShrink: 0,
+          textAlign: "center",
         }}
       >
         <h1
           style={{
             margin: 0,
-            fontFamily: "var(--font-serif)",
-            fontSize: "var(--text-xl)",
-            color: "var(--fg)",
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-md)",
             fontWeight: 600,
+            letterSpacing: "var(--tracking-tight)",
+            color: "var(--fg)",
           }}
         >
           {characterName}
         </h1>
         <p
           style={{
-            margin: "var(--space-1) 0 0 0",
+            margin: "2px 0 0 0",
             fontFamily: "var(--font-sans)",
             fontSize: "var(--text-xs)",
-            color: "var(--fg-subtle)",
+            color: "var(--fg-placeholder)",
+            letterSpacing: 0,
           }}
         >
           내 일기를 기억하는 AI 친구
         </p>
       </header>
 
+      {/* 메시지 목록 */}
       <div
         ref={listRef}
         style={{
           flex: 1,
-          padding: "var(--space-4) var(--space-5)",
+          padding: "var(--space-4) var(--space-4)",
           overflowY: "auto",
           display: "flex",
           flexDirection: "column",
-          gap: "var(--space-3)",
+          gap: 0,
         }}
       >
         {messages.length === 0 && (
           <>
             <Bubble role="assistant">
-              {`안녕하세요, 저는 ${characterName}예요. 🌿\n일기에 대해 뭐든 편하게 물어보세요.`}
+              {`안녕하세요, 저는 ${characterName}예요.\n일기에 대해 뭐든 편하게 물어보세요.`}
             </Bubble>
             <div
               style={{
@@ -148,6 +155,8 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
                 flexDirection: "column",
                 alignItems: "flex-start",
                 gap: "var(--space-2)",
+                marginTop: "var(--space-3)",
+                paddingLeft: 2,
               }}
             >
               {EXAMPLE_QUESTIONS.map((q) => (
@@ -156,16 +165,17 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
                   type="button"
                   onClick={() => void send(q)}
                   disabled={sending || capExhausted}
+                  className="pressable"
                   style={{
-                    padding: "8px var(--space-3)",
+                    padding: "8px var(--space-4)",
                     borderRadius: "var(--radius-pill)",
-                    border: "1px solid var(--border)",
-                    backgroundColor: "var(--surface-raised)",
-                    color: "var(--fg)",
+                    border: "1px solid var(--separator)",
+                    backgroundColor: "var(--surface)",
+                    color: "var(--tint)",
                     fontFamily: "var(--font-sans)",
                     fontSize: "var(--text-sm)",
-                    cursor:
-                      sending || capExhausted ? "not-allowed" : "pointer",
+                    fontWeight: 500,
+                    cursor: sending || capExhausted ? "not-allowed" : "pointer",
                     textAlign: "left",
                   }}
                 >
@@ -175,70 +185,35 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
             </div>
           </>
         )}
-        {messages.map((m) => (
-          <div key={m.id}>
-            <Bubble role={m.role}>{m.content}</Bubble>
-            {m.role === "assistant" && m.relatedDiaries && m.relatedDiaries.length > 0 && (
-              <div style={{ marginTop: "var(--space-2)" }}>
-                <p
-                  style={{
-                    margin: "0 0 var(--space-1) 0",
-                    fontFamily: "var(--font-sans)",
-                    fontSize: "var(--text-xs)",
-                    color: "var(--fg-subtle)",
-                  }}
-                >
-                  관련된 일기
-                </p>
-                <div
-                  className="hide-scrollbar"
-                  style={{
-                    display: "flex",
-                    overflowX: "auto",
-                    gap: "var(--space-2)",
-                  }}
-                >
-                  {m.relatedDiaries.map((d) => {
-                    const dateLabel = new Date(d.createdAt).toLocaleDateString("ko-KR", {
-                      timeZone: "Asia/Seoul",
-                      month: "long",
-                      day: "numeric",
-                    });
-                    const titlePart = d.title?.trim() ? ` · ${d.title}` : "";
-                    return (
-                      <button
-                        key={d.id}
-                        type="button"
-                        onClick={() => router.push(`/diary/${d.id}`)}
-                        style={{
-                          backgroundColor: "var(--surface-raised)",
-                          border: "1px solid var(--border)",
-                          borderRadius: "var(--radius-pill)",
-                          fontFamily: "var(--font-sans)",
-                          fontSize: "var(--text-sm)",
-                          color: "var(--fg)",
-                          padding: "6px var(--space-3)",
-                          whiteSpace: "nowrap",
-                          cursor: "pointer",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {dateLabel}{titlePart}
-                      </button>
-                    );
-                  })}
+
+        {messages.map((m, i) => {
+          const prev = messages[i - 1];
+          const sameSenderAsPrev = prev?.role === m.role;
+          return (
+            <div
+              key={m.id}
+              style={{ marginTop: sameSenderAsPrev ? 4 : 12 }}
+            >
+              <Bubble role={m.role} showAvatar={!sameSenderAsPrev}>
+                {m.content}
+              </Bubble>
+              {m.role === "assistant" && m.relatedDiaries && m.relatedDiaries.length > 0 && (
+                <div style={{ paddingLeft: 36 }}>
+                  <RelatedDiaryChips diaries={m.relatedDiaries} onNavigate={(id) => router.push(`/diary/${id}`)} />
                 </div>
-              </div>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          );
+        })}
+
         {sending && (
-          <Bubble role="assistant" muted>
-            …
-          </Bubble>
+          <div style={{ marginTop: 12 }}>
+            <TypingIndicator />
+          </div>
         )}
       </div>
 
+      {/* 에러 / cap 배너 */}
       {(error || capExhausted) && (
         <div
           role="alert"
@@ -246,9 +221,10 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
             fontFamily: "var(--font-sans)",
             fontSize: "var(--text-xs)",
             color: "var(--danger)",
-            backgroundColor: "color-mix(in srgb, var(--danger) 10%, transparent)",
-            padding: "var(--space-2) var(--space-4)",
-            borderTop: "1px solid var(--border)",
+            backgroundColor: "color-mix(in srgb, var(--danger) 8%, transparent)",
+            padding: "var(--space-2) var(--space-5)",
+            borderTop: "1px solid var(--separator)",
+            textAlign: "center",
           }}
         >
           {capExhausted
@@ -257,15 +233,17 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
         </div>
       )}
 
+      {/* 입력 바 — glass */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           void send();
         }}
+        className="glass"
         style={{
-          borderTop: "1px solid var(--border)",
-          padding: "var(--space-3) var(--space-4)",
-          backgroundColor: "var(--surface-raised)",
+          borderTop: "1px solid var(--separator)",
+          padding: "var(--space-2) var(--space-4)",
+          paddingBottom: "calc(var(--space-2) + env(safe-area-inset-bottom, 0px))",
           flexShrink: 0,
         }}
       >
@@ -292,41 +270,39 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
             style={{
               flex: 1,
               resize: "none",
-              minHeight: 44,
+              minHeight: 38,
               maxHeight: 160,
-              padding: "10px var(--space-3)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-lg)",
-              backgroundColor: "var(--surface)",
+              padding: "9px var(--space-4)",
+              border: "none",
+              borderRadius: "var(--radius-pill)",
+              backgroundColor: "var(--fill-2)",
               fontFamily: "var(--font-sans)",
-              fontSize: "var(--text-sm)",
+              fontSize: "var(--text-md)",
               color: "var(--fg)",
               outline: "none",
+              lineHeight: "var(--leading-normal)",
             }}
           />
           <button
             type="submit"
-            disabled={!draft.trim() || sending || capExhausted}
+            disabled={!canSend}
             aria-label="전송"
             style={{
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              width: 40,
-              height: 40,
+              width: 34,
+              height: 34,
               borderRadius: "var(--radius-pill)",
               border: "none",
-              backgroundColor:
-                !draft.trim() || sending || capExhausted
-                  ? "var(--border)"
-                  : "var(--fg)",
-              color: "var(--bg)",
-              cursor:
-                !draft.trim() || sending || capExhausted ? "not-allowed" : "pointer",
+              backgroundColor: canSend ? "var(--tint)" : "var(--fill-1)",
+              color: canSend ? "var(--on-tint)" : "var(--fg-placeholder)",
+              cursor: canSend ? "pointer" : "not-allowed",
               flexShrink: 0,
+              transition: "background-color var(--duration-fast), color var(--duration-fast)",
             }}
           >
-            <Send size={16} aria-hidden />
+            <ArrowUp size={16} aria-hidden strokeWidth={2.5} />
           </button>
         </div>
       </form>
@@ -334,14 +310,17 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
   );
 }
 
+// ── 버블 ──────────────────────────────────────────────────
 function Bubble({
   role,
   children,
   muted,
+  showAvatar = true,
 }: {
   role: Role;
   children: React.ReactNode;
   muted?: boolean;
+  showAvatar?: boolean;
 }) {
   const isUser = role === "user";
   return (
@@ -349,24 +328,183 @@ function Bubble({
       style={{
         display: "flex",
         justifyContent: isUser ? "flex-end" : "flex-start",
+        alignItems: "flex-end",
+        gap: 8,
       }}
     >
+      {/* 메이 아바타 — "내 일기를 기억하는 친구"의 시각적 정체성.
+          연속 버블에선 자리만 유지해 정렬을 지킨다. */}
+      {!isUser &&
+        (showAvatar ? (
+          <MeiAvatar />
+        ) : (
+          <span aria-hidden style={{ width: 28, flexShrink: 0 }} />
+        ))}
       <div
         style={{
           maxWidth: "78%",
-          padding: "10px var(--space-3)",
-          borderRadius: "var(--radius-lg)",
-          backgroundColor: isUser ? "var(--fg)" : "var(--surface)",
-          color: isUser ? "var(--bg)" : "var(--fg)",
-          border: isUser ? "none" : "1px solid var(--border)",
+          padding: "10px 14px",
+          borderRadius: 18,
+          backgroundColor: isUser ? "var(--tint)" : "var(--tint-soft)",
+          color: isUser ? "var(--on-tint)" : "var(--fg)",
           fontFamily: "var(--font-sans)",
-          fontSize: "var(--text-sm)",
+          fontSize: 16,
           lineHeight: "var(--leading-relaxed)",
           whiteSpace: "pre-wrap",
-          opacity: muted ? 0.6 : 1,
+          opacity: muted ? 0.5 : 1,
         }}
       >
         {children}
+      </div>
+    </div>
+  );
+}
+
+// 메이 아바타 — 코랄 원 + 흰 스파크 (AI 친구의 최소 캐릭터 층)
+function MeiAvatar() {
+  return (
+    <span
+      aria-hidden
+      style={{
+        width: 28,
+        height: 28,
+        borderRadius: "50%",
+        backgroundColor: "var(--tint)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        boxShadow: "var(--shadow-xs)",
+      }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="#FFFFFF">
+        <path d="M12 3 L13.8 9.2 L20 11 L13.8 12.8 L12 19 L10.2 12.8 L4 11 L10.2 9.2 Z" />
+      </svg>
+    </span>
+  );
+}
+
+// ── 타이핑 인디케이터 ──────────────────────────────────────
+function TypingIndicator() {
+  return (
+    <>
+      <style>{`
+        @keyframes _dot-bounce {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+          30%            { transform: translateY(-5px); opacity: 1; }
+        }
+        ._dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--fg-placeholder); animation: _dot-bounce 1.2s ease-in-out infinite; }
+        ._dot:nth-child(2) { animation-delay: 0.2s; }
+        ._dot:nth-child(3) { animation-delay: 0.4s; }
+      `}</style>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-start",
+          alignItems: "flex-end",
+          gap: 8,
+        }}
+      >
+        <MeiAvatar />
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            padding: "12px 16px",
+            borderRadius: 18,
+            backgroundColor: "var(--tint-soft)",
+          }}
+        >
+          <span className="_dot" />
+          <span className="_dot" />
+          <span className="_dot" />
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── 관련 일기 칩 ───────────────────────────────────────────
+function RelatedDiaryChips({
+  diaries,
+  onNavigate,
+}: {
+  diaries: RelatedDiary[];
+  onNavigate: (id: string) => void;
+}) {
+  return (
+    <div style={{ marginTop: "var(--space-2)", paddingLeft: 2 }}>
+      <p
+        style={{
+          margin: "0 0 var(--space-1) 0",
+          fontFamily: "var(--font-sans)",
+          fontSize: "var(--text-xs)",
+          color: "var(--fg-placeholder)",
+        }}
+      >
+        관련된 일기
+      </p>
+      <div
+        className="hide-scrollbar"
+        style={{
+          display: "flex",
+          overflowX: "auto",
+          gap: "var(--space-2)",
+        }}
+      >
+        {diaries.map((d) => {
+          const dateLabel = new Date(d.createdAt).toLocaleDateString("ko-KR", {
+            timeZone: "Asia/Seoul",
+            month: "long",
+            day: "numeric",
+          });
+          return (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => onNavigate(d.id)}
+              className="pressable"
+              style={{
+                backgroundColor: "var(--surface)",
+                border: "none",
+                borderRadius: "var(--radius-md)",
+                boxShadow: "var(--shadow-xs)",
+                fontFamily: "var(--font-sans)",
+                padding: "var(--space-2) var(--space-3)",
+                whiteSpace: "nowrap",
+                cursor: "pointer",
+                flexShrink: 0,
+                textAlign: "left",
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "var(--text-xs)",
+                  color: "var(--fg-placeholder)",
+                  lineHeight: 1,
+                }}
+              >
+                {dateLabel}
+              </span>
+              {d.title?.trim() && (
+                <span
+                  style={{
+                    fontSize: "var(--text-sm)",
+                    fontWeight: 600,
+                    color: "var(--fg)",
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {d.title.trim()}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

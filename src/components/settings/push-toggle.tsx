@@ -33,21 +33,6 @@ function isIosNonStandalone(): boolean {
 
 type Support = "checking" | "supported" | "unsupported" | "ios-needs-install";
 
-const ROW_STYLE: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  padding: "var(--space-4) var(--space-4)",
-  minHeight: 56,
-  gap: "var(--space-3)",
-};
-
-const ROW_LABEL_STYLE: React.CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-base)",
-  color: "var(--fg)",
-};
-
 export function PushToggle() {
   const [support, setSupport] = useState<Support>("checking");
   const [enabled, setEnabled] = useState(false);
@@ -178,21 +163,40 @@ export function PushToggle() {
 
   return (
     <div>
-      <div style={ROW_STYLE}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 var(--space-4)",
+          minHeight: 48,
+          gap: "var(--space-3)",
+        }}
+      >
         <div style={{ minWidth: 0 }}>
-          <p style={{ ...ROW_LABEL_STYLE, margin: 0 }}>22:00 리마인드 알림</p>
           <p
             style={{
               fontFamily: "var(--font-sans)",
-              fontSize: "var(--text-xs)",
-              color: "var(--fg-subtle)",
+              fontSize: "var(--text-base)",
+              fontWeight: 400,
+              color: "var(--fg)",
+              margin: 0,
+            }}
+          >
+            22:00 리마인드 알림
+          </p>
+          <p
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-sm)",
+              color: "var(--fg-muted)",
               margin: "2px 0 0",
             }}
           >
             매일 밤 메이가 하루를 남기도록 살짝 알려줘요.
           </p>
         </div>
-        <Switch
+        <IOSSwitch
           checked={enabled}
           disabled={!interactive || busy}
           onToggle={handleToggle}
@@ -203,8 +207,8 @@ export function PushToggle() {
         <p
           style={{
             fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-xs)",
-            color: "var(--fg-subtle)",
+            fontSize: "var(--text-sm)",
+            color: "var(--fg-muted)",
             margin: "0 0 var(--space-3)",
             padding: "0 var(--space-4)",
           }}
@@ -218,7 +222,7 @@ export function PushToggle() {
           role="alert"
           style={{
             fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-xs)",
+            fontSize: "var(--text-sm)",
             color: "var(--danger)",
             margin: "0 0 var(--space-3)",
             padding: "0 var(--space-4)",
@@ -231,7 +235,8 @@ export function PushToggle() {
   );
 }
 
-function Switch({
+// iOS 스위치: 트랙 51×31 캡슐, on=#34C759, off=fill-1, 노브 27px 흰 원 + shadow-sm
+function IOSSwitch({
   checked,
   disabled,
   onToggle,
@@ -250,15 +255,15 @@ function Switch({
       onClick={onToggle}
       style={{
         position: "relative",
-        width: 46,
-        height: 28,
+        width: 51,
+        height: 31,
         flexShrink: 0,
         borderRadius: "var(--radius-pill)",
         border: "none",
-        backgroundColor: checked ? "var(--accent-rose)" : "var(--paper-3)",
+        backgroundColor: checked ? "var(--success)" : "var(--fill-1)",
         cursor: disabled ? "default" : "pointer",
-        opacity: disabled ? 0.5 : 1,
-        transition: "background-color var(--duration-fast) ease",
+        opacity: disabled ? 0.4 : 1,
+        transition: "background-color 200ms var(--ease-out)",
         padding: 0,
       }}
     >
@@ -266,14 +271,14 @@ function Switch({
         aria-hidden
         style={{
           position: "absolute",
-          top: 3,
-          left: checked ? 21 : 3,
-          width: 22,
-          height: 22,
+          top: 2,
+          left: checked ? 22 : 2,
+          width: 27,
+          height: 27,
           borderRadius: "var(--radius-pill)",
-          backgroundColor: "#fff",
-          boxShadow: "var(--shadow-xs)",
-          transition: "left var(--duration-fast) ease",
+          backgroundColor: "#ffffff",
+          boxShadow: "var(--shadow-sm)",
+          transition: "left 200ms var(--ease-out)",
         }}
       />
     </button>

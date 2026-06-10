@@ -95,6 +95,7 @@ export function DiaryAiActions({
       }}
     >
       <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+        {/* Tinted 버튼 — tint-soft 배경 + tint 글자 */}
         <button
           type="button"
           onClick={handleRegenerate}
@@ -103,16 +104,16 @@ export function DiaryAiActions({
             display: "inline-flex",
             alignItems: "center",
             gap: 6,
-            padding: "10px 16px",
+            padding: "0 var(--space-4)",
+            height: 44,
             borderRadius: "var(--radius-md)",
-            border: "1px solid var(--border)",
-            backgroundColor: busy ? "var(--surface)" : "var(--surface-raised)",
-            color: busy ? "var(--fg-subtle)" : "var(--fg)",
+            border: "none",
+            backgroundColor: busy ? "var(--fill-2)" : "var(--tint-soft)",
+            color: busy ? "var(--fg-placeholder)" : "var(--tint)",
             fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-sm)",
+            fontSize: "var(--text-base)",
             fontWeight: 600,
             cursor: busy ? "default" : "pointer",
-            boxShadow: "var(--shadow-xs)",
           }}
         >
           {aiPending ? <Spinner size={14} /> : <Sparkles size={14} aria-hidden />}
@@ -132,13 +133,14 @@ export function DiaryAiActions({
               display: "inline-flex",
               alignItems: "center",
               gap: 6,
-              padding: "10px 16px",
+              padding: "0 var(--space-3)",
+              height: 44,
               borderRadius: "var(--radius-md)",
-              border: "1px solid var(--border)",
+              border: "none",
               backgroundColor: "transparent",
-              color: busy ? "var(--fg-subtle)" : "var(--fg-muted)",
+              color: busy ? "var(--fg-placeholder)" : "var(--fg-muted)",
               fontFamily: "var(--font-sans)",
-              fontSize: "var(--text-sm)",
+              fontSize: "var(--text-base)",
               fontWeight: 500,
               cursor: busy ? "default" : "pointer",
             }}
@@ -152,8 +154,8 @@ export function DiaryAiActions({
       <p
         style={{
           fontFamily: "var(--font-sans)",
-          fontSize: "var(--text-xs)",
-          color: "var(--fg-subtle)",
+          fontSize: "var(--text-sm)",
+          color: "var(--fg-placeholder)",
           margin: 0,
         }}
       >

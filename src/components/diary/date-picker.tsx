@@ -82,11 +82,13 @@ export function DiaryDatePicker({ value, max, onChange }: DatePickerProps) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
+        className="pressable"
         style={{
           fontFamily: "var(--font-sans)",
-          fontSize: "var(--text-xs)",
-          color: isModified ? "var(--accent-rose-deep)" : "var(--fg-subtle)",
-          letterSpacing: "var(--tracking-wider)",
+          fontSize: "var(--text-sm)",
+          fontWeight: 500,
+          color: isModified ? "var(--tint)" : "var(--fg-muted)",
+          letterSpacing: 0,
           background: "none",
           border: "none",
           cursor: "pointer",
@@ -153,10 +155,10 @@ export function DiaryDatePicker({ value, max, onChange }: DatePickerProps) {
               <div key={d} style={{
                 textAlign: "center",
                 fontFamily: "var(--font-sans)",
-                fontSize: 10,
-                fontWeight: 600,
-                color: i === 0 ? "var(--danger)" : i === 6 ? "#4a90d9" : "var(--fg-subtle)",
-                letterSpacing: "var(--tracking-wider)",
+                fontSize: "var(--text-xs)",
+                fontWeight: 500,
+                color: i === 0 ? "var(--danger)" : i === 6 ? "var(--mood-calm)" : "var(--fg-placeholder)",
+                letterSpacing: 0,
                 paddingBottom: 6,
               }}>
                 {d}
@@ -171,8 +173,8 @@ export function DiaryDatePicker({ value, max, onChange }: DatePickerProps) {
               const future = isFuture(day);
               const selected = isSelected(day);
               const todayCell = isToday(day);
-              const col = i % 7; // 0=일(일), 6=토(토)
-              const weekendColor = col === 0 ? "var(--danger)" : col === 6 ? "#4a90d9" : "var(--fg)";
+              const col = i % 7; // 0=일, 6=토
+              const weekendColor = col === 0 ? "var(--danger)" : col === 6 ? "var(--mood-calm)" : "var(--fg)";
 
               return (
                 <button
@@ -189,16 +191,14 @@ export function DiaryDatePicker({ value, max, onChange }: DatePickerProps) {
                     fontSize: "var(--text-sm)",
                     fontWeight: selected ? 700 : todayCell ? 600 : 400,
                     color: selected
-                      ? "#fff"
+                      ? "var(--on-tint)"
                       : future
-                      ? "var(--fg-placeholder, var(--border))"
+                      ? "var(--fg-placeholder)"
                       : todayCell
-                      ? "var(--accent-rose-deep)"
+                      ? "var(--tint)"
                       : weekendColor,
                     backgroundColor: selected
-                      ? "var(--accent-rose)"
-                      : todayCell
-                      ? "var(--accent-rose-soft)"
+                      ? "var(--tint)"
                       : "transparent",
                     border: "none",
                     borderRadius: "var(--radius-pill)",
@@ -213,7 +213,7 @@ export function DiaryDatePicker({ value, max, onChange }: DatePickerProps) {
           </div>
 
           {/* 오늘 버튼 */}
-          <div style={{ marginTop: 10, borderTop: "1px solid var(--border)", paddingTop: 10, textAlign: "center" }}>
+          <div style={{ marginTop: 10, borderTop: "1px solid var(--separator)", paddingTop: 10, textAlign: "center" }}>
             <button
               type="button"
               onClick={() => {
@@ -222,15 +222,16 @@ export function DiaryDatePicker({ value, max, onChange }: DatePickerProps) {
                 setViewMonth(maxMonth);
                 setOpen(false);
               }}
+              className="pressable"
               style={{
                 fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-xs)",
+                fontSize: "var(--text-sm)",
                 fontWeight: 600,
-                color: value === max ? "var(--fg-subtle)" : "var(--accent-rose)",
+                color: value === max ? "var(--fg-subtle)" : "var(--tint)",
                 background: "none",
                 border: "none",
                 cursor: "pointer",
-                letterSpacing: "var(--tracking-wider)",
+                letterSpacing: 0,
               }}
             >
               오늘로 돌아가기

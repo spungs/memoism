@@ -34,8 +34,15 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#FBF6EC",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F4F3F1" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
 };
+
+/** 첫 페인트 전에 .dark 클래스를 적용해 라이트→다크 플래시를 막는다.
+    키·로직은 ThemeToggle(settings)과 동일해야 한다. */
+const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('memoism-theme');var d=t==='dark'||((!t||t==='auto')&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark');}catch(e){}})();`;
 
 export default function RootLayout({
   children,
@@ -43,8 +50,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
       <body className="antialiased">
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <PostHogProvider>
           <QueryProvider>
             <div className="app-shell">{children}</div>

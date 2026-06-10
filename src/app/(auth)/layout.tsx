@@ -8,7 +8,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "var(--space-8) var(--space-6)",
+        padding: "calc(var(--space-8) + env(safe-area-inset-top)) var(--space-5) calc(var(--space-8) + env(safe-area-inset-bottom))",
       }}
     >
       <div style={{ width: "100%", maxWidth: 360 }}>{children}</div>
