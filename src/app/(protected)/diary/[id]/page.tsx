@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: PageProps) {
   const session = await getSession();
   if (!session) return { title: "일기" };
   const diary = await getDiary(id, session.userId);
-  return { title: diary?.title ?? "일기" };
+  return { title: diary?.title || "일기" };
 }
 
 export default async function DiaryDetailPage({ params }: PageProps) {
@@ -56,6 +56,7 @@ export default async function DiaryDetailPage({ params }: PageProps) {
       }}
     >
       <header
+        className="glass"
         style={{
           position: "sticky",
           top: 0,
@@ -63,10 +64,9 @@ export default async function DiaryDetailPage({ params }: PageProps) {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "var(--space-3) var(--space-4)",
-          backgroundColor: "var(--surface-raised)",
-          borderBottom: "1px solid var(--border)",
-          backdropFilter: "saturate(140%) blur(8px)",
+          padding: "0 var(--space-2)",
+          height: 52,
+          borderBottom: "1px solid var(--separator)",
         }}
       >
         <Link
@@ -75,13 +75,15 @@ export default async function DiaryDetailPage({ params }: PageProps) {
           style={{
             display: "inline-flex",
             alignItems: "center",
-            gap: 6,
-            padding: "6px 8px",
+            gap: 4,
+            padding: "0 var(--space-2)",
+            height: 44,
             borderRadius: "var(--radius-md)",
-            color: "var(--fg-muted)",
+            color: "var(--tint)",
             textDecoration: "none",
             fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-sm)",
+            fontSize: "var(--text-base)",
+            fontWeight: 600,
           }}
         >
           <ArrowLeft size={16} aria-hidden />
@@ -97,41 +99,36 @@ export default async function DiaryDetailPage({ params }: PageProps) {
           margin: "0 auto",
         }}
       >
+        {/* 날짜·요일 메타 — 13px tertiary */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
             gap: "var(--space-3)",
-            marginBottom: "var(--space-5)",
+            marginBottom: "var(--space-4)",
             flexWrap: "wrap",
           }}
         >
-          {diary.mood ? (
-            <MoodBadge mood={diary.mood} />
-          ) : (
-            <span aria-hidden style={{ width: 1 }} />
-          )}
           <time
             dateTime={date.toISOString()}
             style={{
               fontFamily: "var(--font-sans)",
-              fontSize: "var(--text-xs)",
-              color: "var(--fg-subtle)",
-              letterSpacing: "var(--tracking-wide)",
+              fontSize: "var(--text-sm)",
+              color: "var(--fg-placeholder)",
             }}
           >
             {dateFmt.format(date)} · {weekdayFmt.format(date)}
           </time>
+          {diary.mood && <MoodBadge mood={diary.mood} />}
         </div>
 
         {diary.title && (
           <h1
             style={{
               margin: "0 0 var(--space-5) 0",
-              fontFamily: "var(--font-serif)",
-              fontSize: "var(--text-2xl)",
-              fontWeight: 600,
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-xl)",
+              fontWeight: 700,
               color: "var(--fg)",
               letterSpacing: "var(--tracking-tight)",
               lineHeight: "var(--leading-snug)",
@@ -168,9 +165,8 @@ export default async function DiaryDetailPage({ params }: PageProps) {
                     width: imageUrls.length === 1 ? "100%" : "min(78%, 280px)",
                     aspectRatio: "1 / 1",
                     overflow: "hidden",
-                    borderRadius: "var(--radius-md)",
-                    backgroundColor: "var(--surface)",
-                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-lg)",
+                    backgroundColor: "var(--fill-2)",
                     scrollSnapAlign: "start",
                   }}
                 >
@@ -187,24 +183,25 @@ export default async function DiaryDetailPage({ params }: PageProps) {
           </div>
         )}
 
-        {/* F5 ✨ AI 마커 — auto_* source일 때만 본문 위 배지 표시 */}
+        {/* ✨ AI 칩 — fill-2 배경 + secondary 글자, 무채색으로 후퇴 */}
         {isAiSource && (
-          <p
+          <span
             style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
               fontFamily: "var(--font-sans)",
-              fontSize: "var(--text-xs)",
-              color: "var(--fg-subtle)",
-              backgroundColor:
-                "color-mix(in srgb, #FFF4CC 35%, transparent)",
-              padding: "4px 8px",
-              borderRadius: "var(--radius-sm)",
-              display: "inline-block",
+              fontSize: 11,
+              fontWeight: 600,
+              color: "var(--fg-muted)",
+              backgroundColor: "var(--fill-2)",
+              padding: "3px 8px",
+              borderRadius: "var(--radius-pill)",
               marginBottom: "var(--space-3)",
-              letterSpacing: "var(--tracking-wide)",
             }}
           >
-            ✨ AI가 정리한 일기
-          </p>
+            ✨ AI
+          </span>
         )}
 
         <DiaryContent>{diary.content}</DiaryContent>

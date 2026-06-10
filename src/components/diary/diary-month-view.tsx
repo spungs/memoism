@@ -17,13 +17,12 @@ interface Props {
 }
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-const NEUTRAL_DOT = "var(--ink-4)";
 const MOOD_DOT_COLOR: Record<string, string> = Object.fromEntries(
   MOODS.map((m) => [m.key, m.color]),
 );
 
 // 그리드 셀 행 높이/간격.
-const ROW = 56;
+const ROW = 52;
 const GAP = 4;
 
 function cellKey(y: number, m: number, d: number): string {
@@ -44,7 +43,7 @@ function buildCells(y: number, m: number): (number | null)[] {
 function dotColor(entry: CalendarEntry): string {
   return entry.mood && KNOWN_MOOD_KEYS.has(entry.mood)
     ? MOOD_DOT_COLOR[entry.mood]
-    : NEUTRAL_DOT;
+    : "var(--fg-placeholder)";
 }
 function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString("ko-KR", {
@@ -74,7 +73,7 @@ export function DiaryMonthView(props: Props) {
   }, []);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
       <DiarySearchView onActiveChange={onActiveChange} />
       <div style={{ display: searchActive ? "none" : "block" }}>
         <MonthCalendarList {...props} />
@@ -104,18 +103,19 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
   );
   const reqRef = useRef(0);
   const touchX = useRef<number | null>(null);
+  const touchY = useRef<number | null>(null);
+  // 월 전환 방향 — 그리드 슬라이드 애니메이션용 (오늘 점프는 애니메이션 없음)
+  const [slideDir, setSlideDir] = useState<"prev" | "next" | null>(null);
 
   const canGoNext = ym(year, month) < todayYm;
 
   // 스크롤 플래그: 그리드가 위로 스크롤돼 사라지면 월 바에 '일기' 라벨을 띄운다.
-  // (그리드는 높이 애니메이션 없이 자연 스크롤 — 레이아웃 변화가 없어 overshoot 없음.)
   useEffect(() => {
     let raf = 0;
     const onScroll = () => {
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
-        // 히스테리시스: 80 넘으면 스크롤됨 / 40 미만이면 해제 (경계 떨림 방지).
         setScrolled((prev) => {
           const y = window.scrollY;
           if (!prev && y > 80) return true;
@@ -145,7 +145,6 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
     setSelectedKey(y === ty && m === tm ? todayKey : cellKey(y, m, 1));
     setError(null);
     setLoading(true);
-    // 월 이동 시 맨 위로 → 달력 그리드 다시 보이게.
     window.scrollTo({ top: 0 });
     setScrolled(false);
     const reqId = ++reqRef.current;
@@ -154,7 +153,7 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
         `/api/diaries/calendar?month=${y}-${String(m).padStart(2, "0")}`,
       );
       const data = await res.json();
-      if (reqId !== reqRef.current) return; // 연타 stale 무시
+      if (reqId !== reqRef.current) return;
       if (!res.ok) {
         setError(data?.error ?? "불러오지 못했어요");
         return;
@@ -169,26 +168,34 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
 
   function goPrev() {
     const d = new Date(year, month - 2, 1);
+    setSlideDir("prev");
     void loadMonth(d.getFullYear(), d.getMonth() + 1);
   }
   function goNext() {
     if (!canGoNext) return;
     const d = new Date(year, month, 1);
+    setSlideDir("next");
     void loadMonth(d.getFullYear(), d.getMonth() + 1);
   }
   function goToday() {
     if (ty === year && tm === month) return;
+    setSlideDir(null);
     void loadMonth(ty, tm);
   }
 
   function onTouchStart(e: React.TouchEvent) {
     touchX.current = e.touches[0].clientX;
+    touchY.current = e.touches[0].clientY;
   }
   function onTouchEnd(e: React.TouchEvent) {
-    if (touchX.current == null) return;
+    if (touchX.current == null || touchY.current == null) return;
     const dx = e.changedTouches[0].clientX - touchX.current;
+    const dy = e.changedTouches[0].clientY - touchY.current;
     touchX.current = null;
-    if (Math.abs(dx) < 40) return;
+    touchY.current = null;
+    // 의도치 않은 월 전환 방지: 충분히 길고(60px+) 수평이 지배적인 스와이프만.
+    if (Math.abs(dx) < 60) return;
+    if (Math.abs(dx) < Math.abs(dy) * 1.5) return;
     if (dx < 0) goNext();
     else goPrev();
   }
@@ -199,12 +206,10 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
     setSelectedKey(key);
     const entries = days[key];
     if (!entries || entries.length === 0) {
-      // 오늘 빈 날은 바로 작성, 과거 빈 날은 실수 진입 방지로 확인 후 이동.
       if (key === todayKey) router.push(`/diary/new?date=${key}`);
       else setPendingDate(key);
       return;
     }
-    // 그날 섹션을 sticky 월 바 바로 아래로 스크롤 + 잠깐 하이라이트(도착 명확화).
     setHighlightKey(key);
     requestAnimationFrame(() => {
       document
@@ -214,23 +219,27 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
   }
 
   const cells = buildCells(year, month);
-  // 주 단위로 끊어 role="row"로 감싼다 (ARIA grid > row > gridcell 구조).
   const weeks: (number | null)[][] = [];
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
 
-  // 그 달 목록 — 날짜 내림차순.
   const dayKeys = Object.keys(days).sort().reverse();
 
   return (
     <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ userSelect: "none" }}>
-      {/* 접히는 달력 (sticky) */}
+      {/* sticky 월 바 — .glass 블러 재질, 스크롤 시 더 불투명 */}
       <div
+        className={scrolled ? "glass is-scrolled" : "glass"}
         style={{
           position: "sticky",
           top: 0,
           zIndex: 5,
-          backgroundColor: "var(--bg)",
+          paddingTop: "var(--space-2)",
           paddingBottom: "var(--space-2)",
+          marginLeft: "calc(var(--space-4) * -1)",
+          marginRight: "calc(var(--space-4) * -1)",
+          paddingLeft: "var(--space-4)",
+          paddingRight: "var(--space-4)",
+          borderBottom: "1px solid var(--separator)",
         }}
       >
         {/* 월 네비 */}
@@ -239,7 +248,6 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            marginBottom: "var(--space-3)",
           }}
         >
           <button type="button" onClick={goPrev} aria-label="이전 달" style={navBtn}>‹</button>
@@ -248,19 +256,18 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: 1,
+              gap: 2,
               lineHeight: 1.1,
             }}
           >
-            {/* 스크롤돼 페이지 헤더('일기')가 사라진 뒤에도 화면 정체성 유지 */}
             {scrolled && (
               <span
                 style={{
                   fontFamily: "var(--font-sans)",
                   fontSize: 11,
                   fontWeight: 600,
-                  letterSpacing: "var(--tracking-wider)",
-                  color: "var(--fg-subtle)",
+                  color: "var(--fg-placeholder)",
+                  letterSpacing: 0,
                 }}
               >
                 일기
@@ -268,22 +275,23 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
             )}
             <span
               style={{
-                fontFamily: "var(--font-serif)",
+                fontFamily: "var(--font-sans)",
                 fontSize: "var(--text-lg)",
                 fontWeight: 600,
                 color: "var(--fg)",
+                letterSpacing: "var(--tracking-tight)",
               }}
             >
               {year}년 {month}월
             </span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-1)" }}>
             <button
               type="button"
               onClick={goToday}
               style={{
                 ...todayBtn,
-                color: ym(year, month) === todayYm ? "var(--fg-subtle)" : "var(--accent-rose)",
+                color: ym(year, month) === todayYm ? "var(--fg-placeholder)" : "var(--tint)",
               }}
             >
               오늘
@@ -301,112 +309,145 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
         </div>
       </div>
 
-      {/* 요일 헤더 + 그리드 — 일반 흐름이라 스크롤하면 월 바 뒤로 자연스럽게 사라진다. */}
-      <div style={{ paddingBottom: "var(--space-1)" }}>
-          {/* 요일 헤더 */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: "var(--space-2)" }}>
-            {WEEKDAYS.map((w, i) => (
-              <span
-                key={w}
-                style={{
-                  textAlign: "center",
-                  fontFamily: "var(--font-sans)",
-                  fontSize: 11,
-                  fontWeight: 600,
-                  letterSpacing: "var(--tracking-wider)",
-                  color: i === 0 ? "var(--danger)" : i === 6 ? "var(--info)" : "var(--fg-subtle)",
-                }}
-              >
-                {w}
-              </span>
-            ))}
-          </div>
+      {/* 요일 헤더 + 그리드 */}
+      <div style={{ paddingTop: "var(--space-3)", paddingBottom: "var(--space-1)" }}>
+        {/* 요일 헤더 */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: "var(--space-2)" }}>
+          {WEEKDAYS.map((w, i) => (
+            <span
+              key={w}
+              style={{
+                textAlign: "center",
+                fontFamily: "var(--font-sans)",
+                fontSize: 11,
+                fontWeight: 500,
+                color: i === 0 ? "var(--danger)" : i === 6 ? "var(--info)" : "var(--fg-placeholder)",
+              }}
+            >
+              {w}
+            </span>
+          ))}
+        </div>
 
-          {/* 그리드 */}
-          <div
-            role="grid"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: GAP,
-            }}
-          >
-            {weeks.map((week, wi) => (
-              <div
-                role="row"
-                key={`w${wi}`}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(7, 1fr)",
-                  gap: GAP,
-                }}
-              >
-                {week.map((day, di) => {
-                  if (day == null)
-                    return <div role="gridcell" key={`b${wi}-${di}`} style={{ height: ROW }} />;
-                  const key = cellKey(year, month, day);
-                  const entries = days[key] ?? [];
-                  const isToday = key === todayKey;
-                  const isSelected = key === selectedKey;
-                  const isFuture = key > todayKey;
-                  const aria = isFuture
-                    ? `${month}월 ${day}일, 미래`
-                    : `${month}월 ${day}일, 일기 ${entries.length}개`;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      role="gridcell"
-                      aria-label={aria}
-                      aria-disabled={isFuture}
-                      onClick={() => onDayTap(day)}
+        {/* 그리드 — 월이 바뀌면 방향에 맞춰 슬라이드 인 */}
+        <style>{`
+          @keyframes month-slide-next {
+            from { opacity: 0; transform: translateX(28px); }
+            to   { opacity: 1; transform: translateX(0); }
+          }
+          @keyframes month-slide-prev {
+            from { opacity: 0; transform: translateX(-28px); }
+            to   { opacity: 1; transform: translateX(0); }
+          }
+        `}</style>
+        <div
+          role="grid"
+          key={`${year}-${month}`}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: GAP,
+            animation: slideDir
+              ? `month-slide-${slideDir} 240ms var(--ease-out)`
+              : undefined,
+          }}
+        >
+          {weeks.map((week, wi) => (
+            <div
+              role="row"
+              key={`w${wi}`}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(7, 1fr)",
+                gap: GAP,
+              }}
+            >
+              {week.map((day, di) => {
+                if (day == null)
+                  return <div role="gridcell" key={`b${wi}-${di}`} style={{ height: ROW }} />;
+                const key = cellKey(year, month, day);
+                const entries = days[key] ?? [];
+                const isToday = key === todayKey;
+                const isSelected = key === selectedKey;
+                const isFuture = key > todayKey;
+                const aria = isFuture
+                  ? `${month}월 ${day}일, 미래`
+                  : `${month}월 ${day}일, 일기 ${entries.length}개`;
+
+                // 오늘: tint 원형 배경 + 흰 숫자
+                // 선택(비오늘): tint 하이라이트 (명확한 대비)
+                // 일기 있는 날(비선택): fill-2 배경
+                const bgColor = isToday
+                  ? "var(--tint)"
+                  : isSelected
+                    ? "var(--tint-soft)"
+                    : entries.length
+                      ? "var(--fill-2)"
+                      : "transparent";
+
+                const numColor = isToday
+                  ? "var(--on-tint)"
+                  : isSelected
+                    ? "var(--tint)"
+                    : isFuture
+                      ? "var(--fg-quaternary)"
+                      : "var(--fg)";
+
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    role="gridcell"
+                    aria-label={aria}
+                    aria-disabled={isFuture}
+                    onClick={() => onDayTap(day)}
+                    style={{
+                      height: ROW,
+                      border: isSelected && !isToday ? "1.5px solid var(--tint)" : "1.5px solid transparent",
+                      borderRadius: "var(--radius-md)",
+                      background: bgColor,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 5,
+                      cursor: isFuture ? "default" : "pointer",
+                      opacity: loading ? 0.5 : 1,
+                      transition: "opacity var(--duration-base, 200ms) var(--ease-out, ease)",
+                    }}
+                  >
+                    <span
                       style={{
-                        height: ROW,
-                        border: isSelected ? "1px solid var(--accent-rose)" : "1px solid transparent",
-                        borderRadius: "var(--radius-md)",
-                        background: entries.length
-                          ? "color-mix(in srgb, var(--accent-rose) 5%, transparent)"
-                          : isToday
-                            ? "var(--accent-rose-soft)"
-                            : "transparent",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 4,
-                        cursor: isFuture ? "default" : "pointer",
-                        opacity: loading ? 0.5 : 1,
-                        transition: "opacity var(--duration-base, 200ms) var(--ease-out, ease)",
+                        fontFamily: "var(--font-sans)",
+                        fontSize: 15,
+                        fontWeight: isToday || isSelected ? 600 : 400,
+                        color: numColor,
+                        lineHeight: 1,
                       }}
                     >
-                      <span
-                        style={{
-                          fontFamily: "var(--font-sans)",
-                          fontSize: "var(--text-sm)",
-                          fontWeight: isToday ? 600 : 400,
-                          color: isFuture
-                            ? "var(--border-strong)"
-                            : isToday
-                              ? "var(--accent-rose-deep)"
-                              : "var(--fg)",
-                        }}
-                      >
-                        {day}
-                      </span>
-                      <span style={{ display: "flex", gap: 3, height: 5 }}>
-                        {entries.slice(0, 2).map((e) => (
-                          <span
-                            key={e.id}
-                            style={{ width: 5, height: 5, borderRadius: "50%", backgroundColor: dotColor(e) }}
-                          />
-                        ))}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
+                      {day}
+                    </span>
+                    {/* mood dot — 일기 있는 날만 표시 */}
+                    <span style={{ display: "flex", gap: 3, height: 9, alignItems: "center" }}>
+                      {entries.slice(0, 2).map((e) => (
+                        <span
+                          key={e.id}
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            backgroundColor: dotColor(e),
+                            flexShrink: 0,
+                          }}
+                        />
+                      ))}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </div>
 
       {error && (
@@ -426,39 +467,58 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
         </p>
       )}
 
-      {/* 범례 — 그리드와 함께 자연 스크롤 */}
+      {/* 범례 */}
       <div
         style={{
           display: "flex",
           flexWrap: "wrap",
           gap: "var(--space-2) var(--space-4)",
-          margin: "var(--space-2) 0 var(--space-4)",
+          margin: "var(--space-2) 0 var(--space-5)",
           paddingTop: "var(--space-3)",
-          borderTop: "1px solid var(--border)",
+          borderTop: "1px solid var(--separator)",
         }}
       >
         {MOODS.map((m) => (
           <LegendItem key={m.key} color={m.color} label={m.label} />
         ))}
-        <LegendItem color={NEUTRAL_DOT} label="미설정" hollow />
+        <LegendItem color="var(--fg-placeholder)" label="미설정" />
       </div>
 
       {/* 그 달 목록 */}
       {dayKeys.length === 0 ? (
-        <p
+        <div
           style={{
-            marginTop: "var(--space-6)",
+            marginTop: "var(--space-8)",
             textAlign: "center",
-            fontFamily: "var(--font-serif)",
-            fontSize: "var(--text-sm)",
-            color: "var(--fg-subtle)",
-            lineHeight: "var(--leading-relaxed)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "var(--space-2)",
           }}
         >
-          이 달엔 아직 기록이 없어요.
-          <br />
-          비어있는 날을 눌러 첫 페이지를 열어볼까요?
-        </p>
+          <span style={{ fontSize: 32, color: "var(--fg-placeholder)" }}>📓</span>
+          <p
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-md)",
+              fontWeight: 600,
+              color: "var(--fg)",
+              margin: 0,
+            }}
+          >
+            이 달엔 아직 기록이 없어요
+          </p>
+          <p
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-base)",
+              color: "var(--fg-muted)",
+              margin: 0,
+            }}
+          >
+            비어있는 날을 눌러 첫 페이지를 열어볼까요?
+          </p>
+        </div>
       ) : (
         <div
           style={{
@@ -473,102 +533,34 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
               key={key}
               id={`day-${key}`}
               style={{
-                scrollMarginTop: 64,
-                // 상시 패딩 + 동일 음수 마진 → 콘텐츠 위치·섹션 간격 불변, 하이라이트 박스만 바깥으로 확장.
-                // 가로는 space-2(8px): 카드보다 넓히되 페이지 셸(가로 space-4)을 넘지 않아 overflow 없음.
+                scrollMarginTop: 72,
                 padding: "var(--space-3) var(--space-2)",
                 margin: "calc(-1 * var(--space-3)) calc(-1 * var(--space-2))",
                 borderRadius: "var(--radius-lg)",
                 backgroundColor:
                   highlightKey === key
-                    ? "color-mix(in srgb, var(--accent-rose) 16%, transparent)"
+                    ? "color-mix(in srgb, var(--tint) 8%, transparent)"
                     : "transparent",
-                boxShadow:
-                  highlightKey === key
-                    ? "0 0 0 1.5px color-mix(in srgb, var(--accent-rose) 55%, transparent), var(--shadow-sm)"
-                    : "none",
                 transition:
-                  "background-color 0.45s var(--ease-out, ease), box-shadow 0.45s var(--ease-out, ease)",
+                  "background-color 0.45s var(--ease-out, ease)",
               }}
             >
+              {/* 날짜 섹션 헤더 */}
               <h3
                 style={{
-                  margin: "0 0 var(--space-2) 0",
+                  margin: "0 0 var(--space-2) var(--space-1)",
                   fontFamily: "var(--font-sans)",
                   fontSize: "var(--text-xs)",
-                  color: "var(--fg-subtle)",
-                  fontWeight: 700,
-                  letterSpacing: "var(--tracking-wider)",
+                  color: "var(--fg-muted)",
+                  fontWeight: 500,
+                  letterSpacing: 0,
                 }}
               >
                 {dayLabel(key)}
               </h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
                 {days[key].map((e) => (
-                  <button
-                    key={e.id}
-                    type="button"
-                    onClick={() => router.push(`/diary/${e.id}`)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "var(--space-3)",
-                      textAlign: "left",
-                      background: "var(--surface)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "var(--radius-md)",
-                      padding: "var(--space-3) var(--space-4)",
-                      cursor: "pointer",
-                      boxShadow: "var(--shadow-xs)",
-                    }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: 4 }}>
-                        {e.mood && KNOWN_MOOD_KEYS.has(e.mood) ? (
-                          <MoodBadge mood={e.mood} size="sm" />
-                        ) : (
-                          <span aria-hidden style={{ fontSize: 14 }}>
-                            {e.source.startsWith("auto_") ? "📷" : "📝"}
-                          </span>
-                        )}
-                        <span style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-xs)", color: "var(--fg-subtle)" }}>
-                          {timeLabel(e.createdAt)}
-                        </span>
-                      </div>
-                      <p
-                        style={{
-                          margin: 0,
-                          fontFamily: "var(--font-serif)",
-                          fontSize: "var(--text-sm)",
-                          color: "var(--fg)",
-                          lineHeight: "var(--leading-relaxed)",
-                          display: "-webkit-box",
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: "vertical",
-                          overflow: "hidden",
-                        }}
-                      >
-                        {e.title?.trim() || snippet(e.content)}
-                      </p>
-                    </div>
-                    {e.thumbnailUrl && (
-                      <Image
-                        src={e.thumbnailUrl}
-                        alt=""
-                        width={64}
-                        height={64}
-                        sizes="64px"
-                        style={{
-                          flexShrink: 0,
-                          width: 64,
-                          height: 64,
-                          objectFit: "cover",
-                          borderRadius: "var(--radius-md)",
-                          border: "1px solid var(--border)",
-                        }}
-                      />
-                    )}
-                  </button>
+                  <DiaryListCard key={e.id} entry={e} onClick={() => router.push(`/diary/${e.id}`)} />
                 ))}
               </div>
             </section>
@@ -590,7 +582,126 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
   );
 }
 
-function LegendItem({ color, label, hollow }: { color: string; label: string; hollow?: boolean }) {
+/** DiaryCard — 흰 카드 radius 16, MoodBadge, 화살표 없음 */
+function DiaryListCard({
+  entry: e,
+  onClick,
+}: {
+  entry: CalendarEntry;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="pressable"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "var(--space-3)",
+        textAlign: "left",
+        background: "var(--surface)",
+        border: "none",
+        borderRadius: "var(--radius-lg)",
+        padding: "var(--space-3) var(--space-4)",
+        cursor: "pointer",
+        width: "100%",
+        minHeight: 44,
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* 메타 줄: mood badge + 시간 */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            marginBottom: "var(--space-1)",
+          }}
+        >
+          {e.mood && KNOWN_MOOD_KEYS.has(e.mood) ? (
+            <MoodBadge mood={e.mood} size="sm" />
+          ) : (
+            // 감정 미설정도 자리를 비우지 않는다 — 회색 dot으로 "감정의 자리" 유지
+            <span
+              aria-hidden
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                backgroundColor: "var(--fg-quaternary)",
+                flexShrink: 0,
+              }}
+            />
+          )}
+          <span
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-xs)",
+              color: "var(--fg-placeholder)",
+            }}
+          >
+            {timeLabel(e.createdAt)}
+          </span>
+        </div>
+        {/* 제목 / 미리보기 */}
+        <p
+          style={{
+            margin: 0,
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-md)",
+            fontWeight: 600,
+            color: "var(--fg)",
+            letterSpacing: "var(--tracking-tight)",
+            lineHeight: "var(--leading-snug)",
+            display: "-webkit-box",
+            WebkitLineClamp: 1,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {e.title?.trim() || snippet(e.content)}
+        </p>
+        {/* 본문 미리보기 (제목 있을 때만) */}
+        {e.title?.trim() && (
+          <p
+            style={{
+              margin: "var(--space-1) 0 0",
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-base)",
+              color: "var(--fg-muted)",
+              lineHeight: "var(--leading-normal)",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            {snippet(e.content, 80)}
+          </p>
+        )}
+      </div>
+      {e.thumbnailUrl && (
+        <Image
+          src={e.thumbnailUrl}
+          alt=""
+          width={64}
+          height={64}
+          sizes="64px"
+          style={{
+            flexShrink: 0,
+            width: 64,
+            height: 64,
+            objectFit: "cover",
+            borderRadius: "var(--radius-md)",
+          }}
+        />
+      )}
+    </button>
+  );
+}
+
+function LegendItem({ color, label }: { color: string; label: string }) {
   return (
     <span
       style={{
@@ -599,16 +710,16 @@ function LegendItem({ color, label, hollow }: { color: string; label: string; ho
         gap: 5,
         fontFamily: "var(--font-sans)",
         fontSize: 11,
-        color: "var(--fg-subtle)",
+        color: "var(--fg-placeholder)",
       }}
     >
       <span
         style={{
-          width: 7,
-          height: 7,
+          width: 6,
+          height: 6,
           borderRadius: "50%",
-          backgroundColor: hollow ? "transparent" : color,
-          border: hollow ? `1.5px solid ${color}` : "none",
+          backgroundColor: color,
+          flexShrink: 0,
         }}
       />
       {label}
@@ -617,22 +728,28 @@ function LegendItem({ color, label, hollow }: { color: string; label: string; ho
 }
 
 const navBtn: React.CSSProperties = {
-  width: 32,
-  height: 32,
+  width: 44,
+  height: 44,
   border: "none",
   background: "none",
   fontSize: 22,
   lineHeight: 1,
-  color: "var(--fg-muted)",
+  color: "var(--tint)",
   cursor: "pointer",
   borderRadius: "var(--radius-md)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
 };
 const todayBtn: React.CSSProperties = {
   border: "none",
   background: "none",
   fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
+  fontSize: "var(--text-base)",
   fontWeight: 600,
   cursor: "pointer",
-  padding: "4px 8px",
+  padding: "var(--space-2) var(--space-2)",
+  minHeight: 44,
+  display: "inline-flex",
+  alignItems: "center",
 };

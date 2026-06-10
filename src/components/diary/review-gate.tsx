@@ -5,6 +5,8 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createDiaryAction } from "@/lib/diary/actions";
 import { getDiaryImageSignedUrls } from "@/lib/storage/actions";
+import { DiaryDatePicker } from "./date-picker";
+import { kstTodayKey } from "@/lib/diary/kst";
 
 const PENDING_DRAFT_KEY = "memoism:pendingDraft";
 const DRAFT_TTL_MS = 5 * 60 * 1000; // 5분 만료 — 사용자가 너무 오래 자리비울 때 보호
@@ -76,16 +78,6 @@ function shortKstLabel(ymd: string): string {
   return `${Number(m)}/${Number(d)}`;
 }
 
-function modeLabel(mode: "A" | "B" | "C"): string {
-  switch (mode) {
-    case "A":
-      return "사진으로 생성";
-    case "B":
-      return "텍스트 정리";
-    case "C":
-      return "사진+텍스트 통합";
-  }
-}
 
 export function ReviewGate() {
   const router = useRouter();
@@ -161,12 +153,32 @@ export function ReviewGate() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [draftState]);
 
+  // 일기 날짜 변경 — state와 sessionStorage 양쪽을 갱신해 새로고침에도 유지.
+  const handleDateChange = (next: string) => {
+    setDraftState((prev) => (prev ? { ...prev, date: next } : prev));
+    try {
+      const raw = sessionStorage.getItem(PENDING_DRAFT_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as PendingDraft;
+        parsed.date = next;
+        sessionStorage.setItem(PENDING_DRAFT_KEY, JSON.stringify(parsed));
+      }
+    } catch {
+      /* sessionStorage 실패 시에도 state로는 반영됨 */
+    }
+  };
+
   const handleApprove = () => {
     if (!draftState) return;
     setSubmitError(null);
 
-    const trimmedTitle = editedTitle.trim() || "일기";
+    // 제목은 필수 — 비어 있으면 저장 대신 입력을 안내한다 (본문 복제 금지).
+    const trimmedTitle = editedTitle.trim();
     const trimmedContent = editedContent.trim();
+    if (!trimmedTitle) {
+      setSubmitError("제목을 입력해주세요.");
+      return;
+    }
     if (!trimmedContent) {
       setSubmitError("내용이 비어있어요. 수정하거나 취소해주세요.");
       return;
@@ -324,13 +336,13 @@ export function ReviewGate() {
       }}
     >
       <header
+        className="glass"
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           padding: "var(--space-3) var(--space-5)",
-          borderBottom: "1px solid var(--border)",
-          backgroundColor: "var(--surface-raised)",
+          borderBottom: "1px solid var(--separator)",
           position: "sticky",
           top: 0,
           zIndex: 10,
@@ -340,44 +352,56 @@ export function ReviewGate() {
           type="button"
           onClick={handleCancel}
           disabled={pending}
+          className="pressable"
           style={{
             background: "none",
             border: "none",
             cursor: "pointer",
-            color: "var(--fg-muted)",
+            color: "var(--tint)",
             fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-sm)",
+            fontSize: "var(--text-base)",
+            fontWeight: 400,
             padding: "4px 0",
+            minWidth: 44,
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
           }}
         >
-          ← 취소
+          <svg width="10" height="16" viewBox="0 0 10 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8 2L2 8L8 14"/>
+          </svg>
+          취소
         </button>
         <span
           style={{
             fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-xs)",
-            color: "var(--fg-subtle)",
-            letterSpacing: "var(--tracking-wider)",
-            textTransform: "uppercase",
+            fontSize: "var(--text-base)",
+            fontWeight: 600,
+            color: "var(--fg)",
+            letterSpacing: "var(--tracking-normal)",
           }}
         >
-          ✨ AI 검토 · {modeLabel(draftState.mode)}
+          AI 검토
         </span>
         <button
           type="button"
           onClick={handleApprove}
           disabled={pending || regenerating || !editedContent.trim()}
+          className="pressable"
           style={{
             background: "none",
             border: "none",
             cursor: pending ? "default" : "pointer",
             color: editedContent.trim()
-              ? "var(--accent-rose)"
+              ? "var(--tint)"
               : "var(--fg-subtle)",
             fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-sm)",
+            fontSize: "var(--text-base)",
             fontWeight: 600,
             padding: "4px 0",
+            minWidth: 44,
+            textAlign: "right",
           }}
         >
           {pending ? "저장 중..." : "저장"}
@@ -397,9 +421,9 @@ export function ReviewGate() {
         <section
           style={{
             backgroundColor: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-md)",
+            borderRadius: "var(--radius-lg)",
             padding: "var(--space-3) var(--space-4)",
+            boxShadow: "var(--shadow-xs)",
           }}
         >
           <p
@@ -440,15 +464,21 @@ export function ReviewGate() {
               <li>{multiDay ? "가장 이른 시각" : "촬영 시각"} · {exifTimeLabel}</li>
             )}
             {exifHasLocation && <li>위치 정보 있음</li>}
-            <li style={{ color: "var(--fg-subtle)" }}>
-              날짜 · {draftState.date}
-            </li>
             {multiDay && (
               <li style={{ color: "var(--danger)" }}>
                 ⚠️ 서로 다른 날 사진이 섞여 있어요. 한 날 사진만 두는 걸 권해요.
               </li>
             )}
           </ul>
+
+          {/* 일기 날짜 — 촬영일이 기본값, 캘린더로 변경 가능 */}
+          <div style={{ marginTop: "var(--space-3)" }}>
+            <DiaryDatePicker
+              value={draftState.date}
+              max={kstTodayKey()}
+              onChange={handleDateChange}
+            />
+          </div>
           {signedUrls.length > 0 && (
             <div
               style={{
@@ -470,8 +500,7 @@ export function ReviewGate() {
                       aspectRatio: signedUrls.length === 1 ? "16 / 9" : "1 / 1",
                       overflow: "hidden",
                       borderRadius: "var(--radius-md)",
-                      border: "1px solid var(--border)",
-                      backgroundColor: "var(--bg)",
+                      backgroundColor: "var(--fill-2)",
                     }}
                   >
                     <Image
@@ -542,9 +571,9 @@ export function ReviewGate() {
           <section
             style={{
               backgroundColor: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-md)",
+              borderRadius: "var(--radius-lg)",
               padding: "var(--space-3) var(--space-4)",
+              boxShadow: "var(--shadow-xs)",
               display: "flex",
               flexDirection: "column",
               gap: "var(--space-2)",
@@ -553,7 +582,7 @@ export function ReviewGate() {
             <div
               style={{
                 display: "flex",
-                alignItems: "baseline",
+                alignItems: "center",
                 justifyContent: "space-between",
                 gap: "var(--space-2)",
               }}
@@ -575,6 +604,7 @@ export function ReviewGate() {
                 type="button"
                 onClick={() => setEditedContent(draftState.text ?? "")}
                 disabled={pending || regenerating}
+                className="pressable"
                 style={{
                   fontFamily: "var(--font-sans)",
                   fontSize: "var(--text-sm)",
@@ -582,11 +612,10 @@ export function ReviewGate() {
                   color:
                     pending || regenerating
                       ? "var(--fg-subtle)"
-                      : "var(--fg-muted)",
-                  backgroundColor: "var(--bg)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "var(--radius-md)",
-                  padding: "6px 12px",
+                      : "var(--tint)",
+                  backgroundColor: "transparent",
+                  border: "none",
+                  padding: "4px 0",
                   cursor: pending || regenerating ? "default" : "pointer",
                   flexShrink: 0,
                 }}
@@ -594,10 +623,11 @@ export function ReviewGate() {
                 이걸로 되돌리기
               </button>
             </div>
+            <div style={{ height: 1, backgroundColor: "var(--separator)" }} />
             <p
               style={{
                 whiteSpace: "pre-wrap",
-                fontFamily: "var(--font-serif)",
+                fontFamily: "var(--font-sans)",
                 fontSize: "var(--text-md)",
                 lineHeight: "var(--leading-relaxed)",
                 color: "var(--fg-muted)",
@@ -609,13 +639,12 @@ export function ReviewGate() {
           </section>
         )}
 
-        {/* Story 영역 — AI 생성 본문 (수정 가능) */}
+        {/* Story 영역 — AI 생성 본문 (수정 가능). 연노랑 하이라이터로 Fact와 시각 분리. */}
         <div
           style={{
             position: "relative",
-            backgroundColor: "color-mix(in srgb, #FFF4CC 30%, transparent)",
-            border: "1px solid color-mix(in srgb, #FFF4CC 60%, transparent)",
-            borderRadius: "var(--radius-md)",
+            backgroundColor: "rgba(255, 204, 0, 0.10)",
+            borderRadius: "var(--radius-lg)",
             padding: "var(--space-4)",
             display: "flex",
             flexDirection: "column",
@@ -643,10 +672,11 @@ export function ReviewGate() {
             maxLength={200}
             style={{
               width: "100%",
-              fontFamily: "var(--font-serif)",
+              fontFamily: "var(--font-sans)",
               fontSize: "var(--text-xl)",
-              fontWeight: 600,
-              lineHeight: 1.3,
+              fontWeight: 700,
+              lineHeight: "var(--leading-snug)",
+              letterSpacing: "var(--tracking-tight)",
               color: "var(--fg)",
               backgroundColor: "transparent",
               border: "none",
@@ -654,6 +684,7 @@ export function ReviewGate() {
               padding: 0,
             }}
           />
+          <div style={{ height: 1, backgroundColor: "rgba(60,56,50,0.10)" }} />
           <textarea
             ref={textareaRef}
             value={editedContent}
@@ -662,7 +693,7 @@ export function ReviewGate() {
             style={{
               width: "100%",
               minHeight: 240,
-              fontFamily: "var(--font-serif)",
+              fontFamily: "var(--font-sans)",
               fontSize: "var(--text-md)",
               lineHeight: "var(--leading-relaxed)",
               color: "var(--fg)",
@@ -677,8 +708,8 @@ export function ReviewGate() {
             <p
               style={{
                 fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-xs)",
-                color: "var(--fg-subtle)",
+                fontSize: "var(--text-sm)",
+                color: "var(--fg-muted)",
                 margin: 0,
               }}
             >
@@ -690,16 +721,16 @@ export function ReviewGate() {
             type="button"
             onClick={handleRegenerate}
             disabled={regenerating || pending}
+            className="pressable"
             style={{
               alignSelf: "flex-start",
               fontFamily: "var(--font-sans)",
               fontSize: "var(--text-sm)",
               fontWeight: 600,
-              color: regenerating ? "var(--fg-subtle)" : "var(--fg-muted)",
-              backgroundColor: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-md)",
-              padding: "8px 14px",
+              color: regenerating || pending ? "var(--fg-subtle)" : "var(--tint)",
+              backgroundColor: "transparent",
+              border: "none",
+              padding: "4px 0",
               cursor: regenerating || pending ? "default" : "pointer",
             }}
           >

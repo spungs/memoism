@@ -373,20 +373,23 @@ export function DiaryForm({
     const trimmedTitle = title.trim();
     const trimmedContent = content.trim();
 
+    // 제목은 필수 — 본문을 제목으로 몰래 복제하지 않고, 명시적으로 입력을 안내한다.
+    if (!trimmedTitle) {
+      setTitleError("제목을 입력해주세요");
+      titleRef.current?.focus();
+      return;
+    }
     if (!trimmedContent) {
       setContentError("내용을 입력해주세요");
       return;
     }
-
-    const effectiveTitle =
-      trimmedTitle || trimmedContent.split("\n")[0]?.slice(0, 60) || "일기";
 
     startTransition(async () => {
       try {
         const { compressed, exifs } = await buildExifsAndCompress();
 
         const fd = new FormData();
-        fd.set("title", effectiveTitle);
+        fd.set("title", trimmedTitle);
         fd.set("content", trimmedContent);
         fd.set("source", "manual");
         fd.set("mood", mood ?? "");
@@ -464,6 +467,11 @@ export function DiaryForm({
         return;
       }
 
+      // 일기 날짜 기본값: 사용자가 폼에서 날짜를 바꾸지 않았다면(=오늘) 사진의
+      // 가장 이른 촬영일(KST)을 쓴다. 검토 화면에서 다시 변경할 수 있다.
+      const draftDate =
+        date === today && dateKeys.length > 0 ? [...dateKeys].sort()[0] : date;
+
       // sessionStorage에 draft + 입력 컨텍스트 저장 → /diary/review가 읽음
       sessionStorage.setItem(
         PENDING_DRAFT_KEY,
@@ -474,7 +482,7 @@ export function DiaryForm({
           mode: data.mode,
           // 사용자 원본 텍스트 — 검토 화면의 "다시 생성"이 B/C 모드 재생성에 사용.
           text: content.trim() || undefined,
-          date,
+          date: draftDate,
           createdAt: Date.now(),
         }),
       );
@@ -511,13 +519,13 @@ export function DiaryForm({
       }}
     >
       <header
+        className="glass"
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           padding: "var(--space-3) var(--space-5)",
-          borderBottom: "1px solid var(--border)",
-          backgroundColor: "var(--surface-raised)",
+          borderBottom: "1px solid var(--separator)",
           position: "sticky",
           top: 0,
           zIndex: 10,
@@ -527,25 +535,34 @@ export function DiaryForm({
           type="button"
           onClick={() => router.back()}
           disabled={pending || aiPending}
+          className="pressable"
           style={{
             background: "none",
             border: "none",
             cursor: "pointer",
-            color: "var(--fg-muted)",
+            color: "var(--tint)",
             fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-sm)",
+            fontSize: "var(--text-base)",
+            fontWeight: 400,
             padding: "4px 0",
+            minWidth: 44,
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
           }}
         >
-          ← 취소
+          <svg width="10" height="16" viewBox="0 0 10 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8 2L2 8L8 14"/>
+          </svg>
+          취소
         </button>
         <span
           style={{
             fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-xs)",
-            color: "var(--fg-subtle)",
-            letterSpacing: "var(--tracking-wider)",
-            textTransform: "uppercase",
+            fontSize: "var(--text-base)",
+            fontWeight: 600,
+            color: "var(--fg)",
+            letterSpacing: "var(--tracking-normal)",
           }}
         >
           {mode === "create" ? "새 일기" : "수정하기"}
@@ -554,15 +571,18 @@ export function DiaryForm({
           form="diary-form"
           type="submit"
           disabled={!canManualSave}
+          className="pressable"
           style={{
             background: "none",
             border: "none",
             cursor: canManualSave ? "pointer" : "default",
-            color: canManualSave ? "var(--accent-rose)" : "var(--fg-subtle)",
+            color: canManualSave ? "var(--tint)" : "var(--fg-subtle)",
             fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-sm)",
+            fontSize: "var(--text-base)",
             fontWeight: 600,
             padding: "4px 0",
+            minWidth: 44,
+            textAlign: "right",
           }}
         >
           {pending ? "저장 중..." : "저장"}
@@ -585,8 +605,19 @@ export function DiaryForm({
 
         <MoodPicker value={mood} onChange={setMood} />
 
-        <div style={{ height: 1, backgroundColor: "var(--border)" }} />
-
+        {/* 글쓰기 표면 — 흰 카드로 분리해 "지금 기록하고 있다"는 물성 부여 */}
+        <div
+          style={{
+            backgroundColor: "var(--surface)",
+            borderRadius: "var(--radius-lg)",
+            boxShadow: "var(--shadow-xs)",
+            padding: "var(--space-4) var(--space-4) var(--space-5)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-3)",
+            flex: 1,
+          }}
+        >
         <div>
           <textarea
             ref={titleRef}
@@ -605,16 +636,17 @@ export function DiaryForm({
                 textareaRef.current?.focus();
               }
             }}
-            placeholder="제목 (선택)"
+            placeholder="제목"
             maxLength={200}
             rows={1}
             aria-invalid={Boolean(titleError)}
             style={{
               width: "100%",
-              fontFamily: "var(--font-serif)",
+              fontFamily: "var(--font-sans)",
               fontSize: "var(--text-xl)",
-              fontWeight: 600,
-              lineHeight: 1.3,
+              fontWeight: 700,
+              lineHeight: "var(--leading-snug)",
+              letterSpacing: "var(--tracking-tight)",
               color: "var(--fg)",
               backgroundColor: "transparent",
               border: "none",
@@ -631,6 +663,8 @@ export function DiaryForm({
             </p>
           )}
         </div>
+
+        <div style={{ height: 1, backgroundColor: "var(--separator)" }} />
 
         <div style={{ flex: 1 }}>
           <textarea
@@ -652,7 +686,7 @@ export function DiaryForm({
             style={{
               width: "100%",
               minHeight: 120,
-              fontFamily: "var(--font-serif)",
+              fontFamily: "var(--font-sans)",
               fontSize: "var(--text-md)",
               lineHeight: "var(--leading-relaxed)",
               color: "var(--fg)",
@@ -669,8 +703,7 @@ export function DiaryForm({
             </p>
           )}
         </div>
-
-        <div style={{ height: 1, backgroundColor: "var(--border)" }} />
+        </div>
 
         {/* 사진 (상한은 구독별, maxImages prop) — 작성·수정 공용. 가로 스크롤(개행 X). */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
@@ -750,16 +783,22 @@ export function DiaryForm({
           )}
           {slotsLeft > 0 && (
             <label
+              className="pressable"
               style={{
                 fontFamily: "var(--font-sans)",
                 fontSize: "var(--text-sm)",
-                color: "var(--fg-muted)",
-                padding: "6px 12px",
-                borderRadius: "var(--radius-md)",
-                border: "1px solid var(--border)",
-                backgroundColor: "var(--surface)",
+                fontWeight: 500,
+                color: "var(--tint)",
+                padding: "7px 14px",
+                borderRadius: "var(--radius-pill)",
+                border: "none",
+                backgroundColor: "var(--tint-soft)",
                 cursor: "pointer",
                 alignSelf: "flex-start",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                minHeight: 36,
               }}
             >
               + 사진 추가
@@ -782,17 +821,20 @@ export function DiaryForm({
               type="button"
               onClick={handleAiGenerate}
               disabled={!canAiGenerate}
+              className="pressable"
               style={{
                 fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-md)",
+                fontSize: "var(--text-base)",
                 fontWeight: 600,
-                color: canAiGenerate ? "var(--bg)" : "var(--fg-subtle)",
-                backgroundColor: canAiGenerate ? "var(--fg)" : "var(--surface)",
-                border: "1px solid " + (canAiGenerate ? "var(--fg)" : "var(--border)"),
+                color: canAiGenerate ? "var(--on-tint)" : "var(--fg-subtle)",
+                backgroundColor: canAiGenerate ? "var(--tint)" : "var(--fill-2)",
+                border: "none",
                 borderRadius: "var(--radius-md)",
-                padding: "12px 16px",
+                padding: "0 16px",
+                height: 50,
+                width: "100%",
                 cursor: canAiGenerate ? "pointer" : "default",
-                transition: "background-color 120ms",
+                transition: "background-color var(--duration-fast) var(--ease-out)",
               }}
             >
               {aiPending ? (
