@@ -73,9 +73,12 @@ function getInitials(email: string): string {
 
 interface SettingsViewProps {
   email: string;
+  googleLinked: boolean;
+  hasPassword: boolean;
+  googleNotice?: string;
 }
 
-export function SettingsView({ email }: SettingsViewProps) {
+export function SettingsView({ email, googleLinked, hasPassword, googleNotice }: SettingsViewProps) {
   const router = useRouter();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
@@ -206,11 +209,47 @@ export function SettingsView({ email }: SettingsViewProps) {
       <div style={{ padding: "0 var(--space-5)", marginBottom: "var(--space-6)" }}>
         <p style={SECTION_LABEL_STYLE}>계정</p>
         <div style={CARD_STYLE}>
-          <RowButton
-            label="비밀번호 변경"
-            onClick={() => setPasswordOpen(true)}
-          />
+          {hasPassword && (
+            <>
+              <RowButton label="비밀번호 변경" onClick={() => setPasswordOpen(true)} />
+              <div style={DIVIDER_STYLE} />
+            </>
+          )}
+          {googleLinked ? (
+            <div style={ROW_STYLE}>
+              <span style={ROW_LABEL_STYLE}>Google 계정</span>
+              <span style={ROW_VALUE_STYLE}>연결됨</span>
+            </div>
+          ) : (
+            <a
+              href="/api/auth/google?flow=link"
+              className="pressable"
+              style={{
+                ...ROW_STYLE,
+                width: "100%",
+                textDecoration: "none",
+                cursor: "pointer",
+              }}
+            >
+              <span style={ROW_LABEL_STYLE}>Google 계정 연결</span>
+              <ChevronIcon />
+            </a>
+          )}
         </div>
+        {googleNotice && (
+          <p
+            role="status"
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-sm)",
+              color: "var(--fg-muted)",
+              margin: "var(--space-2) 0 0",
+              paddingLeft: "var(--space-4)",
+            }}
+          >
+            {googleNotice}
+          </p>
+        )}
       </div>
 
       {/* 알림 그룹 */}

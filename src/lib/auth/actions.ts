@@ -154,6 +154,9 @@ export async function changePasswordAction(
     select: { passwordHash: true },
   });
   if (!user) return { error: "사용자를 찾을 수 없습니다" };
+  if (!user.passwordHash) {
+    return { error: "구글 로그인으로 가입한 계정은 비밀번호가 없어요" };
+  }
 
   const ok = await verifyPassword(currentPassword, user.passwordHash);
   if (!ok) return { fieldErrors: { currentPassword: "현재 비밀번호가 올바르지 않습니다" } };
