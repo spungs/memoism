@@ -14,6 +14,20 @@ const SESSION_COOKIE = "session";
 export { signSession, verifySessionToken };
 export type { SessionPayload };
 
+const SESSION_COOKIE_OPTS = {
+  httpOnly: true as const,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: SESSION_DURATION_SECONDS,
+};
+
+// 라우트 핸들러에서 응답 객체에 직접 세션 쿠키를 부착할 때 재사용.
+// (NextResponse.redirect를 반환하는 핸들러에서는 cookies().set() 대신 이걸 써야 안정적.)
+export function buildSessionCookie(token: string) {
+  return { name: SESSION_COOKIE, value: token, options: SESSION_COOKIE_OPTS };
+}
+
 export async function createSession(
   userId: string,
   email: string,
@@ -21,13 +35,7 @@ export async function createSession(
 ): Promise<void> {
   const token = await signSession({ userId, email, tokenVersion });
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_DURATION_SECONDS,
-  });
+  cookieStore.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTS);
 }
 
 export async function deleteSession(): Promise<void> {

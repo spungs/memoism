@@ -4,7 +4,7 @@ import { verifySessionToken } from "@/lib/auth/jwt";
 // Exact-match whitelist. Adding a sub-route under /login or /signup later requires
 // updating this list explicitly — preferred over prefix matching to avoid auth
 // bypass via unintended sub-routes (QA L-1).
-const PUBLIC_PATHS = new Set(["/login", "/signup"]);
+const PUBLIC_PATHS = new Set(["/login", "/signup", "/signup/consent"]);
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -19,6 +19,22 @@ export async function middleware(req: NextRequest) {
 
   const token = req.cookies.get("session")?.value;
   const session = token ? await verifySessionToken(token) : null;
+
+  // OAuth 엔드포인트: 로그아웃 상태(로그인/가입)와 로그인 상태(설정 연동) 둘 다에서
+  // 도달 가능해야 한다. 절대 게이트하지 않고, 세션이 있으면 x-user-* 헤더를 포워딩해
+  // 콜백에서 getSession()이 동작하도록 한다(link 플로우).
+  if (pathname.startsWith("/api/auth/")) {
+    const h = new Headers(req.headers);
+    h.delete("x-user-id");
+    h.delete("x-user-email");
+    h.delete("x-user-token-version");
+    if (session) {
+      h.set("x-user-id", session.userId);
+      h.set("x-user-email", session.email);
+      h.set("x-user-token-version", String(session.tokenVersion));
+    }
+    return NextResponse.next({ request: { headers: h } });
+  }
 
   // Authed user hitting an auth page → bounce to home.
   if (session && isPublic) {
