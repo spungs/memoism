@@ -62,6 +62,165 @@ function dayLabel(key: string): string {
   return `${m}월 ${d}일 ${wd}요일`;
 }
 
+type DaysMap = Record<string, CalendarEntry[]>;
+function ymStr(y: number, m: number): string {
+  return `${y}-${String(m).padStart(2, "0")}`;
+}
+// delta 개월 이동 (음수=이전). Date 정규화로 연도 경계 자동 처리.
+function addMonth(y: number, m: number, delta: number): { y: number; m: number } {
+  const d = new Date(y, m - 1 + delta, 1);
+  return { y: d.getFullYear(), m: d.getMonth() + 1 };
+}
+function weeksOf(y: number, m: number): number {
+  return buildCells(y, m).length / 7;
+}
+
+/**
+ * 한 달치 날짜 그리드(주 7열). 카루셀 패널 단위로 쓰인다.
+ * interactive=true인 가운데(현재) 패널만 탭 가능하고, 양옆 미리보기 패널은
+ * aria-hidden 비대화형(드래그 중 비치는 용도)이다.
+ */
+function MonthGrid({
+  year,
+  month,
+  days,
+  todayKey,
+  selectedKey,
+  interactive,
+  onDayTap,
+}: {
+  year: number;
+  month: number;
+  days: DaysMap;
+  todayKey: string;
+  selectedKey: string;
+  interactive: boolean;
+  onDayTap?: (day: number) => void;
+}) {
+  const cells = buildCells(year, month);
+  const weeks: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+
+  return (
+    <div
+      role={interactive ? "grid" : undefined}
+      aria-hidden={interactive ? undefined : true}
+      style={{
+        flex: "0 0 100%",
+        minWidth: 0,
+        display: "flex",
+        flexDirection: "column",
+        gap: GAP,
+        alignContent: "flex-start",
+      }}
+    >
+      {weeks.map((week, wi) => (
+        <div
+          role={interactive ? "row" : undefined}
+          key={`w${wi}`}
+          style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: GAP }}
+        >
+          {week.map((day, di) => {
+            if (day == null)
+              return <div key={`b${wi}-${di}`} style={{ height: ROW }} />;
+            const key = cellKey(year, month, day);
+            const entries = days[key] ?? [];
+            const isToday = key === todayKey;
+            const isSelected = interactive && key === selectedKey;
+            const isFuture = key > todayKey;
+
+            // 오늘: tint 원형 배경 + 흰 숫자 / 선택(비오늘): tint 하이라이트 / 일기 있는 날: fill-2
+            const bgColor = isToday
+              ? "var(--tint)"
+              : isSelected
+                ? "var(--tint-soft)"
+                : entries.length
+                  ? "var(--fill-2)"
+                  : "transparent";
+            const numColor = isToday
+              ? "var(--on-tint)"
+              : isSelected
+                ? "var(--tint)"
+                : isFuture
+                  ? "var(--fg-quaternary)"
+                  : "var(--fg)";
+
+            const cellStyle: React.CSSProperties = {
+              height: ROW,
+              border:
+                isSelected && !isToday
+                  ? "1.5px solid var(--tint)"
+                  : "1.5px solid transparent",
+              borderRadius: "var(--radius-md)",
+              background: bgColor,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 5,
+              cursor: interactive && !isFuture ? "pointer" : "default",
+            };
+            const inner = (
+              <>
+                <span
+                  style={{
+                    fontFamily: "var(--font-sans)",
+                    fontSize: 15,
+                    fontWeight: isToday || isSelected ? 600 : 400,
+                    color: numColor,
+                    lineHeight: 1,
+                  }}
+                >
+                  {day}
+                </span>
+                {/* mood dot — 일기 있는 날만 표시 */}
+                <span style={{ display: "flex", gap: 3, height: 9, alignItems: "center" }}>
+                  {entries.slice(0, 2).map((e) => (
+                    <span
+                      key={e.id}
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        backgroundColor: dotColor(e),
+                        flexShrink: 0,
+                      }}
+                    />
+                  ))}
+                </span>
+              </>
+            );
+
+            if (!interactive) {
+              return (
+                <div key={key} style={cellStyle}>
+                  {inner}
+                </div>
+              );
+            }
+            const aria = isFuture
+              ? `${month}월 ${day}일, 미래`
+              : `${month}월 ${day}일, 일기 ${entries.length}개`;
+            return (
+              <button
+                key={key}
+                type="button"
+                role="gridcell"
+                aria-label={aria}
+                aria-disabled={isFuture}
+                onClick={() => onDayTap?.(day)}
+                style={cellStyle}
+              >
+                {inner}
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /**
  * 일기 통합 뷰 — 검색창 + (검색 비활성 시) 접히는 월 달력 + 그 달 목록.
  * 검색이 활성화되면 DiarySearchView가 결과를 그리고 달력/목록은 숨긴다.
@@ -90,8 +249,10 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
 
   const [year, setYear] = useState(initialYear);
   const [month, setMonth] = useState(initialMonth);
-  const [days, setDays] = useState(initialDays);
-  const [loading, setLoading] = useState(false);
+  // 월별 데이터 캐시 — 인접 달을 미리 받아 카루셀 드래그 중 dot까지 비친다.
+  const [monthCache, setMonthCache] = useState<Record<string, DaysMap>>(() => ({
+    [ymStr(initialYear, initialMonth)]: initialDays,
+  }));
   const [error, setError] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const [highlightKey, setHighlightKey] = useState<string | null>(null);
@@ -101,13 +262,24 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
       ? todayKey
       : cellKey(initialYear, initialMonth, 1),
   );
-  const reqRef = useRef(0);
-  const touchX = useRef<number | null>(null);
-  const touchY = useRef<number | null>(null);
-  // 월 전환 방향 — 그리드 슬라이드 애니메이션용 (오늘 점프는 애니메이션 없음)
-  const [slideDir, setSlideDir] = useState<"prev" | "next" | null>(null);
+
+  // 카루셀 드래그/전환 상태
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef({ sx: 0, sy: 0, st: 0, dragging: false, armed: false });
+  const dxRef = useRef(0);
+  const [dx, setDx] = useState(0); // 드래그 오프셋 px (트랙 translateX 계산용)
+  const [committing, setCommitting] = useState<null | "prev" | "next" | "snap">(
+    null,
+  );
 
   const canGoNext = ym(year, month) < todayYm;
+
+  // 현재/이전/다음 달 + 각 데이터 (캐시에서, 없으면 빈 맵)
+  const prev = addMonth(year, month, -1);
+  const next = addMonth(year, month, 1);
+  const days = monthCache[ymStr(year, month)] ?? {};
+  const prevDays = monthCache[ymStr(prev.y, prev.m)] ?? {};
+  const nextDays = monthCache[ymStr(next.y, next.m)] ?? {};
 
   // 스크롤 플래그: 그리드가 위로 스크롤돼 사라지면 월 바에 '일기' 라벨을 띄운다.
   useEffect(() => {
@@ -139,65 +311,120 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
     return () => clearTimeout(t);
   }, [highlightKey]);
 
-  async function loadMonth(y: number, m: number) {
+  // 현재·이전·다음 달 데이터 프리페치 (캐시에 없을 때만). 인접 달을 미리 받아둬야
+  // 드래그 중 비치는 패널에 dot이 보인다.
+  useEffect(() => {
+    const wants: Array<[number, number]> = [
+      [year, month],
+      [prev.y, prev.m],
+      [next.y, next.m],
+    ];
+    for (const [y, m] of wants) {
+      const k = ymStr(y, m);
+      if (monthCache[k]) continue;
+      fetch(`/api/diaries/calendar?month=${k}`)
+        .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
+        .then(({ ok, data }) => {
+          if (!ok) {
+            if (y === year && m === month)
+              setError(data?.error ?? "불러오지 못했어요");
+            return;
+          }
+          setMonthCache((c) => (c[k] ? c : { ...c, [k]: data.days }));
+        })
+        .catch(() => {
+          if (y === year && m === month) setError("불러오지 못했어요");
+        });
+    }
+    // monthCache는 의도적으로 의존성에서 제외(월 변경 시에만 프리페치, 캐시 갱신 루프 방지)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year, month]);
+
+  // 커밋 후 트랙을 -100%로 즉시 리베이스 — 같은 내용이 같은 자리에 오므로 점프 없음.
+  function rebaseTo(y: number, m: number) {
+    setCommitting(null);
+    setDx(0);
+    dxRef.current = 0;
     setYear(y);
     setMonth(m);
     setSelectedKey(y === ty && m === tm ? todayKey : cellKey(y, m, 1));
     setError(null);
-    setLoading(true);
     window.scrollTo({ top: 0 });
     setScrolled(false);
-    const reqId = ++reqRef.current;
-    try {
-      const res = await fetch(
-        `/api/diaries/calendar?month=${y}-${String(m).padStart(2, "0")}`,
-      );
-      const data = await res.json();
-      if (reqId !== reqRef.current) return;
-      if (!res.ok) {
-        setError(data?.error ?? "불러오지 못했어요");
-        return;
-      }
-      setDays(data.days);
-    } catch {
-      if (reqId === reqRef.current) setError("불러오지 못했어요");
-    } finally {
-      if (reqId === reqRef.current) setLoading(false);
+  }
+
+  function onTrackTransitionEnd(e: React.TransitionEvent) {
+    if (e.propertyName !== "transform" || !committing) return;
+    if (committing === "snap") {
+      setCommitting(null);
+      setDx(0);
+      dxRef.current = 0;
+      return;
     }
+    const t = committing === "prev" ? prev : next;
+    rebaseTo(t.y, t.m);
   }
 
   function goPrev() {
-    const d = new Date(year, month - 2, 1);
-    setSlideDir("prev");
-    void loadMonth(d.getFullYear(), d.getMonth() + 1);
+    if (committing) return;
+    setCommitting("prev");
   }
   function goNext() {
-    if (!canGoNext) return;
-    const d = new Date(year, month, 1);
-    setSlideDir("next");
-    void loadMonth(d.getFullYear(), d.getMonth() + 1);
+    if (committing || !canGoNext) return;
+    setCommitting("next");
   }
   function goToday() {
-    if (ty === year && tm === month) return;
-    setSlideDir(null);
-    void loadMonth(ty, tm);
+    if (committing || (ty === year && tm === month)) return;
+    rebaseTo(ty, tm); // 멀리 점프 — 애니메이션 없이 즉시
   }
 
   function onTouchStart(e: React.TouchEvent) {
-    touchX.current = e.touches[0].clientX;
-    touchY.current = e.touches[0].clientY;
+    if (committing) return;
+    const t = e.touches[0];
+    dragRef.current = {
+      sx: t.clientX,
+      sy: t.clientY,
+      st: e.timeStamp,
+      dragging: false,
+      armed: true,
+    };
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    const d = dragRef.current;
+    if (!d.armed) return;
+    const t = e.touches[0];
+    const ddx = t.clientX - d.sx;
+    const ddy = t.clientY - d.sy;
+    if (!d.dragging) {
+      // 세로 우세 → 스크롤 의도, 취소 (touch-action: pan-y로 세로는 브라우저가 처리)
+      if (Math.abs(ddy) > Math.abs(ddx)) {
+        d.armed = false;
+        return;
+      }
+      if (Math.abs(ddx) > 8) d.dragging = true;
+      else return;
+    }
+    // 다음 달(미래) 불가 시 왼쪽 드래그에 저항
+    const v = !canGoNext && ddx < 0 ? ddx * 0.3 : ddx;
+    dxRef.current = v;
+    setDx(v);
   }
   function onTouchEnd(e: React.TouchEvent) {
-    if (touchX.current == null || touchY.current == null) return;
-    const dx = e.changedTouches[0].clientX - touchX.current;
-    const dy = e.changedTouches[0].clientY - touchY.current;
-    touchX.current = null;
-    touchY.current = null;
-    // 의도치 않은 월 전환 방지: 충분히 길고(60px+) 수평이 지배적인 스와이프만.
-    if (Math.abs(dx) < 60) return;
-    if (Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    if (dx < 0) goNext();
-    else goPrev();
+    const d = dragRef.current;
+    if (!d.dragging) {
+      d.armed = false;
+      return;
+    }
+    d.armed = false;
+    d.dragging = false;
+    const w = viewportRef.current?.clientWidth ?? 350;
+    const v = dxRef.current;
+    const elapsed = e.timeStamp - d.st;
+    const far = Math.abs(v) > w * 0.3;
+    const flick = Math.abs(v) > 60 && elapsed < 300;
+    if (v > 0 && (far || flick)) setCommitting("prev");
+    else if (v < 0 && (far || flick) && canGoNext) setCommitting("next");
+    else setCommitting("snap");
   }
 
   function onDayTap(day: number) {
@@ -218,14 +445,28 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
     });
   }
 
-  const cells = buildCells(year, month);
-  const weeks: (number | null)[][] = [];
-  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
-
   const dayKeys = Object.keys(days).sort().reverse();
 
+  // 뷰포트 높이: 세 패널 중 최대 주 수에 맞춰 고정 → 다른 주 수의 인접 달이 잘리지 않음
+  const maxWeeks = Math.max(
+    weeksOf(prev.y, prev.m),
+    weeksOf(year, month),
+    weeksOf(next.y, next.m),
+  );
+  const viewportHeight = maxWeeks * ROW + (maxWeeks - 1) * GAP;
+  const trackTransform =
+    committing === "prev"
+      ? "translateX(0%)"
+      : committing === "next"
+        ? "translateX(-200%)"
+        : committing === "snap"
+          ? "translateX(-100%)"
+          : dx !== 0
+            ? `translateX(calc(-100% + ${dx}px))`
+            : "translateX(-100%)";
+
   return (
-    <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ userSelect: "none" }}>
+    <div style={{ userSelect: "none" }}>
       {/* sticky 월 바 — .glass 블러 재질, 스크롤 시 더 불투명 */}
       <div
         className={scrolled ? "glass is-scrolled" : "glass"}
@@ -329,124 +570,49 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
           ))}
         </div>
 
-        {/* 그리드 — 월이 바뀌면 방향에 맞춰 슬라이드 인 */}
-        <style>{`
-          @keyframes month-slide-next {
-            from { opacity: 0; transform: translateX(28px); }
-            to   { opacity: 1; transform: translateX(0); }
-          }
-          @keyframes month-slide-prev {
-            from { opacity: 0; transform: translateX(-28px); }
-            to   { opacity: 1; transform: translateX(0); }
-          }
-        `}</style>
+        {/* 그리드 — 3패널 카루셀(이전·현재·다음): 손가락 따라 인접 달이 비친다.
+            touchAction: pan-y로 세로 스크롤은 브라우저, 가로는 카루셀이 가져간다. */}
         <div
-          role="grid"
-          key={`${year}-${month}`}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: GAP,
-            animation: slideDir
-              ? `month-slide-${slideDir} 240ms var(--ease-out)`
-              : undefined,
-          }}
+          ref={viewportRef}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          style={{ overflow: "hidden", height: viewportHeight, touchAction: "pan-y" }}
         >
-          {weeks.map((week, wi) => (
-            <div
-              role="row"
-              key={`w${wi}`}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(7, 1fr)",
-                gap: GAP,
-              }}
-            >
-              {week.map((day, di) => {
-                if (day == null)
-                  return <div role="gridcell" key={`b${wi}-${di}`} style={{ height: ROW }} />;
-                const key = cellKey(year, month, day);
-                const entries = days[key] ?? [];
-                const isToday = key === todayKey;
-                const isSelected = key === selectedKey;
-                const isFuture = key > todayKey;
-                const aria = isFuture
-                  ? `${month}월 ${day}일, 미래`
-                  : `${month}월 ${day}일, 일기 ${entries.length}개`;
-
-                // 오늘: tint 원형 배경 + 흰 숫자
-                // 선택(비오늘): tint 하이라이트 (명확한 대비)
-                // 일기 있는 날(비선택): fill-2 배경
-                const bgColor = isToday
-                  ? "var(--tint)"
-                  : isSelected
-                    ? "var(--tint-soft)"
-                    : entries.length
-                      ? "var(--fill-2)"
-                      : "transparent";
-
-                const numColor = isToday
-                  ? "var(--on-tint)"
-                  : isSelected
-                    ? "var(--tint)"
-                    : isFuture
-                      ? "var(--fg-quaternary)"
-                      : "var(--fg)";
-
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    role="gridcell"
-                    aria-label={aria}
-                    aria-disabled={isFuture}
-                    onClick={() => onDayTap(day)}
-                    style={{
-                      height: ROW,
-                      border: isSelected && !isToday ? "1.5px solid var(--tint)" : "1.5px solid transparent",
-                      borderRadius: "var(--radius-md)",
-                      background: bgColor,
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 5,
-                      cursor: isFuture ? "default" : "pointer",
-                      opacity: loading ? 0.5 : 1,
-                      transition: "opacity var(--duration-base, 200ms) var(--ease-out, ease)",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontFamily: "var(--font-sans)",
-                        fontSize: 15,
-                        fontWeight: isToday || isSelected ? 600 : 400,
-                        color: numColor,
-                        lineHeight: 1,
-                      }}
-                    >
-                      {day}
-                    </span>
-                    {/* mood dot — 일기 있는 날만 표시 */}
-                    <span style={{ display: "flex", gap: 3, height: 9, alignItems: "center" }}>
-                      {entries.slice(0, 2).map((e) => (
-                        <span
-                          key={e.id}
-                          style={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: "50%",
-                            backgroundColor: dotColor(e),
-                            flexShrink: 0,
-                          }}
-                        />
-                      ))}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+          <div
+            onTransitionEnd={onTrackTransitionEnd}
+            style={{
+              display: "flex",
+              transform: trackTransform,
+              transition: committing ? "transform 320ms var(--ease-soft)" : "none",
+            }}
+          >
+            <MonthGrid
+              year={prev.y}
+              month={prev.m}
+              days={prevDays}
+              todayKey={todayKey}
+              selectedKey={selectedKey}
+              interactive={false}
+            />
+            <MonthGrid
+              year={year}
+              month={month}
+              days={days}
+              todayKey={todayKey}
+              selectedKey={selectedKey}
+              interactive
+              onDayTap={onDayTap}
+            />
+            <MonthGrid
+              year={next.y}
+              month={next.m}
+              days={nextDays}
+              todayKey={todayKey}
+              selectedKey={selectedKey}
+              interactive={false}
+            />
+          </div>
         </div>
       </div>
 
