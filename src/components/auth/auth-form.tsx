@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
 import type { AuthFormState } from "@/lib/auth/actions";
+import { GoogleButton } from "@/components/auth/google-button";
 
 type Mode = "login" | "signup";
 
 interface AuthFormProps {
   mode: Mode;
   action: (state: AuthFormState, formData: FormData) => Promise<AuthFormState>;
+  notice?: string;
 }
 
 const COPY = {
@@ -63,7 +65,7 @@ function FieldInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   );
 }
 
-export function AuthForm({ mode, action }: AuthFormProps) {
+export function AuthForm({ mode, action, notice }: AuthFormProps) {
   const [state, formAction, pending] = useActionState<AuthFormState, FormData>(
     action,
     {},
@@ -108,6 +110,25 @@ export function AuthForm({ mode, action }: AuthFormProps) {
           {copy.subtitle}
         </p>
       </header>
+
+      {notice && (
+        <p
+          role="alert"
+          style={{
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-sm)",
+            color: "var(--fg-muted)",
+            backgroundColor: "var(--fill-2)",
+            borderRadius: "var(--radius-md)",
+            padding: "var(--space-3) var(--space-4)",
+            margin: 0,
+            lineHeight: "var(--leading-relaxed)",
+            textAlign: "center",
+          }}
+        >
+          {notice}
+        </p>
+      )}
 
       {/* 인풋 스택 + CTA */}
       <form
@@ -276,6 +297,27 @@ export function AuthForm({ mode, action }: AuthFormProps) {
           </span>
         </button>
       </form>
+
+      {/* 구분선 + 구글 로그인 */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+          <span style={{ flex: 1, height: 1, backgroundColor: "var(--separator)" }} />
+          <span
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-sm)",
+              color: "var(--fg-placeholder)",
+            }}
+          >
+            또는
+          </span>
+          <span style={{ flex: 1, height: 1, backgroundColor: "var(--separator)" }} />
+        </div>
+        <GoogleButton
+          flow="auth"
+          label={mode === "login" ? "Google로 로그인" : "Google로 계속하기"}
+        />
+      </div>
 
       {/* 전환 링크 — plain tint 텍스트 */}
       <p
