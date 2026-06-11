@@ -41,7 +41,8 @@ enum SubscriptionStatus {
 model User {
   id                 String   @id @default(uuid())
   email              String   @unique
-  passwordHash       String   @map("password_hash")
+  passwordHash       String?  @map("password_hash")
+  googleSub          String?  @unique @map("google_sub")
   externalLLMConsent Boolean  @default(false) @map("external_llm_consent")
   // tokenVersion — 세션 무효화 카운터 (QA M-10). JWT payload에 담고 getSession에서
   // DB 값과 비교. 비밀번호 변경 시 increment → 발급된 기존 토큰 전부 무효.
