@@ -120,7 +120,9 @@ export async function chat(input: ChatInput): Promise<string> {
         contents,
         config: {
           systemInstruction: input.systemPrompt,
-          temperature: 0.7,
+          // 0.7→0.5: 기억을 "회상"하려는 압력을 낮춰 환각(없는 사실 confabulation)을 억제.
+          // 따뜻한 말투는 페르소나·스타일 지시가 담당하므로 0.5에서도 유지된다.
+          temperature: 0.5,
           maxOutputTokens: input.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
           // gemini-2.5 thinking 모델에서 출력 토큰이 내부 사고에 잠식되지 않게.
           thinkingConfig: { thinkingBudget: 0 },
