@@ -7,14 +7,16 @@ import { scanOrphans, deleteOrphans, type OrphanScan } from "@/lib/storage/gc";
 // (Vercel Hobby cron은 실행 보장이 없어 사용 안 함). 미들웨어가 /api/cron/* 를 우회하므로
 // 쿠키 없는 호출이 도달하며, 본 핸들러는 CRON_SECRET으로 자체 인증한다.
 //
-// ── 스케줄 SQL (검토 끝난 뒤 Supabase SQL Editor에서 실행 — 지금은 미적용) ──
+// ── 스케줄 (2026-06-12 등록됨: pg_cron job 'gc-orphans', jobid=3) ──
+// reminder-push와 동일하게 Vault 시크릿 'reminder_cron_secret'을 쓴다
+// (prod env CRON_SECRET === 이 Vault 값이라 위 Bearer 검증과 매칭).
 //   select cron.schedule(
 //     'gc-orphans',
-//     '30 4 * * *',  -- 매일 04:30 UTC (= 13:30 KST), 트래픽 적은 시간
+//     '30 18 * * *',  -- 매일 18:30 UTC (= 03:30 KST), deep night
 //     $$ select net.http_get(
 //          url := 'https://memoism-spungs.vercel.app/api/cron/gc-orphans?execute=true',
 //          headers := jsonb_build_object(
-//            'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'CRON_SECRET')
+//            'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'reminder_cron_secret')
 //          )
 //        ) $$
 //   );
