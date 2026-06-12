@@ -350,7 +350,7 @@ export function CharacterChat({
             placeholder={
               capExhausted
                 ? "내일 다시 만나요"
-                : `${characterName}에게 말 걸기...`
+                : `${characterName}에게 물어보기`
             }
             aria-label="메시지 입력"
             rows={1}
