@@ -101,14 +101,6 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
     }
   }
 
-  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    // Enter: 전송 / Shift+Enter: 줄바꿈
-    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-      e.preventDefault();
-      void send();
-    }
-  }
-
   const canSend = !!draft.trim() && !sending && !capExhausted;
 
   return (
@@ -311,7 +303,6 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
             ref={textareaRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={onKeyDown}
             disabled={sending || capExhausted}
             placeholder={
               capExhausted
@@ -365,7 +356,7 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
         onClose={() => setResetOpen(false)}
         onConfirm={() => void handleReset()}
         title="새 대화를 시작할까요?"
-        description="지금까지의 대화 내용을 지우고 처음부터 시작해요. (일기는 그대로예요)"
+        description="지금까지의 대화 내용을 지우고 처음부터 시작해요."
         confirmLabel="새 대화 시작"
         confirmVariant="danger"
         isLoading={resetting}
