@@ -285,7 +285,7 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     console.error("[chat] Gemini error:", e instanceof Error ? e.message : e);
     return NextResponse.json(
-      { error: "잠시 후 다시 시도해주세요. (AI 응답 실패)" },
+      { error: "메이가 잠시 응답하지 못했어요. 잠시 후 다시 시도해주세요." },
       { status: 502 },
     );
   }

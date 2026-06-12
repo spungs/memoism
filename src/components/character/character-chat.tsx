@@ -47,12 +47,14 @@ interface Props {
   characterName: string;
   initialMessages: Message[];
   initialBoundaryAt: string | null;
+  initialCapExhausted: boolean;
 }
 
 export function CharacterChat({
   characterName,
   initialMessages,
   initialBoundaryAt,
+  initialCapExhausted,
 }: Props) {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -61,7 +63,7 @@ export function CharacterChat({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [capExhausted, setCapExhausted] = useState(false);
+  const [capExhausted, setCapExhausted] = useState(initialCapExhausted);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -96,7 +98,7 @@ export function CharacterChat({
       const data = await res.json();
       if (!res.ok) {
         if (data?.capExhausted) setCapExhausted(true);
-        setError(data?.error ?? "응답을 받지 못했어요");
+        setError(data?.error ?? "메이가 잠시 응답하지 못했어요. 잠시 후 다시 시도해주세요.");
         return;
       }
       setMessages((prev) => [
@@ -109,8 +111,8 @@ export function CharacterChat({
           relatedDiaries: data.relatedDiaries,
         },
       ]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "네트워크 오류");
+    } catch {
+      setError("메이가 잠시 응답하지 못했어요. 잠시 후 다시 시도해주세요.");
     } finally {
       setSending(false);
       textareaRef.current?.focus();
