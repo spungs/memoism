@@ -187,6 +187,58 @@ export async function deleteImages(storagePaths: string[]): Promise<void> {
   }
 }
 
+/** 버킷에 실재하는 객체 1건. GC가 DiaryImage.storagePath와 대조하는 단위. */
+export interface BucketObject {
+  path: string; // "{ownerId}/{uuid}.ext"
+  ownerId: string;
+  createdAt: string; // ISO — 업로드 시각 (grace 판정용)
+  sizeBytes: number;
+}
+
+/**
+ * 버킷의 모든 객체를 나열한다 (루트 폴더=userId → 그 안의 파일). 고아 GC 전용.
+ * 폴더당 1000개 단위로 페이지네이션. service-role 클라이언트로만 동작.
+ */
+export async function listBucketObjects(): Promise<BucketObject[]> {
+  const client = getClient();
+  const { data: roots, error } = await client.storage
+    .from(BUCKET)
+    .list("", { limit: 1000 });
+  if (error) throw new StorageError(`버킷 루트 나열 실패: ${error.message}`);
+
+  const out: BucketObject[] = [];
+  for (const r of roots ?? []) {
+    if (r.id) continue; // 폴더는 id가 falsy(null) — 루트 직속 파일(id 있음)은 무시
+    let offset = 0;
+    for (;;) {
+      const { data: files, error: e2 } = await client.storage
+        .from(BUCKET)
+        .list(r.name, {
+          limit: 1000,
+          offset,
+          sortBy: { column: "created_at", order: "asc" },
+        });
+      if (e2) {
+        console.warn(`[storage] listBucketObjects(${r.name}) 실패:`, e2.message);
+        break;
+      }
+      const batch = files ?? [];
+      for (const f of batch) {
+        if (!f.id) continue; // 중첩 폴더(id falsy) 방어
+        out.push({
+          path: `${r.name}/${f.name}`,
+          ownerId: r.name,
+          createdAt: f.created_at ?? "",
+          sizeBytes: Number(f.metadata?.size) || 0,
+        });
+      }
+      if (batch.length < 1000) break;
+      offset += batch.length;
+    }
+  }
+  return out;
+}
+
 /**
  * Issue a short-lived (1h) signed URL for a private storage path.
  * Returns null if URL generation fails (caller should fall back to placeholder).
