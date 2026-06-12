@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, SquarePen } from "lucide-react";
+import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 
 type Role = "user" | "assistant";
 type RelatedDiary = { id: string; title: string; createdAt: string };
@@ -27,6 +28,8 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [capExhausted, setCapExhausted] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -78,6 +81,26 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
     }
   }
 
+  async function handleReset() {
+    if (resetting) return;
+    setResetting(true);
+    try {
+      const res = await fetch("/api/chat/reset", { method: "POST" });
+      if (!res.ok) {
+        setError("대화를 비우지 못했어요. 잠시 후 다시 시도해주세요.");
+        return;
+      }
+      setMessages([]);
+      setError(null);
+      setDraft("");
+      setResetOpen(false);
+    } catch {
+      setError("네트워크 오류로 대화를 비우지 못했어요.");
+    } finally {
+      setResetting(false);
+    }
+  }
+
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     // Enter: 전송 / Shift+Enter: 줄바꿈
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -101,6 +124,7 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
       <header
         className="glass"
         style={{
+          position: "relative",
           borderBottom: "1px solid var(--separator)",
           padding: "12px var(--space-5)",
           flexShrink: 0,
@@ -130,6 +154,35 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
         >
           내 일기를 기억하는 AI 친구
         </p>
+        {/* 새 대화하기 — 이전 대화 맥락을 비워 오염된 기억 반복을 끊는다 */}
+        <button
+          type="button"
+          onClick={() => setResetOpen(true)}
+          disabled={sending || messages.length === 0}
+          aria-label="새 대화하기"
+          className="pressable"
+          style={{
+            position: "absolute",
+            right: "var(--space-4)",
+            top: "50%",
+            transform: "translateY(-50%)",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 34,
+            height: 34,
+            borderRadius: "var(--radius-pill)",
+            border: "none",
+            backgroundColor: "transparent",
+            color:
+              sending || messages.length === 0
+                ? "var(--fg-placeholder)"
+                : "var(--tint)",
+            cursor: sending || messages.length === 0 ? "default" : "pointer",
+          }}
+        >
+          <SquarePen size={19} aria-hidden strokeWidth={2} />
+        </button>
       </header>
 
       {/* 메시지 목록 */}
@@ -306,6 +359,17 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
           </button>
         </div>
       </form>
+
+      <ConfirmSheet
+        isOpen={resetOpen}
+        onClose={() => setResetOpen(false)}
+        onConfirm={() => void handleReset()}
+        title="새 대화를 시작할까요?"
+        description="지금까지의 대화 내용을 지우고 처음부터 시작해요. (일기는 그대로예요)"
+        confirmLabel="새 대화 시작"
+        confirmVariant="danger"
+        isLoading={resetting}
+      />
     </div>
   );
 }
