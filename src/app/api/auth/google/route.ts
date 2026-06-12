@@ -13,6 +13,9 @@ export async function GET(request: Request) {
   const codeVerifier = generateCodeVerifier();
   const google = getGoogleClient();
   const authUrl = google.createAuthorizationURL(state, codeVerifier, [...GOOGLE_SCOPES]);
+  // 구글 계정 picker를 항상 표시 — 단일 로그인 계정 자동선택을 막아 사용자가
+  // 어느 계정으로 가입/로그인할지 고를 수 있게 한다(다계정·재로그인 UX).
+  authUrl.searchParams.set("prompt", "select_account");
 
   const res = NextResponse.redirect(authUrl);
   const cookieOpts = {
