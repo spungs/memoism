@@ -1,13 +1,40 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp, SquarePen } from "lucide-react";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 
 type Role = "user" | "assistant";
 type RelatedDiary = { id: string; title: string; createdAt: string };
-type Message = { id: string; role: Role; content: string; relatedDiaries?: RelatedDiary[] };
+type Message = {
+  id: string;
+  role: Role;
+  content: string;
+  createdAt: string;
+  relatedDiaries?: RelatedDiary[];
+};
+
+// Asia/Seoul 기준 YYYY-MM-DD 키 (날짜 구분선 비교용). en-CA = YYYY-MM-DD 포맷.
+function kstDayKey(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+}
+
+// 날짜 구분선 라벨: 오늘 / 어제 / "6월 10일 (수)". KST는 DST가 없어 24h 차감으로 어제 계산 안전.
+function dayDividerLabel(iso: string): string {
+  const now = Date.now();
+  const today = kstDayKey(new Date(now).toISOString());
+  const yesterday = kstDayKey(new Date(now - 24 * 60 * 60 * 1000).toISOString());
+  const key = kstDayKey(iso);
+  if (key === today) return "오늘";
+  if (key === yesterday) return "어제";
+  return new Date(iso).toLocaleDateString("ko-KR", {
+    timeZone: "Asia/Seoul",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  });
+}
 
 // 빈 화면에서 탭하면 바로 전송되는 예시 질문 (메이가 먼저 건네는 첫 대화 가이드)
 const EXAMPLE_QUESTIONS = [
@@ -19,11 +46,18 @@ const EXAMPLE_QUESTIONS = [
 interface Props {
   characterName: string;
   initialMessages: Message[];
+  initialBoundaryAt: string | null;
 }
 
-export function CharacterChat({ characterName, initialMessages }: Props) {
+export function CharacterChat({
+  characterName,
+  initialMessages,
+  initialBoundaryAt,
+}: Props) {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
+  // "새 대화" 경계 시각(ISO). 이 시각 이후가 현재 대화 — 그 앞에 "새 대화" 구분선을 그린다.
+  const [boundaryAt, setBoundaryAt] = useState<string | null>(initialBoundaryAt);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +82,7 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
       id: `local-${Date.now()}-u`,
       role: "user",
       content: text,
+      createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMsg]);
     setDraft("");
@@ -70,6 +105,7 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
           id: `local-${Date.now()}-a`,
           role: "assistant",
           content: data.message,
+          createdAt: new Date().toISOString(),
           relatedDiaries: data.relatedDiaries,
         },
       ]);
@@ -87,15 +123,15 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
     try {
       const res = await fetch("/api/chat/reset", { method: "POST" });
       if (!res.ok) {
-        setError("대화를 비우지 못했어요. 잠시 후 다시 시도해주세요.");
+        setError("새 대화를 시작하지 못했어요. 잠시 후 다시 시도해주세요.");
         return;
       }
-      setMessages([]);
+      // 비파괴: 기록은 그대로 두고 경계만 현재로 옮긴다 → 이전 대화는 구분선 위에 남는다.
+      setBoundaryAt(new Date().toISOString());
       setError(null);
-      setDraft("");
       setResetOpen(false);
     } catch {
-      setError("네트워크 오류로 대화를 비우지 못했어요.");
+      setError("네트워크 오류로 새 대화를 시작하지 못했어요.");
     } finally {
       setResetting(false);
     }
@@ -234,22 +270,46 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
         {messages.map((m, i) => {
           const prev = messages[i - 1];
           const sameSenderAsPrev = prev?.role === m.role;
+          // 날짜가 바뀌면(또는 첫 메시지) 날짜 구분선 — 카톡식 연속 스크롤 + 날짜 divider.
+          const showDateDivider =
+            !prev || kstDayKey(prev.createdAt) !== kstDayKey(m.createdAt);
+          // "새 대화" 경계를 넘는 첫 메시지 앞엔 경계 구분선 (날짜 구분선보다 우선).
+          const crossedBoundary =
+            !!boundaryAt &&
+            m.createdAt >= boundaryAt &&
+            (!prev || prev.createdAt < boundaryAt);
           return (
-            <div
-              key={m.id}
-              style={{ marginTop: sameSenderAsPrev ? 4 : 12 }}
-            >
-              <Bubble role={m.role} showAvatar={!sameSenderAsPrev}>
-                {m.content}
-              </Bubble>
-              {m.role === "assistant" && m.relatedDiaries && m.relatedDiaries.length > 0 && (
-                <div style={{ paddingLeft: 36 }}>
-                  <RelatedDiaryChips diaries={m.relatedDiaries} onNavigate={(id) => router.push(`/diary/${id}`)} />
-                </div>
+            <Fragment key={m.id}>
+              {crossedBoundary ? (
+                <BoundaryDivider />
+              ) : (
+                showDateDivider && <DateDivider label={dayDividerLabel(m.createdAt)} />
               )}
-            </div>
+              <div
+                style={{
+                  marginTop:
+                    crossedBoundary || showDateDivider ? 0 : sameSenderAsPrev ? 4 : 12,
+                }}
+              >
+                <Bubble role={m.role} showAvatar={!sameSenderAsPrev}>
+                  {m.content}
+                </Bubble>
+                {m.role === "assistant" && m.relatedDiaries && m.relatedDiaries.length > 0 && (
+                  <div style={{ paddingLeft: 36 }}>
+                    <RelatedDiaryChips diaries={m.relatedDiaries} onNavigate={(id) => router.push(`/diary/${id}`)} />
+                  </div>
+                )}
+              </div>
+            </Fragment>
           );
         })}
+
+        {/* 경계가 모든 메시지 뒤(방금 "새 대화" 누름)이면 맨 아래 구분선 — 다음 메시지가 그 아래로 */}
+        {boundaryAt &&
+          messages.length > 0 &&
+          messages[messages.length - 1].createdAt < boundaryAt && (
+            <BoundaryDivider />
+          )}
 
         {sending && (
           <div style={{ marginTop: 12 }}>
@@ -356,9 +416,9 @@ export function CharacterChat({ characterName, initialMessages }: Props) {
         onClose={() => setResetOpen(false)}
         onConfirm={() => void handleReset()}
         title="새 대화를 시작할까요?"
-        description="지금까지의 대화 내용을 지우고 처음부터 시작해요."
+        description="여기까지 마무리하고 새 대화를 시작해요. 이전 대화는 위로 넘기면 다시 볼 수 있어요."
         confirmLabel="새 대화 시작"
-        confirmVariant="danger"
+        confirmVariant="primary"
         isLoading={resetting}
       />
     </div>
@@ -477,6 +537,60 @@ function TypingIndicator() {
         </div>
       </div>
     </>
+  );
+}
+
+// ── 날짜 구분선 ────────────────────────────────────────────
+function DateDivider({ label }: { label: string }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        margin: "var(--space-4) 0 var(--space-2)",
+      }}
+    >
+      <span
+        style={{
+          fontFamily: "var(--font-sans)",
+          fontSize: "var(--text-xs)",
+          fontWeight: 500,
+          color: "var(--fg-placeholder)",
+          backgroundColor: "var(--fill-1)",
+          padding: "3px var(--space-3)",
+          borderRadius: "var(--radius-pill)",
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+// ── "새 대화" 경계 구분선 (비파괴) — 이 위는 이전 대화, 아래는 현재 대화 ──
+function BoundaryDivider() {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "var(--space-3)",
+        margin: "var(--space-5) 0 var(--space-2)",
+      }}
+    >
+      <span style={{ flex: 1, height: 1, backgroundColor: "var(--separator)" }} />
+      <span
+        style={{
+          fontFamily: "var(--font-sans)",
+          fontSize: "var(--text-xs)",
+          fontWeight: 500,
+          color: "var(--fg-placeholder)",
+        }}
+      >
+        새 대화
+      </span>
+      <span style={{ flex: 1, height: 1, backgroundColor: "var(--separator)" }} />
+    </div>
   );
 }
 
