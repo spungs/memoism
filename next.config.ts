@@ -20,6 +20,13 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  experimental: {
+    // Server Action 본문 기본 한도는 1MB라, 일기 편집에서 압축 사진(장당 ~1MB,
+    // 최대 10장)을 직접 첨부해 저장하면 초과돼 요청이 거부됐다("저장 중 문제").
+    // Vercel 함수 본문 천장(4.5MB) 아래로 올려 여러 장 첨부를 허용한다.
+    // (V2: 직접 저장 경로도 AI검토처럼 사진을 스토리지에 선업로드해 본문을 비우면 천장 자체를 우회)
+    serverActions: { bodySizeLimit: "4mb" },
+  },
   images: {
     remotePatterns: [
       {
