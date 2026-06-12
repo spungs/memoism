@@ -67,11 +67,11 @@ export function CharacterChat({
   const listRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // 새 메시지 추가 시 스크롤 최하단으로
+  // 새 메시지 추가 / 새 대화 시작 시 스크롤 최하단으로 (리셋 땐 messages는 그대로라 boundaryAt도 의존)
   useEffect(() => {
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  }, [messages, boundaryAt]);
 
   async function send(textArg?: string) {
     const text = (textArg ?? draft).trim();
@@ -137,6 +137,12 @@ export function CharacterChat({
     }
   }
 
+  // "현재 대화"(경계선 이후)가 비었는가 — 첫 사용이거나 방금 새 대화를 시작한 직후.
+  // 이때만 인사말+예시 칩을 보여주고, "새 대화하기"는 더 나눌 게 없으니 비활성화한다.
+  const currentEmpty = boundaryAt
+    ? !messages.some((m) => m.createdAt >= boundaryAt)
+    : messages.length === 0;
+
   const canSend = !!draft.trim() && !sending && !capExhausted;
 
   return (
@@ -186,7 +192,7 @@ export function CharacterChat({
         <button
           type="button"
           onClick={() => setResetOpen(true)}
-          disabled={sending || messages.length === 0}
+          disabled={sending || currentEmpty}
           aria-label="새 대화하기"
           className="pressable"
           style={{
@@ -203,10 +209,10 @@ export function CharacterChat({
             border: "none",
             backgroundColor: "transparent",
             color:
-              sending || messages.length === 0
+              sending || currentEmpty
                 ? "var(--fg-placeholder)"
                 : "var(--tint)",
-            cursor: sending || messages.length === 0 ? "default" : "pointer",
+            cursor: sending || currentEmpty ? "default" : "pointer",
           }}
         >
           <SquarePen size={19} aria-hidden strokeWidth={2} />
@@ -226,45 +232,12 @@ export function CharacterChat({
         }}
       >
         {messages.length === 0 && (
-          <>
-            <Bubble role="assistant">
-              {`안녕하세요, 저는 ${characterName}예요.\n일기에 대해 뭐든 편하게 물어보세요.`}
-            </Bubble>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "flex-start",
-                gap: "var(--space-2)",
-                marginTop: "var(--space-3)",
-                paddingLeft: 2,
-              }}
-            >
-              {EXAMPLE_QUESTIONS.map((q) => (
-                <button
-                  key={q}
-                  type="button"
-                  onClick={() => void send(q)}
-                  disabled={sending || capExhausted}
-                  className="pressable"
-                  style={{
-                    padding: "8px var(--space-4)",
-                    borderRadius: "var(--radius-pill)",
-                    border: "1px solid var(--separator)",
-                    backgroundColor: "var(--surface)",
-                    color: "var(--tint)",
-                    fontFamily: "var(--font-sans)",
-                    fontSize: "var(--text-sm)",
-                    fontWeight: 500,
-                    cursor: sending || capExhausted ? "not-allowed" : "pointer",
-                    textAlign: "left",
-                  }}
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
-          </>
+          <Greeting
+            text={`안녕하세요, 저는 ${characterName}예요.\n일기에 대해 뭐든 편하게 물어보세요.`}
+            sending={sending}
+            capExhausted={capExhausted}
+            onPick={(q) => void send(q)}
+          />
         )}
 
         {messages.map((m, i) => {
@@ -304,11 +277,19 @@ export function CharacterChat({
           );
         })}
 
-        {/* 경계가 모든 메시지 뒤(방금 "새 대화" 누름)이면 맨 아래 구분선 — 다음 메시지가 그 아래로 */}
+        {/* 경계가 모든 메시지 뒤(방금 "새 대화" 누름)이면 맨 아래 구분선 + 인사말 — 다음 메시지가 그 아래로 */}
         {boundaryAt &&
           messages.length > 0 &&
           messages[messages.length - 1].createdAt < boundaryAt && (
-            <BoundaryDivider />
+            <>
+              <BoundaryDivider />
+              <Greeting
+                text={"다시 만나서 반가워요.\n무엇이든 편하게 물어보세요."}
+                sending={sending}
+                capExhausted={capExhausted}
+                onPick={(q) => void send(q)}
+              />
+            </>
           )}
 
         {sending && (
@@ -422,6 +403,59 @@ export function CharacterChat({
         isLoading={resetting}
       />
     </div>
+  );
+}
+
+// ── 빈 현재 대화 인사 — 메이 인사말 + 예시 질문 칩 (첫 사용 / 새 대화 직후 공용) ──
+function Greeting({
+  text,
+  sending,
+  capExhausted,
+  onPick,
+}: {
+  text: string;
+  sending: boolean;
+  capExhausted: boolean;
+  onPick: (q: string) => void;
+}) {
+  return (
+    <>
+      <Bubble role="assistant">{text}</Bubble>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-start",
+          gap: "var(--space-2)",
+          marginTop: "var(--space-3)",
+          paddingLeft: 2,
+        }}
+      >
+        {EXAMPLE_QUESTIONS.map((q) => (
+          <button
+            key={q}
+            type="button"
+            onClick={() => onPick(q)}
+            disabled={sending || capExhausted}
+            className="pressable"
+            style={{
+              padding: "8px var(--space-4)",
+              borderRadius: "var(--radius-pill)",
+              border: "1px solid var(--separator)",
+              backgroundColor: "var(--surface)",
+              color: "var(--tint)",
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-sm)",
+              fontWeight: 500,
+              cursor: sending || capExhausted ? "not-allowed" : "pointer",
+              textAlign: "left",
+            }}
+          >
+            {q}
+          </button>
+        ))}
+      </div>
+    </>
   );
 }
 
