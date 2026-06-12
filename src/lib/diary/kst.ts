@@ -25,3 +25,14 @@ export function kstMonthRangeUtc(
   const endUtc = new Date(Date.UTC(year, month, 1) - KST_OFFSET_MS);
   return { startUtc, endUtc };
 }
+
+/** KST 하루(year·month 1~12·day)의 [startUtc, endUtc) UTC 경계. 날짜 질문 검색용. */
+export function kstDayRangeUtc(
+  year: number,
+  month: number,
+  day: number,
+): { startUtc: Date; endUtc: Date } {
+  const startUtc = new Date(Date.UTC(year, month - 1, day) - KST_OFFSET_MS);
+  const endUtc = new Date(startUtc.getTime() + 24 * 60 * 60 * 1000);
+  return { startUtc, endUtc };
+}

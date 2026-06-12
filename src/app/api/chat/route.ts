@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { chat } from "@/lib/ai/gemini";
-import { searchDiaries, type RagSearchHit } from "@/lib/ai/rag";
+import { findRelevantDiaries, type RelevantDiary } from "@/lib/ai/rag";
 import { checkAndIncrement } from "@/lib/ai/usage";
 import { captureServer } from "@/lib/analytics/server";
 import { CHARACTER_NAME } from "@/lib/character/utils";
@@ -67,22 +67,27 @@ function formatRecent(
     .join("\n");
 }
 
-function formatRelated(hits: RagSearchHit[], excludeIds: Set<string>): string {
-  const filtered = hits.filter((h) => !excludeIds.has(h.id));
+function formatRelevant(items: RelevantDiary[], excludeIds: Set<string>): string {
+  const filtered = items.filter((d) => !excludeIds.has(d.id));
   if (filtered.length === 0) return "";
   return filtered
-    .map((h) => {
-      const date = h.createdAt.toLocaleDateString("ko-KR", {
+    .map((d) => {
+      const date = d.createdAt.toLocaleDateString("ko-KR", {
         timeZone: "Asia/Seoul",
         year: "numeric",
         month: "long",
         day: "numeric",
         weekday: "short",
       });
-      const mood = h.mood ? ` [기분: ${h.mood}]` : "";
-      const score = h.similarity.toFixed(2);
+      const mood = d.mood ? ` [기분: ${d.mood}]` : "";
+      // 왜 뽑혔는지 메이에게 알려줘 정확한 근거로 답하게 한다 (날짜·키워드·의미).
+      const reason = d.matchedByDate
+        ? `날짜 ${d.matchedByDate} 일치`
+        : d.matchedByKeyword
+          ? `'${d.matchedByKeyword}' 언급`
+          : `의미 유사도 ${d.similarity.toFixed(2)}`;
       // 검색으로 뽑힌 일기일수록 사용자가 바로 그 내용을 물을 확률이 높다 — 전체 본문 전달.
-      return `[${date}${mood} · 유사도 ${score}] ${h.title}: ${h.content}`;
+      return `[${date}${mood} · ${reason}] ${d.title}: ${d.content}`;
     })
     .join("\n");
 }
@@ -97,12 +102,12 @@ function buildSystemPrompt(args: {
     mood: string | null;
     createdAt: Date;
   }[];
-  relatedHits: RagSearchHit[];
+  relevant: RelevantDiary[];
 }): string {
-  const { characterName, persona, recentDiaries, relatedHits } = args;
+  const { characterName, persona, recentDiaries, relevant } = args;
   const recentSection = formatRecent(recentDiaries);
   const recentIds = new Set(recentDiaries.map((d) => d.id));
-  const relatedSection = formatRelated(relatedHits, recentIds);
+  const relatedSection = formatRelevant(relevant, recentIds);
   const style = personaStyle(persona);
   const todayLabel = new Date().toLocaleDateString("ko-KR", {
     timeZone: "Asia/Seoul",
@@ -121,7 +126,7 @@ function buildSystemPrompt(args: {
 ${recentSection}
 ${
   relatedSection
-    ? `\n## 사용자의 메시지와 의미적으로 가까운 과거 일기:\n${relatedSection}\n`
+    ? `\n## 질문과 관련된 과거 일기 (날짜·키워드·의미로 찾음):\n${relatedSection}\n`
     : ""
 }
 ## 가장 중요한 규칙 — 일기에 있는 내용만 말하기:
@@ -154,7 +159,7 @@ export async function POST(req: NextRequest) {
   }
   const userMessage = parsed.data.message;
 
-  const [character, recentDiaries, recentHistory, persona, relatedHits] =
+  const [character, recentDiaries, recentHistory, persona, relevant] =
     await Promise.all([
       prisma.character.findUnique({
         where: { userId: session.userId },
@@ -185,13 +190,16 @@ export async function POST(req: NextRequest) {
         where: { userId: session.userId },
         select: { tone: true, formality: true, sentenceLength: true },
       }),
-      // RAG는 실패해도 chat 전체를 막지 않는다 (best-effort).
-      searchDiaries(session.userId, userMessage, { topK: 5 }).catch((e) => {
+      // 하이브리드 검색(의미+날짜+키워드). 실패해도 chat 전체를 막지 않는다 (best-effort).
+      findRelevantDiaries(session.userId, userMessage, {
+        now: new Date(),
+        topK: 5,
+      }).catch((e) => {
         console.warn(
-          "[chat] RAG search failed:",
+          "[chat] relevant-diary search failed:",
           e instanceof Error ? e.message : e,
         );
-        return [] as RagSearchHit[];
+        return [] as RelevantDiary[];
       }),
     ]);
 
@@ -214,7 +222,7 @@ export async function POST(req: NextRequest) {
     characterName: CHARACTER_NAME,
     persona,
     recentDiaries,
-    relatedHits,
+    relevant,
   });
   const history = recentHistory
     .filter((m) => m.role !== "SYSTEM")
@@ -257,16 +265,22 @@ export async function POST(req: NextRequest) {
     }),
   ]);
 
+  // 칩: 날짜·키워드로 직접 찾았거나 의미 유사도 높은 일기 (relevant는 이미 정렬됨).
   const RELATED_CHIP_THRESHOLD = 0.7;
   const RELATED_CHIP_MAX = 3;
-  const relatedDiaries = relatedHits
-    .filter((h) => h.similarity >= RELATED_CHIP_THRESHOLD)
+  const relatedDiaries = relevant
+    .filter(
+      (d) =>
+        d.matchedByDate !== null ||
+        d.matchedByKeyword !== null ||
+        d.similarity >= RELATED_CHIP_THRESHOLD,
+    )
     .slice(0, RELATED_CHIP_MAX)
-    .map((h) => ({ id: h.id, title: h.title, createdAt: h.createdAt.toISOString() }));
+    .map((d) => ({ id: d.id, title: d.title, createdAt: d.createdAt.toISOString() }));
 
   await captureServer("chat_message_sent", session.userId, {
     message_length: userMessage.length,
-    rag_hits: relatedHits.length,
+    rag_hits: relevant.length,
     cap_remaining: cap.remaining,
   });
   return NextResponse.json({
