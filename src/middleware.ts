@@ -1,5 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { verifySessionToken } from "@/lib/auth/jwt";
+import { verifySessionToken, signSession, SESSION_DURATION_SECONDS } from "@/lib/auth/jwt";
+
+// 슬라이딩 세션: 남은 유효기간이 전체의 절반(15일) 이하이면 쿠키를 재발급한다.
+// Edge 런타임에서 실행되므로 jose(Edge-safe)만 사용 — DB 접근 없음.
+const SESSION_REFRESH_THRESHOLD = SESSION_DURATION_SECONDS / 2;
+
+const SESSION_COOKIE_OPTS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: SESSION_DURATION_SECONDS,
+};
 
 // Exact-match whitelist. Adding a sub-route under /login or /signup later requires
 // updating this list explicitly — preferred over prefix matching to avoid auth
@@ -63,7 +75,29 @@ export async function middleware(req: NextRequest) {
     requestHeaders.set("x-user-email", session.email);
     requestHeaders.set("x-user-token-version", String(session.tokenVersion));
   }
-  return NextResponse.next({ request: { headers: requestHeaders } });
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+
+  // 슬라이딩 세션: 남은 유효기간 < 15일이면 쿠키를 재발급해 30일을 다시 부여.
+  // exp가 없거나 이미 만료된 경우(session이 null)엔 이 분기에 도달하지 않는다.
+  if (session?.exp) {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const remainSec = session.exp - nowSec;
+    if (remainSec > 0 && remainSec < SESSION_REFRESH_THRESHOLD) {
+      try {
+        const newToken = await signSession({
+          userId: session.userId,
+          email: session.email,
+          tokenVersion: session.tokenVersion,
+        });
+        response.cookies.set("session", newToken, SESSION_COOKIE_OPTS);
+      } catch {
+        // 재발급 실패 시 기존 쿠키로 계속 진행 (로그아웃 없음)
+      }
+    }
+  }
+
+  return response;
 }
 
 export const config = {

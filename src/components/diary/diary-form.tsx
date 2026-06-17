@@ -32,6 +32,26 @@ interface NewDraft {
   savedAt: number;
 }
 
+/** draft 저장 시각 기준으로 "N분 전 / N시간 전" + 만료까지 남은 시간 문자열 반환 */
+function draftAgeLabel(savedAt: number): string {
+  const elapsedMs = Date.now() - savedAt;
+  const remainMs = DRAFT_TTL_MS - elapsedMs;
+
+  const elapsedMin = Math.floor(elapsedMs / 60_000);
+  const savedLabel =
+    elapsedMin < 1
+      ? "방금 전"
+      : elapsedMin < 60
+        ? `${elapsedMin}분 전`
+        : `${Math.floor(elapsedMin / 60)}시간 전`;
+
+  const remainHours = Math.ceil(remainMs / (60 * 60_000));
+  const expireLabel =
+    remainHours <= 1 ? "1시간 이내 만료" : `${remainHours}시간 후 만료`;
+
+  return `${savedLabel} 저장 · ${expireLabel}`;
+}
+
 type Mode = "create" | "edit";
 
 interface DiaryFormProps {
@@ -274,8 +294,9 @@ export function DiaryForm({
   // 진행 중인 AI 생성 요청을 취소(Abort)하기 위한 핸들.
   const aiAbortRef = useRef<AbortController | null>(null);
 
-  // create 모드: localStorage 자동저장 복원 배너 표시 여부
+  // create 모드: localStorage 자동저장 복원 배너 표시 여부 + 저장 시각
   const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<number>(0);
 
   // edit 모드 AI 액션 state (재생성·되돌리기 후 부모로 lift된 값 갱신용)
   const [hasPrev, setHasPrev] = useState(
@@ -327,6 +348,7 @@ export function DiaryForm({
       // 의미 있는 내용이 있을 때만 배너 표시
       if (draft.title?.trim() || draft.content?.trim()) {
         setShowDraftBanner(true);
+        setDraftSavedAt(draft.savedAt);
       }
     } catch {
       // localStorage 파싱 실패 시 무시
@@ -694,16 +716,30 @@ export function DiaryForm({
               gap: "var(--space-3)",
             }}
           >
-            <span
-              style={{
-                fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-sm)",
-                color: "var(--fg)",
-                lineHeight: "var(--leading-snug)",
-              }}
-            >
-              ✏️ 이전에 작성 중이던 내용이 있어요.
-            </span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-sm)",
+                  color: "var(--fg)",
+                  lineHeight: "var(--leading-snug)",
+                }}
+              >
+                ✏️ 이전에 작성 중이던 내용이 있어요.
+              </span>
+              {draftSavedAt > 0 && (
+                <span
+                  style={{
+                    fontFamily: "var(--font-sans)",
+                    fontSize: "var(--text-xs)",
+                    color: "var(--fg-subtle)",
+                    lineHeight: "var(--leading-snug)",
+                  }}
+                >
+                  {draftAgeLabel(draftSavedAt)}
+                </span>
+              )}
+            </div>
             <div style={{ display: "flex", gap: "var(--space-2)", flexShrink: 0 }}>
               <button
                 type="button"
