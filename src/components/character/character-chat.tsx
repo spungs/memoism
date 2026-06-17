@@ -43,6 +43,9 @@ const EXAMPLE_QUESTIONS = [
   "지난주에 뭐 했지?",
 ];
 
+const INPUT_MIN_H = 38;
+const INPUT_MAX_H = 160;
+
 interface Props {
   characterName: string;
   initialMessages: Message[];
@@ -74,6 +77,14 @@ export function CharacterChat({
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, boundaryAt]);
+
+  // 입력창 높이 자동 조정 — 내용 없을 때 minHeight로 리셋, 입력하면 최대 maxHeight까지 확장
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(Math.max(ta.scrollHeight, INPUT_MIN_H), INPUT_MAX_H) + "px";
+  }, [draft]);
 
   async function send(textArg?: string) {
     const text = (textArg ?? draft).trim();
@@ -357,8 +368,9 @@ export function CharacterChat({
             style={{
               flex: 1,
               resize: "none",
-              minHeight: 38,
-              maxHeight: 160,
+              height: INPUT_MIN_H,
+              maxHeight: INPUT_MAX_H,
+              overflow: "hidden",
               padding: "9px var(--space-4)",
               border: "none",
               borderRadius: "var(--radius-pill)",
@@ -368,6 +380,7 @@ export function CharacterChat({
               color: "var(--fg)",
               outline: "none",
               lineHeight: "var(--leading-normal)",
+              display: "block",
             }}
           />
           <button
