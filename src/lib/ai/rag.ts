@@ -140,6 +140,27 @@ export function parseDateRefs(message: string, now: Date): DateRange[] {
   const nDaysAgo = message.match(/(\d+)\s*일\s*전/);
   if (nDaysAgo) { const t = kstShiftDays(now, -Number(nDaysAgo[1])); add(t.y, t.m, t.day, `${nDaysAgo[1]}일 전`); }
 
+  // 이번주/지난주/저번주 + 요일 (예: "지난주 월요일", "이번주 금요일")
+  // JS getDay(): 0=일, 1=월, 2=화, 3=수, 4=목, 5=금, 6=토
+  const DOW_MAP: Record<string, number> = { 월: 1, 화: 2, 수: 3, 목: 4, 금: 5, 토: 6, 일: 0 };
+  const { y: tky, m: tkm, day: tkd } = kstYmd(now);
+  const todayDow = new Date(tky, tkm - 1, tkd).getDay();
+  // 이번 주 월요일까지의 일 수(음수 또는 0). 월=0, 화=-1(이번주 화요일은 어제), ...
+  const daysToThisMonday = -((todayDow + 6) % 7);
+  for (const [prefix, weekDelta] of [
+    ["이번주", 0], ["지난주", -7], ["저번주", -7],
+  ] as [string, number][]) {
+    const re = new RegExp(`${prefix}\\s*([월화수목금토일])요일`, "g");
+    for (const mt of message.matchAll(re)) {
+      const dow = DOW_MAP[mt[1]]; // JS dow
+      // 이번 주 해당 요일까지의 거리: Mon(1)→0, Tue(2)→1, ..., Sun(0)→6
+      const daysInWeek = dow === 0 ? 6 : dow - 1;
+      const delta = daysToThisMonday + daysInWeek + weekDelta;
+      const t = kstShiftDays(now, delta);
+      add(t.y, t.m, t.day, `${prefix} ${mt[1]}요일`);
+    }
+  }
+
   return ranges;
 }
 
