@@ -126,6 +126,12 @@ export function parseDateRefs(message: string, now: Date): DateRange[] {
   const thisYear = kstYmd(now).y;
   for (const mt of rest.matchAll(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/g)) {
     add(thisYear, +mt[1], +mt[2], `${mt[1]}월 ${mt[2]}일`);
+    rest = rest.replace(mt[0], " ");
+  }
+  // M/D 또는 M.D 슬래시·점 형식 (예: 6/8, 6.8) → KST 올해.
+  // 앞에서 연도 포함·한국어 형식이 이미 처리된 rest 기준으로 파싱해 중복을 방지한다.
+  for (const mt of rest.matchAll(/\b(\d{1,2})[\/.](\d{1,2})\b/g)) {
+    add(thisYear, +mt[1], +mt[2], `${mt[1]}월 ${mt[2]}일`);
   }
   // 상대 표현
   if (/오늘/.test(message)) { const t = kstShiftDays(now, 0); add(t.y, t.m, t.day, "오늘"); }
