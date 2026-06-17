@@ -82,7 +82,7 @@ export function CharacterChat({
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
-    ta.style.height = "auto";
+    ta.style.height = "1px";
     ta.style.height = Math.min(Math.max(ta.scrollHeight, INPUT_MIN_H), INPUT_MAX_H) + "px";
   }, [draft]);
 
@@ -163,7 +163,7 @@ export function CharacterChat({
       style={{
         display: "flex",
         flexDirection: "column",
-        height: "calc(100svh - 56px - env(safe-area-inset-bottom))",
+        height: "calc(100svh - 52px - env(safe-area-inset-bottom))",
         backgroundColor: "var(--bg)",
       }}
     >
@@ -342,7 +342,7 @@ export function CharacterChat({
         style={{
           borderTop: "1px solid var(--separator)",
           padding: "var(--space-2) var(--space-4)",
-          paddingBottom: "calc(var(--space-2) + env(safe-area-inset-bottom, 0px))",
+          paddingBottom: "var(--space-2)",
           flexShrink: 0,
         }}
       >
@@ -364,7 +364,6 @@ export function CharacterChat({
                 : `${characterName}에게 물어보기`
             }
             aria-label="메시지 입력"
-            rows={1}
             style={{
               flex: 1,
               resize: "none",
