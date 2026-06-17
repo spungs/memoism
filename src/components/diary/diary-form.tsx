@@ -345,8 +345,9 @@ export function DiaryForm({
         localStorage.removeItem(DRAFT_KEY_NEW);
         return;
       }
-      // 의미 있는 내용이 있을 때만 배너 표시
-      if (draft.title?.trim() || draft.content?.trim()) {
+      // 의미 있는 내용이 있고, 저장된 날짜가 현재 폼 날짜와 같을 때만 배너 표시.
+      // 날짜가 다르면 다른 날 작성하던 임시저장이므로 표시하지 않는다.
+      if ((draft.title?.trim() || draft.content?.trim()) && draft.date === date) {
         setShowDraftBanner(true);
         setDraftSavedAt(draft.savedAt);
       }
