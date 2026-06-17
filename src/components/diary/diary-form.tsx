@@ -20,6 +20,17 @@ import { MoodPicker, type MoodKey } from "./mood-picker";
 import { AiBusyOverlay, Spinner } from "@/components/ui/ai-busy-overlay";
 
 const PENDING_DRAFT_KEY = "memoism:pendingDraft";
+// create 모드에서 작성 중 내용을 자동저장하는 키. 새로고침·세션만료로 인한 유실 방지.
+const DRAFT_KEY_NEW = "memoism:draft:new";
+const DRAFT_TTL_MS = 24 * 60 * 60 * 1000; // 24시간 후 만료
+
+interface NewDraft {
+  title: string;
+  content: string;
+  mood: MoodKey | null;
+  date: string;
+  savedAt: number;
+}
 
 type Mode = "create" | "edit";
 
@@ -263,6 +274,9 @@ export function DiaryForm({
   // 진행 중인 AI 생성 요청을 취소(Abort)하기 위한 핸들.
   const aiAbortRef = useRef<AbortController | null>(null);
 
+  // create 모드: localStorage 자동저장 복원 배너 표시 여부
+  const [showDraftBanner, setShowDraftBanner] = useState(false);
+
   // edit 모드 AI 액션 state (재생성·되돌리기 후 부모로 lift된 값 갱신용)
   const [hasPrev, setHasPrev] = useState(
     initial?.hasPreviousContent ?? false,
@@ -297,6 +311,65 @@ export function DiaryForm({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // create 모드 — 마운트 시 localStorage draft 존재 확인 → 복원 배너 표시
+  useEffect(() => {
+    if (mode !== "create") return;
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY_NEW);
+      if (!raw) return;
+      const draft: NewDraft = JSON.parse(raw);
+      // 24시간 초과 → 만료 처리
+      if (Date.now() - draft.savedAt > DRAFT_TTL_MS) {
+        localStorage.removeItem(DRAFT_KEY_NEW);
+        return;
+      }
+      // 의미 있는 내용이 있을 때만 배너 표시
+      if (draft.title?.trim() || draft.content?.trim()) {
+        setShowDraftBanner(true);
+      }
+    } catch {
+      // localStorage 파싱 실패 시 무시
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // create 모드 — title / content / mood / date 변경 시 debounce 500ms 자동저장
+  useEffect(() => {
+    if (mode !== "create") return;
+    if (!title.trim() && !content.trim()) return; // 빈 폼은 저장하지 않음
+    const timer = setTimeout(() => {
+      try {
+        const draft: NewDraft = { title, content, mood, date, savedAt: Date.now() };
+        localStorage.setItem(DRAFT_KEY_NEW, JSON.stringify(draft));
+      } catch {
+        // QuotaExceededError 등 무시
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [title, content, mood, date, mode]);
+
+  // localStorage draft 복원
+  const handleRestoreDraft = () => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY_NEW);
+      if (!raw) return;
+      const draft: NewDraft = JSON.parse(raw);
+      if (draft.title) setTitle(draft.title);
+      if (draft.content) setContent(draft.content);
+      if (draft.mood) setMood(draft.mood);
+      if (draft.date) setDate(draft.date);
+    } catch {
+      // 무시
+    }
+    setShowDraftBanner(false);
+  };
+
+  // localStorage draft 버리기
+  const handleDiscardDraft = () => {
+    localStorage.removeItem(DRAFT_KEY_NEW);
+    setShowDraftBanner(false);
+  };
 
   const handlePickFiles: React.ChangeEventHandler<HTMLInputElement> = async (
     e,
@@ -418,6 +491,10 @@ export function DiaryForm({
           return;
         }
 
+        // 저장 성공 → localStorage draft 삭제
+        if (mode === "create") {
+          try { localStorage.removeItem(DRAFT_KEY_NEW); } catch { /* 무시 */ }
+        }
         router.push(`/diary/${result.data.id}`);
         router.refresh();
       } catch {
@@ -486,6 +563,7 @@ export function DiaryForm({
           createdAt: Date.now(),
         }),
       );
+      // AI 생성 성공 후 review 이동 → draft는 유지(뒤로가기 시 복원용)
       router.push("/diary/review");
     } catch (e) {
       // 사용자가 취소한 경우는 에러로 표시하지 않는다.
@@ -601,6 +679,70 @@ export function DiaryForm({
           gap: "var(--space-5)",
         }}
       >
+        {/* 자동저장 draft 복원 배너 — create 모드에서만 표시 */}
+        {showDraftBanner && (
+          <div
+            role="alert"
+            style={{
+              backgroundColor: "color-mix(in srgb, var(--tint) 10%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--tint) 30%, transparent)",
+              borderRadius: "var(--radius-md)",
+              padding: "var(--space-3) var(--space-4)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "var(--space-3)",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                color: "var(--fg)",
+                lineHeight: "var(--leading-snug)",
+              }}
+            >
+              ✏️ 이전에 작성 중이던 내용이 있어요.
+            </span>
+            <div style={{ display: "flex", gap: "var(--space-2)", flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={handleRestoreDraft}
+                className="pressable"
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-sm)",
+                  fontWeight: 600,
+                  color: "var(--tint)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "2px 4px",
+                }}
+              >
+                불러오기
+              </button>
+              <button
+                type="button"
+                onClick={handleDiscardDraft}
+                className="pressable"
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-sm)",
+                  fontWeight: 400,
+                  color: "var(--fg-subtle)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "2px 4px",
+                }}
+              >
+                버리기
+              </button>
+            </div>
+          </div>
+        )}
+
         <DiaryDatePicker value={date} max={today} onChange={setDate} />
 
         <MoodPicker value={mood} onChange={setMood} />

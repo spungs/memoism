@@ -7,7 +7,7 @@ import type { JWTPayload } from "jose";
 // runtime, where Prisma is unavailable. DB-backed session validation lives in
 // session.ts (Node/server-only).
 
-const SESSION_DURATION_SECONDS = 60 * 60 * 24 * 7; // 7 days
+const SESSION_DURATION_SECONDS = 60 * 60 * 24 * 30; // 30 days (PWA 홈 화면 추가 사용자 로그인 유지)
 
 export interface SessionPayload extends JWTPayload {
   userId: string;
