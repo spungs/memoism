@@ -45,13 +45,6 @@ function dotColor(entry: CalendarEntry): string {
     ? MOOD_DOT_COLOR[entry.mood]
     : "var(--fg-placeholder)";
 }
-function timeLabel(iso: string): string {
-  return new Date(iso).toLocaleTimeString("ko-KR", {
-    timeZone: "Asia/Seoul",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 function snippet(content: string, n = 50): string {
   const t = content.replace(/\s+/g, " ").trim();
   return t.length > n ? t.slice(0, n) + "…" : t;
@@ -800,15 +793,6 @@ function DiaryListCard({
               }}
             />
           )}
-          <span
-            style={{
-              fontFamily: "var(--font-sans)",
-              fontSize: "var(--text-xs)",
-              color: "var(--fg-placeholder)",
-            }}
-          >
-            {timeLabel(e.createdAt)}
-          </span>
         </div>
         {/* 제목 / 미리보기 */}
         <p
