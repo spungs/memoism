@@ -305,7 +305,7 @@ export function DiaryForm({
   const [aiVer, setAiVer] = useState(initial?.aiGenerationVersion ?? 0);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const titleRef = useRef<HTMLTextAreaElement>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
   const today = todayStr();
 
   // content 변경 시 textarea 높이 자동 조정 (재생성·되돌리기 후도 포함)
@@ -315,15 +315,6 @@ export function DiaryForm({
     ta.style.height = "auto";
     ta.style.height = Math.max(120, ta.scrollHeight) + "px";
   }, [content]);
-
-  // title 변경 시 높이 자동 조정 (초기 긴 제목·AI가 채운 제목 포함).
-  // 제목을 줄바꿈 textarea로 둬 긴 제목도 전체가 보이고 가로 캐럿 추적 문제가 없다.
-  useEffect(() => {
-    const ta = titleRef.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = ta.scrollHeight + "px";
-  }, [title]);
 
   // 미리보기 URL revoke on unmount
   useEffect(() => {
@@ -798,18 +789,15 @@ export function DiaryForm({
           }}
         >
         <div>
-          <textarea
+          <input
+            type="text"
             ref={titleRef}
             value={title}
             onChange={(e) => {
-              // 제목은 한 줄 개념 — 붙여넣기로 들어온 개행은 공백으로 치환.
-              setTitle(e.target.value.replace(/\n/g, " "));
-              const el = e.currentTarget;
-              el.style.height = "auto";
-              el.style.height = el.scrollHeight + "px";
+              setTitle(e.target.value);
             }}
             onKeyDown={(e) => {
-              // 제목에서 Enter → 줄바꿈 막고 본문으로 포커스 이동.
+              // 제목에서 Enter → 본문으로 포커스 이동.
               if (e.key === "Enter") {
                 e.preventDefault();
                 textareaRef.current?.focus();
@@ -817,7 +805,6 @@ export function DiaryForm({
             }}
             placeholder="제목"
             maxLength={200}
-            rows={1}
             aria-invalid={Boolean(titleError)}
             style={{
               width: "100%",
@@ -831,9 +818,6 @@ export function DiaryForm({
               border: "none",
               outline: "none",
               padding: 0,
-              resize: "none",
-              overflow: "hidden",
-              display: "block",
             }}
           />
           {titleError && (
