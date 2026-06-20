@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { Sparkles, Undo2 } from "lucide-react";
 import { revertDiaryAction } from "@/lib/diary/actions";
 import { AiBusyOverlay, Spinner } from "@/components/ui/ai-busy-overlay";
+import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 
 export interface DiaryAiUpdate {
   title: string;
@@ -29,6 +30,7 @@ export function DiaryAiActions({
   const [aiPending, setAiPending] = useState(false);
   const [reverting, startRevert] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [usageSignal, setUsageSignal] = useState(0);
   // 진행 중인 재생성 요청 취소(Abort) 핸들.
   const aiAbortRef = useRef<AbortController | null>(null);
 
@@ -62,6 +64,7 @@ export function DiaryAiActions({
       setError(e instanceof Error ? e.message : "재생성에 실패했어요");
     } finally {
       setAiPending(false);
+      setUsageSignal((n) => n + 1);
       aiAbortRef.current = null;
     }
   };
@@ -163,6 +166,8 @@ export function DiaryAiActions({
           ? "사진과 메모를 기반으로 AI가 다시 정리해줘요."
           : "사진과 본문을 기반으로 AI가 1인칭 일기로 정리해줘요."}
       </p>
+
+      <AiUsageCounter refreshSignal={usageSignal} />
 
       {error && (
         <p

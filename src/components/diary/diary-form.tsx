@@ -18,6 +18,7 @@ import { DiaryAiActions } from "./diary-ai-actions";
 import { DiaryDatePicker } from "./date-picker";
 import { MoodPicker, type MoodKey } from "./mood-picker";
 import { AiBusyOverlay, Spinner } from "@/components/ui/ai-busy-overlay";
+import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 
 const PENDING_DRAFT_KEY = "memoism:pendingDraft";
 // create 모드에서 작성 중 내용을 자동저장하는 키. 새로고침·세션만료로 인한 유실 방지.
@@ -291,6 +292,7 @@ export function DiaryForm({
 
   const [aiPending, setAiPending] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [usageSignal, setUsageSignal] = useState(0);
   // 진행 중인 AI 생성 요청을 취소(Abort)하기 위한 핸들.
   const aiAbortRef = useRef<AbortController | null>(null);
 
@@ -585,6 +587,7 @@ export function DiaryForm({
       setAiError(e instanceof Error ? e.message : "AI 생성 실패");
     } finally {
       setAiPending(false);
+      setUsageSignal((n) => n + 1);
       aiAbortRef.current = null;
     }
   };
@@ -1019,6 +1022,7 @@ export function DiaryForm({
             <p style={{ ...MUTED_LABEL, textTransform: "none", letterSpacing: "normal" }}>
               사진만 있어도, 텍스트만 있어도, 둘 다 있어도 OK.
             </p>
+            <AiUsageCounter refreshSignal={usageSignal} />
             {aiError && (
               <p role="alert" style={errorStyle}>
                 {aiError}

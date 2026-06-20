@@ -4,6 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp, SquarePen } from "lucide-react";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
+import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 
 type Role = "user" | "assistant";
 type RelatedDiary = { id: string; title: string; createdAt: string };
@@ -67,6 +68,8 @@ export function CharacterChat({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [capExhausted, setCapExhausted] = useState(initialCapExhausted);
+  // AI 사용량 카운터 갱신 신호 — 전송 후 올리면 "오늘 AI X/N"이 다시 조회된다.
+  const [usageSignal, setUsageSignal] = useState(0);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -126,6 +129,7 @@ export function CharacterChat({
       setError("메이가 잠시 응답하지 못했어요. 잠시 후 다시 시도해주세요.");
     } finally {
       setSending(false);
+      setUsageSignal((n) => n + 1);
       textareaRef.current?.focus();
     }
   }
@@ -346,6 +350,9 @@ export function CharacterChat({
           flexShrink: 0,
         }}
       >
+        <div style={{ padding: "0 var(--space-2) 4px" }}>
+          <AiUsageCounter refreshSignal={usageSignal} align="right" />
+        </div>
         <div
           style={{
             display: "flex",

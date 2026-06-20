@@ -7,6 +7,7 @@ import { createDiaryAction } from "@/lib/diary/actions";
 import { getDiaryImageSignedUrls } from "@/lib/storage/actions";
 import { DiaryDatePicker } from "./date-picker";
 import { kstTodayKey } from "@/lib/diary/kst";
+import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 
 const PENDING_DRAFT_KEY = "memoism:pendingDraft";
 const DRAFT_TTL_MS = 5 * 60 * 1000; // 5분 만료 — 사용자가 너무 오래 자리비울 때 보호
@@ -90,6 +91,7 @@ export function ReviewGate() {
   const [signedUrls, setSignedUrls] = useState<(string | null)[]>([]);
   const [regenerating, setRegenerating] = useState(false);
   const [regenError, setRegenError] = useState<string | null>(null);
+  const [usageSignal, setUsageSignal] = useState(0);
   const [usingOriginal, setUsingOriginal] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -256,6 +258,7 @@ export function ReviewGate() {
       setRegenError(e instanceof Error ? e.message : "다시 생성 실패");
     } finally {
       setRegenerating(false);
+      setUsageSignal((n) => n + 1);
     }
   };
 
@@ -667,6 +670,8 @@ export function ReviewGate() {
           >
             {regenerating ? "생성 중..." : "✨ 다시 생성"}
           </button>
+
+          <AiUsageCounter refreshSignal={usageSignal} />
 
           {regenError && (
             <p
