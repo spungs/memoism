@@ -200,7 +200,7 @@ export async function POST(req: NextRequest) {
   // 캐릭터 먼저 — chatResetAt(대화 경계)이 아래 history 쿼리 범위를 정한다.
   const character = await prisma.character.findUnique({
     where: { userId: session.userId },
-    select: { id: true, subscriptionStatus: true, chatResetAt: true },
+    select: { id: true, subscriptionStatus: true, plan: true, chatResetAt: true },
   });
   if (!character) {
     return NextResponse.json({ error: "캐릭터를 찾을 수 없어요" }, { status: 404 });
@@ -249,7 +249,7 @@ export async function POST(req: NextRequest) {
     }),
   ]);
 
-  const cap = await checkAndIncrement(session.userId, character.subscriptionStatus);
+  const cap = await checkAndIncrement(session.userId, character.subscriptionStatus, character.plan);
   if (!cap.allowed) {
     return NextResponse.json(
       {

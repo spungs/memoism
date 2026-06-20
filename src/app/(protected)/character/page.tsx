@@ -16,7 +16,7 @@ export default async function CharacterPage() {
   const [character, recentChat] = await Promise.all([
     prisma.character.findUnique({
       where: { userId: session.userId },
-      select: { id: true, chatResetAt: true, subscriptionStatus: true },
+      select: { id: true, chatResetAt: true, subscriptionStatus: true, plan: true },
     }),
     // 표시는 영구 저장된 대화를 그대로 보여준다 (24h 삭제 폐기 — 어젯밤 대화가 사라지면
     // "하룻밤 새 잊은 친구"처럼 차갑다). 최신 100개만 초기 로드. 모델 컨텍스트용 24h 쿼리는
@@ -42,7 +42,7 @@ export default async function CharacterPage() {
 
   // 오늘 한도 소진 여부를 로드 시점에 함께 내려준다 → 새로고침해도 입력창이 "열린 척"
   // 하지 않고 즉시 비활성. (등급→한도 계산이 character 결과에 의존해 순차 조회)
-  const usage = await todayUsage(session.userId, character.subscriptionStatus);
+  const usage = await todayUsage(session.userId, character.subscriptionStatus, character.plan);
   const initialCapExhausted = usage.remaining <= 0;
 
   const initialMessages = recentChat

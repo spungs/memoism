@@ -11,6 +11,12 @@ import { PageHeader } from "@/components/layout/page-header";
 
 const APP_VERSION = "v0.1.0";
 
+const PLAN_LABEL: Record<string, string> = {
+  FREE: "무료",
+  BASIC: "베이직",
+  PRO: "프로",
+};
+
 // iOS 설정 앱 그룹 리스트 패턴
 // 섹션 레이블: 카드 밖 좌측 16px, 13px / secondary
 const SECTION_LABEL_STYLE: React.CSSProperties = {
@@ -76,9 +82,10 @@ interface SettingsViewProps {
   googleLinked: boolean;
   hasPassword: boolean;
   googleNotice?: string;
+  usage?: { tier: string; used: number; limit: number } | null;
 }
 
-export function SettingsView({ email, googleLinked, hasPassword, googleNotice }: SettingsViewProps) {
+export function SettingsView({ email, googleLinked, hasPassword, googleNotice, usage }: SettingsViewProps) {
   const router = useRouter();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
@@ -251,6 +258,40 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice }:
           </p>
         )}
       </div>
+
+      {/* 구독 그룹 — 요금제 배지 + 오늘 AI 사용량 (읽기전용) */}
+      {usage && (
+        <div style={{ padding: "0 var(--space-5)", marginBottom: "var(--space-6)" }}>
+          <p style={SECTION_LABEL_STYLE}>구독</p>
+          <div style={CARD_STYLE}>
+            <div style={ROW_STYLE}>
+              <span style={ROW_LABEL_STYLE}>요금제</span>
+              <span style={ROW_VALUE_STYLE}>
+                <span
+                  style={{
+                    fontFamily: "var(--font-sans)",
+                    fontSize: "var(--text-sm)",
+                    fontWeight: 600,
+                    color: "var(--tint)",
+                    backgroundColor: "var(--tint-soft)",
+                    padding: "2px 10px",
+                    borderRadius: "var(--radius-pill)",
+                  }}
+                >
+                  {PLAN_LABEL[usage.tier] ?? usage.tier}
+                </span>
+              </span>
+            </div>
+            <div style={DIVIDER_STYLE} />
+            <div style={ROW_STYLE}>
+              <span style={ROW_LABEL_STYLE}>오늘 AI 사용</span>
+              <span style={ROW_VALUE_STYLE}>
+                {usage.used} / {usage.limit}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 알림 그룹 */}
       <div style={{ padding: "0 var(--space-5)", marginBottom: "var(--space-6)" }}>

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { SettingsView } from "@/components/settings/settings-view";
+import { todayUsage } from "@/lib/ai/usage";
 
 const GOOGLE_NOTICES: Record<string, string> = {
   linked: "구글 계정이 연결되었어요.",
@@ -22,6 +23,15 @@ export default async function SettingsPage({
     select: { googleSub: true, passwordHash: true },
   });
 
+  // 요금제 배지 + 오늘 AI 사용량 (읽기전용 표시)
+  const character = await prisma.character.findUnique({
+    where: { userId: session.userId },
+    select: { subscriptionStatus: true, plan: true },
+  });
+  const usage = character
+    ? await todayUsage(session.userId, character.subscriptionStatus, character.plan)
+    : null;
+
   const { google } = await searchParams;
   const googleNotice = google ? GOOGLE_NOTICES[google] : undefined;
 
@@ -31,6 +41,9 @@ export default async function SettingsPage({
       googleLinked={Boolean(user?.googleSub)}
       hasPassword={Boolean(user?.passwordHash)}
       googleNotice={googleNotice}
+      usage={
+        usage ? { tier: usage.tier, used: usage.used, limit: usage.limit } : null
+      }
     />
   );
 }

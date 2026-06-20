@@ -1,29 +1,31 @@
 import "server-only";
-import { SubscriptionStatus } from "@prisma/client";
+import { SubscriptionStatus, SubscriptionPlan } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
-// 베타 cap 정책 (마일스톤 ⑦ Phase 5):
-//   - FREE: 일 3회 (V2 광고 시청당 +1)
-//   - BASIC: 일 10회 (V2 광고 시청당 +N)
-//   - PRO: 일 100회 (V2, 안전 cap)
-const TIER_LIMITS = {
+// 일일 AI 호출 cap — plan(요금제 티어)으로 결정 (마일스톤 ⑦ Phase 5):
+//   - FREE: 일 3회 / BASIC: 일 10회 / PRO: 일 100회
+const TIER_LIMITS: Record<SubscriptionPlan, number> = {
   FREE: 3,
   BASIC: 10,
   PRO: 100,
-} as const;
+};
 
-export type Tier = keyof typeof TIER_LIMITS;
+export type Tier = SubscriptionPlan;
 
 export type CapResult =
   | { allowed: true; remaining: number; tier: Tier }
   | { allowed: false; remaining: 0; tier: Tier; reason: "daily_cap" };
 
 /**
- * 베타 정책 (D-PG 옵션 나): subscriptionStatus = ACTIVE → Basic 자동 부여.
- * V2에서 결제 도입 시 ACTIVE 안에서 Basic/Pro 분리.
+ * 실효 티어 = 구독이 유효(ACTIVE/TRIAL)할 때만 plan 적용, 아니면 FREE로 강등.
+ * (만료·미구독은 무료 한도. 결제 도입 전 베타는 전원 ACTIVE+BASIC.)
  */
-function tierOf(status: SubscriptionStatus): Tier {
-  return status === "ACTIVE" ? "BASIC" : "FREE";
+function effectiveTier(
+  status: SubscriptionStatus,
+  plan: SubscriptionPlan,
+): Tier {
+  const active = status === "ACTIVE" || status === "TRIAL";
+  return active ? plan : "FREE";
 }
 
 /**
@@ -49,8 +51,9 @@ function todayKST(): Date {
 export async function checkAndIncrement(
   userId: string,
   subscriptionStatus: SubscriptionStatus,
+  plan: SubscriptionPlan,
 ): Promise<CapResult> {
-  const tier = tierOf(subscriptionStatus);
+  const tier = effectiveTier(subscriptionStatus, plan);
   const limit = TIER_LIMITS[tier];
   const date = todayKST();
 
@@ -94,8 +97,9 @@ export async function checkAndIncrement(
 export async function todayUsage(
   userId: string,
   subscriptionStatus: SubscriptionStatus,
+  plan: SubscriptionPlan,
 ): Promise<{ used: number; limit: number; remaining: number; tier: Tier }> {
-  const tier = tierOf(subscriptionStatus);
+  const tier = effectiveTier(subscriptionStatus, plan);
   const limit = TIER_LIMITS[tier];
   const date = todayKST();
 

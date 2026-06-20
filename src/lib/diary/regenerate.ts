@@ -75,11 +75,11 @@ export async function regenerateDiary(
 
   const character = await prisma.character.findUnique({
     where: { userId },
-    select: { subscriptionStatus: true },
+    select: { subscriptionStatus: true, plan: true },
   });
   if (!character) return { ok: false, error: "사용자 정보를 찾을 수 없습니다" };
 
-  const cap = await checkAndIncrement(userId, character.subscriptionStatus);
+  const cap = await checkAndIncrement(userId, character.subscriptionStatus, character.plan);
   if (!cap.allowed) {
     return {
       ok: false,

@@ -34,6 +34,15 @@ enum SubscriptionStatus {
   EXPIRED
 }
 
+// 요금제 티어 — 구독 "상태"(SubscriptionStatus)와 분리. AI 캡 한도는 plan으로 결정.
+//   - FREE 3 / BASIC 10 / PRO 100 (일일 AI 호출, src/lib/ai/usage.ts)
+//   - 베타 기본값 BASIC (전원 ACTIVE+BASIC = 현행 10회 유지). 결제 도입은 V2.
+enum SubscriptionPlan {
+  FREE
+  BASIC
+  PRO
+}
+
 // =============================================================================
 // Account & user-owned content
 // =============================================================================
@@ -173,6 +182,8 @@ model Character {
   id                    String             @id @default(uuid())
   userId                String             @unique @map("user_id")
   subscriptionStatus    SubscriptionStatus @default(ACTIVE) @map("subscription_status")
+  // 요금제 티어. subscriptionStatus가 유효(ACTIVE/TRIAL)일 때 이 plan으로 캡 한도 결정.
+  plan                  SubscriptionPlan   @default(BASIC)
   subscriptionExpiresAt DateTime?          @map("subscription_expires_at")
   createdAt             DateTime           @default(now()) @map("created_at")
   updatedAt             DateTime           @updatedAt @map("updated_at")

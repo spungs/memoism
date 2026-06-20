@@ -31,14 +31,14 @@ export async function previewGenerateDiary(
 ): Promise<PreviewGenerateResult> {
   const character = await prisma.character.findUnique({
     where: { userId: input.userId },
-    select: { subscriptionStatus: true },
+    select: { subscriptionStatus: true, plan: true },
   });
   if (!character) {
     return { ok: false, error: "사용자 정보를 찾을 수 없습니다" };
   }
 
   // 일일 cap 검증·증분 (호출 전 차감)
-  const cap = await checkAndIncrement(input.userId, character.subscriptionStatus);
+  const cap = await checkAndIncrement(input.userId, character.subscriptionStatus, character.plan);
   if (!cap.allowed) {
     return {
       ok: false,
