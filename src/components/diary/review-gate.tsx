@@ -90,6 +90,7 @@ export function ReviewGate() {
   const [signedUrls, setSignedUrls] = useState<(string | null)[]>([]);
   const [regenerating, setRegenerating] = useState(false);
   const [regenError, setRegenError] = useState<string | null>(null);
+  const [usingOriginal, setUsingOriginal] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // storagePaths가 있으면 signed URL 일괄 발급 (1h TTL).
@@ -237,6 +238,7 @@ export function ReviewGate() {
 
       setEditedTitle(data.data.title);
       setEditedContent(data.data.content);
+      setUsingOriginal(false);
       setDraftState((prev) =>
         prev
           ? {
@@ -565,85 +567,12 @@ export function ReviewGate() {
           )}
         </section>
 
-        {/* 내가 쓴 원본 — 모드 B/C에서만. AI가 다듬으며 내 글이 줄었을 때
-            한 탭으로 원본을 되살릴 안전망. (text는 sessionStorage에 보존돼 있음) */}
-        {draftState.text && (
-          <section
-            style={{
-              backgroundColor: "var(--surface)",
-              borderRadius: "var(--radius-lg)",
-              padding: "var(--space-3) var(--space-4)",
-              boxShadow: "var(--shadow-xs)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "var(--space-2)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "var(--space-2)",
-              }}
-            >
-              <p
-                style={{
-                  fontFamily: "var(--font-sans)",
-                  fontSize: "var(--text-xs)",
-                  color: "var(--fg-subtle)",
-                  letterSpacing: "var(--tracking-wider)",
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  margin: 0,
-                }}
-              >
-                내가 쓴 원본
-              </p>
-              <button
-                type="button"
-                onClick={() => setEditedContent(draftState.text ?? "")}
-                disabled={pending || regenerating}
-                className="pressable"
-                style={{
-                  fontFamily: "var(--font-sans)",
-                  fontSize: "var(--text-sm)",
-                  fontWeight: 600,
-                  color:
-                    pending || regenerating
-                      ? "var(--fg-subtle)"
-                      : "var(--tint)",
-                  backgroundColor: "transparent",
-                  border: "none",
-                  padding: "4px 0",
-                  cursor: pending || regenerating ? "default" : "pointer",
-                  flexShrink: 0,
-                }}
-              >
-                이걸로 되돌리기
-              </button>
-            </div>
-            <div style={{ height: 1, backgroundColor: "var(--separator)" }} />
-            <p
-              style={{
-                whiteSpace: "pre-wrap",
-                fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-md)",
-                lineHeight: "var(--leading-relaxed)",
-                color: "var(--fg-muted)",
-                margin: 0,
-              }}
-            >
-              {draftState.text}
-            </p>
-          </section>
-        )}
-
         {/* Story 영역 — AI 생성 본문 (수정 가능). 연노랑 하이라이터로 Fact와 시각 분리. */}
         <div
           style={{
             position: "relative",
-            backgroundColor: "rgba(255, 204, 0, 0.10)",
+            backgroundColor: usingOriginal ? "var(--surface)" : "rgba(255, 204, 0, 0.10)",
+            boxShadow: usingOriginal ? "var(--shadow-xs)" : "none",
             borderRadius: "var(--radius-lg)",
             padding: "var(--space-4)",
             display: "flex",
@@ -662,7 +591,9 @@ export function ReviewGate() {
               margin: 0,
             }}
           >
-            ✨ AI가 정리한 일기 (수정해도 OK)
+            {usingOriginal
+              ? "✏️ 내가 쓴 원본 (수정해서 저장)"
+              : "✨ AI가 정리한 일기 (수정해도 OK)"}
           </p>
           <input
             type="text"
@@ -751,6 +682,84 @@ export function ReviewGate() {
             </p>
           )}
         </div>
+
+        {/* 내가 쓴 원본 — 모드 B/C에서만. AI가 다듬으며 내 글이 줄었을 때
+            한 탭으로 원본을 되살릴 안전망. (text는 sessionStorage에 보존돼 있음) */}
+        {draftState.text && !usingOriginal && (
+          <section
+            style={{
+              backgroundColor: "var(--surface)",
+              borderRadius: "var(--radius-lg)",
+              padding: "var(--space-3) var(--space-4)",
+              boxShadow: "var(--shadow-xs)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--space-2)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "var(--space-2)",
+              }}
+            >
+              <p
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-xs)",
+                  color: "var(--fg-subtle)",
+                  letterSpacing: "var(--tracking-wider)",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  margin: 0,
+                }}
+              >
+                내가 쓴 원본
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditedContent(draftState.text ?? "");
+                  setUsingOriginal(true);
+                  requestAnimationFrame(() => textareaRef.current?.focus());
+                }}
+                disabled={pending || regenerating}
+                className="pressable"
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-sm)",
+                  fontWeight: 600,
+                  color:
+                    pending || regenerating
+                      ? "var(--fg-subtle)"
+                      : "var(--tint)",
+                  backgroundColor: "transparent",
+                  border: "none",
+                  padding: "4px 0",
+                  cursor: pending || regenerating ? "default" : "pointer",
+                  flexShrink: 0,
+                }}
+              >
+                이걸로 되돌리기
+              </button>
+            </div>
+            <div style={{ height: 1, backgroundColor: "var(--separator)" }} />
+            <p
+              style={{
+                whiteSpace: "pre-wrap",
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-md)",
+                lineHeight: "var(--leading-relaxed)",
+                color: "var(--fg-muted)",
+                margin: 0,
+              }}
+            >
+              {draftState.text}
+            </p>
+          </section>
+        )}
 
         {submitError && (
           <p
