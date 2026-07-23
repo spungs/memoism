@@ -36,3 +36,12 @@ export function kstDayRangeUtc(
   const endUtc = new Date(startUtc.getTime() + 24 * 60 * 60 * 1000);
   return { startUtc, endUtc };
 }
+
+/** KST 날짜키 "YYYY-MM-DD" → 그날 [startUtc, endUtc) UTC 경계. */
+export function kstDayRangeFromKey(dateKey: string): {
+  startUtc: Date;
+  endUtc: Date;
+} {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return kstDayRangeUtc(y, m, d);
+}
