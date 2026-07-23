@@ -23,3 +23,23 @@ describe("kstDayRangeFromKey", () => {
     expect(instant >= startUtc && instant < endUtc).toBe(true);
   });
 });
+
+import { diaryCreatedAtForDateKey } from "./kst";
+
+describe("diaryCreatedAtForDateKey", () => {
+  const now = new Date("2026-07-23T05:00:00Z"); // KST 14:00, 2026-07-23
+  it("오늘(KST) → now 그대로", () => {
+    expect(diaryCreatedAtForDateKey("2026-07-23", now)).toBe(now);
+  });
+  it("미래 → now 그대로", () => {
+    expect(diaryCreatedAtForDateKey("2099-01-01", now)).toBe(now);
+  });
+  it("과거 → 그 날 KST 정오 (UTC 03:00)", () => {
+    expect(diaryCreatedAtForDateKey("2026-07-20", now).toISOString()).toBe(
+      "2026-07-20T03:00:00.000Z",
+    );
+  });
+  it("형식 오류 → now", () => {
+    expect(diaryCreatedAtForDateKey("bad", now)).toBe(now);
+  });
+});

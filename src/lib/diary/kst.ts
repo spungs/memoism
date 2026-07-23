@@ -45,3 +45,14 @@ export function kstDayRangeFromKey(dateKey: string): {
   const [y, m, d] = dateKey.split("-").map(Number);
   return kstDayRangeUtc(y, m, d);
 }
+
+/**
+ * 일기 createdAt 앵커 — 날짜키 기준. createdAt은 "날짜 칸" + "작성 시각" 겸용.
+ *   - 오늘(KST)/미래 → 실제 작성 시각(now). 과거 → 그 날 KST 정오.
+ */
+export function diaryCreatedAtForDateKey(dateKey: string, now: Date): Date {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return now;
+  if (dateKey >= kstDateKey(now)) return now;
+  const d = new Date(`${dateKey}T12:00:00+09:00`);
+  return isNaN(d.getTime()) ? now : d;
+}

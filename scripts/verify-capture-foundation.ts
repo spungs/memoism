@@ -1,7 +1,7 @@
 // DiaryFragment 데이터 모델 통합 검증 — self-contained (scripts/reembed-diaries.ts 패턴).
 // server-only/@/ 체인을 피하려 PrismaClient 직접 + get-or-create 로직 인라인
 // (실 함수 createFragment/getOrCreateDiaryForDate 는 build 타입체크로 검증).
-// 실데이터 보호: 2099-01-01(실일기와 안 겹침) + 시작/종료 시 cascade 정리.
+// 실데이터 보호: 1990-01-01(실일기와 안 겹침) + 시작/종료 시 cascade 정리.
 // 실행: node scripts/verify-capture-foundation.ts
 import { config as loadEnv } from "dotenv";
 import { PrismaClient } from "@prisma/client";
@@ -11,7 +11,7 @@ loadEnv({ path: ".env.local", override: true });
 
 const prisma = new PrismaClient();
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
-const DATE_KEY = "2099-01-01";
+const DATE_KEY = "1990-01-01";
 
 function dayRange(dateKey: string) {
   const [y, m, d] = dateKey.split("-").map(Number);
@@ -28,13 +28,16 @@ async function getOrCreateDiary(userId: string, dateKey: string) {
     select: { id: true },
   });
   if (existing) return existing;
-  // 실 getOrCreateDiaryForDate(queries.ts, Task 3/4 — 이 태스크 범위 밖)는 DB
-  // 기본값 now()를 그대로 쓴다. 오늘 날짜로만 호출되는 실사용에선 문제없지만,
-  // 이 검증은 실데이터와 절대 안 겹치는 미래 날짜(2099-01-01)를 쓰므로 now()로
-  // 만들면 방금 만든 행이 그 날짜 창(window) 밖에 놓여 idempotency 체크가
-  // 거짓 실패한다. createdAt을 dateKey 창 안으로 명시해 검증 로직만 보정.
+  // 실 getOrCreateDiaryForDate(queries.ts)와 동일한 앵커 방식: 과거 날짜는
+  // 그 날 KST 정오로 createdAt을 고정해 dateKey 창 안에 정확히 버킷시킨다.
   return prisma.diary.create({
-    data: { userId, title: "", content: "", source: "chat", createdAt: startUtc },
+    data: {
+      userId,
+      title: "",
+      content: "",
+      source: "chat",
+      createdAt: new Date(`${dateKey}T12:00:00+09:00`),
+    },
     select: { id: true },
   });
 }
@@ -44,7 +47,7 @@ async function main() {
   if (!user) throw new Error("검증용 user 없음 — 로컬 DB에 계정 1개 필요");
   const userId = user.id;
 
-  // 이전 실패 잔여 정리 (2099-01-01 범위만)
+  // 이전 실패 잔여 정리 (DATE_KEY 범위만)
   const r = dayRange(DATE_KEY);
   await prisma.diary.deleteMany({ where: { userId, createdAt: { gte: r.startUtc, lt: r.endUtc } } });
 

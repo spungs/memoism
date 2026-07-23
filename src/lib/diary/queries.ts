@@ -1,7 +1,12 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { getSignedUrl, getSignedUrlsByPath } from "@/lib/storage";
-import { kstDateKey, kstDayRangeFromKey, kstMonthRangeUtc } from "@/lib/diary/kst";
+import {
+  diaryCreatedAtForDateKey,
+  kstDateKey,
+  kstDayRangeFromKey,
+  kstMonthRangeUtc,
+} from "@/lib/diary/kst";
 
 const DEFAULT_TAKE = 20;
 const SEARCH_TAKE = 50;
@@ -307,7 +312,13 @@ export async function getOrCreateDiaryForDate(
   if (existing) return existing;
 
   const created = await prisma.diary.create({
-    data: { userId, title: "", content: "", source: "chat" },
+    data: {
+      userId,
+      title: "",
+      content: "",
+      source: "chat",
+      createdAt: diaryCreatedAtForDateKey(dateKey, new Date()),
+    },
     select: { id: true },
   });
   return created;
