@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { getSignedUrl, getSignedUrlsByPath } from "@/lib/storage";
-import { kstDateKey, kstMonthRangeUtc } from "@/lib/diary/kst";
+import { kstDateKey, kstDayRangeFromKey, kstMonthRangeUtc } from "@/lib/diary/kst";
 
 const DEFAULT_TAKE = 20;
 const SEARCH_TAKE = 50;
@@ -287,4 +287,28 @@ export async function getDiariesForMonth(
     });
   }
   return { year, month, days };
+}
+
+/**
+ * 대화형 캡처 라우팅용 — 해당 KST 날짜의 "그날 일기"를 결정적으로 확보.
+ *   - 있으면 가장 이른 일기(그날의 주 컨테이너)를 반환.
+ *   - 없으면 빈 일기(source:"chat") 생성. title/content는 조각이 채움.
+ */
+export async function getOrCreateDiaryForDate(
+  userId: string,
+  dateKey: string,
+): Promise<{ id: string }> {
+  const { startUtc, endUtc } = kstDayRangeFromKey(dateKey);
+  const existing = await prisma.diary.findFirst({
+    where: { userId, createdAt: { gte: startUtc, lt: endUtc } },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  if (existing) return existing;
+
+  const created = await prisma.diary.create({
+    data: { userId, title: "", content: "", source: "chat" },
+    select: { id: true },
+  });
+  return created;
 }
