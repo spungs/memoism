@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { getOrCreateDiaryForDate } from "./queries";
+import { reembedDiaryWithFragments } from "./fragment-embed";
 import type { Prisma } from "@prisma/client";
 
 export type CreateFragmentInput = {
@@ -20,7 +21,7 @@ export type FragmentRow = {
   createdAt: Date;
 };
 
-/** 조각 1건을 그날 일기에 라이브 누적. 임베딩 재계산은 Task 6에서 wire. */
+/** 조각 1건을 그날 일기에 라이브 누적하고 재임베딩(best-effort). */
 export async function createFragment(
   input: CreateFragmentInput,
 ): Promise<{ diaryId: string; fragmentId: string }> {
@@ -38,6 +39,7 @@ export async function createFragment(
     },
     select: { id: true },
   });
+  await reembedDiaryWithFragments(diaryId);
   return { diaryId, fragmentId: fragment.id };
 }
 
