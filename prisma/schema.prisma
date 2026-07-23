@@ -112,6 +112,7 @@ model Diary {
 
   user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   images    DiaryImage[]
+  fragments DiaryFragment[]
   embedding DiaryEmbedding?
 
   @@index([userId, createdAt(sort: Desc)])
@@ -136,6 +137,24 @@ model DiaryImage {
 
   @@index([diaryId, orderIndex])
   @@map("diary_images")
+}
+
+// DiaryFragment — 메이 채팅으로 캡처한 "조각"(record 메시지). Diary의 자식(단일 원본).
+//   - kind: "text" | "photo". text면 content, photo면 storagePath(+exif).
+//   - 회상 검색은 그날 Diary 임베딩이 커버 (별도 조각 임베딩 없음).
+model DiaryFragment {
+  id          String   @id @default(uuid())
+  diaryId     String   @map("diary_id")
+  kind        String
+  content     String?
+  storagePath String?  @map("storage_path")
+  exif        Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  diary Diary @relation(fields: [diaryId], references: [id], onDelete: Cascade)
+
+  @@index([diaryId, createdAt])
+  @@map("diary_fragments")
 }
 
 // DiaryEmbedding — pgvector 768d (Gemini text-embedding-004).
