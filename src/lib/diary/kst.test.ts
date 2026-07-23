@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { kstDateKey, kstDayRangeFromKey } from "./kst";
+import {
+  kstDateKey,
+  kstDayRangeFromKey,
+  diaryCreatedAtForDateKey,
+} from "./kst";
 
 describe("kstDateKey", () => {
   it("UTC 인스턴트를 KST 달력 날짜로 매핑한다", () => {
@@ -23,8 +27,6 @@ describe("kstDayRangeFromKey", () => {
     expect(instant >= startUtc && instant < endUtc).toBe(true);
   });
 });
-
-import { diaryCreatedAtForDateKey } from "./kst";
 
 describe("diaryCreatedAtForDateKey", () => {
   const now = new Date("2026-07-23T05:00:00Z"); // KST 14:00, 2026-07-23
