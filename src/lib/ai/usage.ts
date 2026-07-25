@@ -20,7 +20,7 @@ export type CapResult =
  * 실효 티어 = 구독이 유효(ACTIVE/TRIAL)할 때만 plan 적용, 아니면 FREE로 강등.
  * (만료·미구독은 무료 한도. 결제 도입 전 베타는 전원 ACTIVE+BASIC.)
  */
-function effectiveTier(
+export function effectiveTier(
   status: SubscriptionStatus,
   plan: SubscriptionPlan,
 ): Tier {
