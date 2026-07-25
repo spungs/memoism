@@ -127,6 +127,7 @@ model DiaryImage {
   id          String    @id @default(uuid())
   diaryId     String    @map("diary_id")
   storagePath String    @map("storage_path")
+  sizeBytes   Int       @default(0) @map("size_bytes")
   exifTakenAt DateTime? @map("exif_taken_at")
   exifLat     Float?    @map("exif_lat")
   exifLng     Float?    @map("exif_lng")
@@ -204,6 +205,8 @@ model Character {
   // 요금제 티어. subscriptionStatus가 유효(ACTIVE/TRIAL)일 때 이 plan으로 캡 한도 결정.
   plan                  SubscriptionPlan   @default(BASIC)
   subscriptionExpiresAt DateTime?          @map("subscription_expires_at")
+  // 개인별 총 스토리지 사용량(바이트) 비정규화 캐시 — 업로드/삭제와 같은 트랜잭션에서 증감.
+  storageUsedBytes      BigInt             @default(0) @map("storage_used_bytes")
   createdAt             DateTime           @default(now()) @map("created_at")
   updatedAt             DateTime           @updatedAt @map("updated_at")
   // "새 대화하기" 경계 — 이 시각 이후 메시지만 메이의 대화 컨텍스트로 쓴다 (비파괴, 삭제 아님).
