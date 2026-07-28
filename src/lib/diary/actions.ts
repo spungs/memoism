@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth/session";
 import { getMaxImagesForUser } from "@/lib/character/queries";
 import { prisma } from "@/lib/db";
 import { deleteImage, getObjectSize, saveImage } from "@/lib/storage";
+import { assertStorageQuota, STORAGE_FULL_MSG } from "@/lib/storage/quota";
 import { upsertDiaryEmbedding } from "./embedding";
 import { diaryCreatedAtForDateKey } from "./kst";
 import {
@@ -140,22 +141,37 @@ export async function createDiaryAction(
   const maxImages = await getMaxImagesForUser(session.userId);
 
   // 이미지 경로 결정: AI 검토 통과(storagePaths) vs 직접 작성(image File[])
-  const preuploaded = parseStoragePaths(formData.get("storagePaths"), maxImages);
+  const parsedPaths = parseStoragePaths(formData.get("storagePaths"), maxImages);
+  const preuploaded = parsedPaths && parsedPaths.length > 0 ? parsedPaths : null;
+  const files = preuploaded
+    ? []
+    : formData
+        .getAll("image")
+        .filter((f): f is File => f instanceof File && f.size > 0)
+        .slice(0, maxImages);
+
   const storagePaths: string[] = [];
   // storagePaths와 같은 인덱스의 바이트 크기 (스토리지 쿼터 카운터용).
   const sizes: number[] = [];
   const uploadedToCleanup: string[] = [];
 
-  if (preuploaded && preuploaded.length > 0) {
+  if (preuploaded) {
     storagePaths.push(...preuploaded);
     // 검토 게이트에서 이미 업로드된 사진은 File이 없어 버킷에서 크기를 조회한다.
     sizes.push(...(await Promise.all(preuploaded.map(getObjectSize))));
-  } else {
-    const files = formData
-      .getAll("image")
-      .filter((f): f is File => f instanceof File && f.size > 0)
-      .slice(0, maxImages);
+  }
 
+  // 쿼터는 업로드·저장 확정 **전에** 판정한다 — 초과면 한 장도 올리지 않고,
+  // 이미 있는 사진·일기는 건드리지 않는다(하드룰: 삭제 없이 새 업로드만 차단).
+  const addBytes = preuploaded
+    ? sizes.reduce((sum, n) => sum + n, 0)
+    : files.reduce((sum, f) => sum + f.size, 0);
+  if (addBytes > 0) {
+    const quota = await assertStorageQuota(session.userId, addBytes);
+    if (!quota.ok) return { ok: false, error: STORAGE_FULL_MSG };
+  }
+
+  if (!preuploaded) {
     for (const file of files) {
       try {
         const path = await saveImage(file, session.userId);
@@ -313,6 +329,12 @@ export async function updateDiaryAction(
     const slots = maxImages - currentCount;
     if (slots > 0) {
       const accepted = newFiles.slice(0, slots);
+      const addedBytes = accepted.reduce((sum, f) => sum + f.size, 0);
+      // 업로드 전 쿼터 판정. 초과 시 사진만 거부하고, 이미 반영된 본문 수정과
+      // 기존 사진은 그대로 둔다(사용자가 쓴 글을 잃지 않게).
+      const quota = await assertStorageQuota(session.userId, addedBytes);
+      if (!quota.ok) return { ok: false, error: STORAGE_FULL_MSG };
+
       const exifs = parseExifs(formData.get("exifs"));
       const agg = await prisma.diaryImage.aggregate({
         where: { diaryId: id },
@@ -327,7 +349,6 @@ export async function updateDiaryAction(
         for (const file of accepted) {
           uploaded.push(await saveImage(file, session.userId));
         }
-        const addedBytes = accepted.reduce((sum, f) => sum + f.size, 0);
         await prisma.$transaction([
           ...uploaded.map((path, i) =>
             prisma.diaryImage.create({

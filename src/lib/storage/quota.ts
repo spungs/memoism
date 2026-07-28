@@ -13,6 +13,13 @@ export const TIER_STORAGE_BYTES: Record<Tier, number> = {
   PRO: 200 * GB,
 };
 
+/**
+ * 쿼터 도달 안내 (스펙 하드룰: 도달해도 기존 사진을 지우지 않는다 — 새 업로드만 막는다).
+ * 일괄 저장공간 관리 UI가 아직 없으므로 "사진을 정리해 주세요"라고 말하지 않는다.
+ */
+export const STORAGE_FULL_MSG =
+  "저장 공간이 가득 찼어요. 요금제를 올리면 공간이 늘어나고, 일기를 편집해 사진을 지우면 공간이 다시 생겨요.";
+
 /** 순수: 추가 후 쿼터 초과 여부. */
 export function exceedsQuota(
   used: number,

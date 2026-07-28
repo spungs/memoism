@@ -105,11 +105,13 @@ export async function POST(req: NextRequest) {
   });
 
   if (!result.ok) {
-    const status = result.capExhausted ? 429 : 502;
+    // 공간 부족은 사용자 입력 문제라 400 (502는 Gemini·업로드 등 서버 실패용)
+    const status = result.capExhausted ? 429 : result.storageFull ? 400 : 502;
     return NextResponse.json(
       {
         error: result.error,
         capExhausted: result.capExhausted ?? false,
+        storageFull: result.storageFull ?? false,
       },
       { status },
     );
