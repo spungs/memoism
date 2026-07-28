@@ -22,3 +22,11 @@ export const diaryInputSchema = z.object({
 
 export type DiaryInput = z.infer<typeof diaryInputSchema>;
 export type MoodKey = z.infer<typeof moodKeySchema>;
+
+/**
+ * AI 정리 입력 본문 상한.
+ *
+ * diaryInputSchema.content에는 상한이 없어(저장된 일기는 얼마든지 길 수 있다)
+ * 넉넉히 잡는다. AI 출력 상한(gemini.ts의 3000자)과는 다른 값이다 — 여긴 입력이다.
+ */
+export const MAX_AI_INPUT_CONTENT_LENGTH = 10000;
