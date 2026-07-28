@@ -69,5 +69,8 @@ next-env.d.ts
 # Obsidian (personal notes)
 .obsidian/
 
+# 설계·계획 작업노트 (커밋 안 함 — spec/plan/design 문서 및 html)
+/docs/superpowers/
+
 # Supabase CLI local state
 .supabase/

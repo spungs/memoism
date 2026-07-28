@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import { createDiaryAction } from "@/lib/diary/actions";
 import { getDiaryImageSignedUrls } from "@/lib/storage/actions";
 import { DiaryDatePicker } from "./date-picker";
+import { AiInstructionInput } from "./ai-instruction-input";
+import { ContentLengthHint, isOverAiLimit } from "./content-length-hint";
+import { buildInstruction } from "@/lib/diary/ai-instruction";
+import { pickRegenerateText } from "@/lib/diary/regenerate-input";
 import { kstTodayKey } from "@/lib/diary/kst";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 
@@ -93,6 +97,9 @@ export function ReviewGate() {
   const [regenError, setRegenError] = useState<string | null>(null);
   const [usageSignal, setUsageSignal] = useState(0);
   const [usingOriginal, setUsingOriginal] = useState(false);
+  // 재정리 방향 지시 — 전송 직전 buildInstruction으로 한 문자열로 합친다.
+  const [instructionChips, setInstructionChips] = useState<string[]>([]);
+  const [instructionText, setInstructionText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // storagePaths가 있으면 signed URL 일괄 발급 (1h TTL).
@@ -217,14 +224,28 @@ export function ReviewGate() {
     setRegenError(null);
     setRegenerating(true);
     try {
+      // 무엇을 입력으로 보낼지는 pickRegenerateText가 정한다 (판단 근거는 그 파일 주석).
+      // 고친 본문이면 그걸, 안 고쳤고 지시도 없으면 최초 입력으로 되돌려 새로 뽑는다.
+      // mode는 보내지 않는다(서버가 실제 입력으로 도출). draftState.mode 자체는
+      // 저장 시 source 라벨로 계속 쓰이므로 지우지 않는다.
+      const instruction =
+        buildInstruction(instructionChips, instructionText) || undefined;
+      const text = pickRegenerateText({
+        edited: editedContent,
+        lastAiContent: draftState.draft.content,
+        originalText: draftState.text,
+        hasInstruction: !!instruction,
+        hasPhotos: draftState.storagePaths.length > 0,
+      });
+
       const res = await fetch("/api/diaries/preview-regenerate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           storagePaths: draftState.storagePaths,
           exifs: draftState.exifs,
-          text: draftState.text,
-          mode: draftState.mode,
+          text,
+          instruction,
         }),
       });
       const data = await res.json();
@@ -241,6 +262,9 @@ export function ReviewGate() {
       setEditedTitle(data.data.title);
       setEditedContent(data.data.content);
       setUsingOriginal(false);
+      // 지시가 반영된 결과가 나왔으니 비운다. 남겨두면 다음 재생성에 또 적용된다.
+      setInstructionChips([]);
+      setInstructionText("");
       setDraftState((prev) =>
         prev
           ? {
@@ -315,6 +339,8 @@ export function ReviewGate() {
   const exifTimeLabel = earliestExif ? formatExifTime(earliestExif.takenAt) : null;
   const exifHasLocation = draftState.exifs.some((e) => e.lat != null && e.lng != null);
   const photoCount = draftState.storagePaths.length;
+  // 상한 초과면 눌러봐야 400이다. 누르기 전에 막는다 (저장은 그대로 가능).
+  const overAiLimit = isOverAiLimit(editedContent);
 
   // 촬영 날짜(KST) distinct — 2일 이상이면 "섞임" 경고 표시
   const distinctKstDates = Array.from(
@@ -638,6 +664,8 @@ export function ReviewGate() {
               padding: 0,
             }}
           />
+          <ContentLengthHint value={editedContent} />
+
           {draftState.draft.suggestedMood && (
             <p
               style={{
@@ -651,21 +679,33 @@ export function ReviewGate() {
             </p>
           )}
 
+          <AiInstructionInput
+            chips={instructionChips}
+            onChipsChange={setInstructionChips}
+            freeText={instructionText}
+            onFreeTextChange={setInstructionText}
+            disabled={regenerating || pending}
+          />
+
           <button
             type="button"
             onClick={handleRegenerate}
-            disabled={regenerating || pending}
+            disabled={regenerating || pending || overAiLimit}
             className="pressable"
             style={{
               alignSelf: "flex-start",
               fontFamily: "var(--font-sans)",
               fontSize: "var(--text-sm)",
               fontWeight: 600,
-              color: regenerating || pending ? "var(--fg-subtle)" : "var(--tint)",
+              color:
+                regenerating || pending || overAiLimit
+                  ? "var(--fg-subtle)"
+                  : "var(--tint)",
               backgroundColor: "transparent",
               border: "none",
               padding: "4px 0",
-              cursor: regenerating || pending ? "default" : "pointer",
+              cursor:
+                regenerating || pending || overAiLimit ? "default" : "pointer",
             }}
           >
             {regenerating ? "생성 중..." : "✨ 다시 생성"}
