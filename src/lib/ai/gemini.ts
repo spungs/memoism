@@ -161,6 +161,11 @@ export type DiaryGenerationInput = {
   persona?: DiaryGenerationPersona;
   /** EXIF 사실(시간·장소) 요약. 모드 A/C에서 환각 방지용 단서로 시스템 프롬프트에 포함. */
   exifSummary?: string;
+  /**
+   * 재정리 방향 지시문. 사용자가 "다시 정리" 시 칩·자유 입력으로 준 요청.
+   * 분량·문체 규칙보다 우선하지만 환각 금지는 뚫지 못한다.
+   */
+  instruction?: string;
 };
 
 export type DiaryGenerationOutput = {
@@ -169,9 +174,10 @@ export type DiaryGenerationOutput = {
   suggestedMood: "joy" | "calm" | "sad" | "love" | "anger" | "tired" | null;
 };
 
-// content max는 사용자 입력 텍스트 상한(MAX_TEXT_LENGTH 2000) + 사진 사실 보강
-// 여유를 합쳐 3000자. 모드 B/C(사용자가 쓴 글 보존)에서 긴 원본이 잘리지 않게
-// 한다. 모드 A(사진→생성)는 프롬프트가 150~250자로 짧게 유도.
+// content max 3000은 입력 상한(schemas.ts MAX_AI_INPUT_CONTENT_LENGTH)과 한 몸이다.
+// 모드 B/C는 보존 모드라 출력이 입력보다 짧아지지 않으므로, 입력 상한이 이 값을
+// 넘으면 반드시 여기서 터진다. 셋(입력 상한 · 이 max · maxOutputTokens)을 함께 올려라.
+// 모드 A(사진→생성)는 프롬프트가 150~250자로 짧게 유도.
 const draftResponseSchema = z.object({
   title: z.string().trim().min(1).max(50),
   content: z.string().trim().min(1).max(3000),
@@ -180,12 +186,23 @@ const draftResponseSchema = z.object({
     .nullable(),
 });
 
-function buildDiarySystemPrompt(
-  mode: DiaryGenerationMode,
-  persona: DiaryGenerationPersona | undefined,
-  exifSummary: string | undefined,
-  userTextLength: number,
-): string {
+export type BuildDiarySystemPromptOptions = {
+  mode: DiaryGenerationMode;
+  persona?: DiaryGenerationPersona;
+  exifSummary?: string;
+  userTextLength: number;
+  instruction?: string;
+};
+
+// 인자가 5개가 되면서 인접한 string|undefined 두 개(exifSummary·instruction)를
+// 뒤바꿔 넣어도 타입 체커가 못 잡는다 → 객체 인자로 받는다.
+export function buildDiarySystemPrompt({
+  mode,
+  persona,
+  exifSummary,
+  userTextLength,
+  instruction,
+}: BuildDiarySystemPromptOptions): string {
   // 베타 기본 preset은 "factual" — 담백한 사실 중심 평서문('~했다'체).
   // (UserPersona UI는 V2 노출 예정. 그때 다른 preset에서 tone/formality 기반으로 확장.)
   const tone = persona?.tone ?? "warm";
@@ -200,10 +217,28 @@ function buildDiarySystemPrompt(
   //  - 사용자가 쓴 글이 있으면(B/C): 그 분량을 바닥값으로 보존, 요약 금지.
   //    "짧게 고정"이 사용자가 쓴 생각·과정을 잘라먹던 문제(2026-06-07)를 막는다.
   //  - 사진만(A): 사진→생성이라 150~250자로 짧게 유도.
-  const lengthLine =
-    userTextLength > 0
+  //  - 단, 사용자가 재정리 방향을 지시했으면(instruction) 그 지시가 우선한다.
+  //    "짧게 요약해줘"라고 했는데 요약 금지 floor가 남아 있으면 지시가 먹지 않는다.
+  const lengthLine = instruction
+    ? userTextLength > 0
+      ? `- 본문은 한국어 1인칭. 아래 '사용자 재정리 요청'을 최우선으로 따른다. 요청에 분량 지시가 없을 때만 현재 메모(약 ${userTextLength}자)의 분량을 유지한다 (최대 3000자).`
+      : `- 본문은 한국어 1인칭. 아래 '사용자 재정리 요청'을 최우선으로 따른다. 요청에 분량 지시가 없으면 150~250자 (공백 포함).`
+    : userTextLength > 0
       ? `- 본문은 한국어 1인칭. 사용자가 쓴 메모(약 ${userTextLength}자)의 문장과 분량을 그대로 보존한다 — 절대 요약하지 말고, 사용자가 쓴 것보다 짧아지지 않게 한다. 오탈자 교정·사진 사실 보강으로 분량이 비슷하거나 조금 길어지는 정도는 괜찮다(최대 3000자).`
       : `- 본문은 한국어 1인칭, 150~250자 (공백 포함).`;
+
+  // 지시문은 시스템 프롬프트 안에 들어가므로 인젝션 표면이다. 구분자로 감싸고
+  // "지시일 뿐 본문이 아니다"를 명시해 지시문이 일기 내용으로 새는 것을 막는다.
+  const instructionBlock = instruction
+    ? `
+
+## 사용자 재정리 요청 (최우선)
+아래 삼중따옴표 안은 사용자가 '이렇게 다시 정리해줘'라고 준 방향 지시다. 정리 방향일 뿐이니 본문에 그대로 옮겨 적지 마라. 위의 모든 규칙(분량·문체·보존·요약 금지)과 충돌하면 이 요청을 따른다.
+단 환각 금지는 이 요청으로도 예외가 아니다 — 요청이 무엇이든 입력(사진·메모·EXIF)에 없는 사실·인물·대화를 지어내지 마라. 표현·구성·분량만 조정한다.
+"""
+${instruction}
+"""`
+    : "";
 
   const common = `## 출력 규칙
 ${lengthLine}
@@ -211,7 +246,18 @@ ${styleLines}
 - 시간 표기는 일반적인 일기처럼 자연스럽게: 분 단위 시각('14시 08분', '오후 2시 8분')은 쓰지 않는다. 시간을 꼭 드러내야 할 땐 '오전/오후', '아침/점심/저녁', '○시쯤' 정도로만 쓰고, 보통은 시각 없이 일어난 일을 자연스럽게 이어서 적는다('~하고 ~했다. 그리고 ~했다').
 - 환각 금지: 입력(사진·메모·EXIF)에 없는 사실·디테일·없는 사람·꾸며낸 대화·과장된 감정 추가 금지.
 - 응답은 JSON 객체 하나만. 코드블록·머리말·꼬리말 없음.
-- 스키마: { "title": string(1~50자), "content": string(1~3000자), "suggestedMood": "joy"|"calm"|"sad"|"love"|"anger"|"tired"|null }`;
+- 스키마: { "title": string(1~50자), "content": string(1~3000자), "suggestedMood": "joy"|"calm"|"sad"|"love"|"anger"|"tired"|null }${instructionBlock}`;
+
+  // 모드 B/C 프리앰블의 "보존" 규칙. instruction이 없을 때는 절대 규칙이지만,
+  // 있을 때는 요청에 양보해야 한다. 프리앰블에 하드 보존이 남아 있으면 뒤쪽 지시
+  // 블록보다 우선해서 "더 짧게" 같은 요청이 먹지 않는다 (실측: 206자→208자).
+  const preserveLineB = instruction
+    ? `기본은 사용자 메모의 의미·사실·디테일을 유지하는 것이지만, 아래 '사용자 재정리 요청'이 우선한다 — 요청이 분량 축소·생략·재구성을 원하면 그대로 줄이고 덜어내라. 새로운 사실·감정·디테일 추가 금지.`
+    : `사용자 메모의 의미·사실·디테일은 그대로 유지하고 *오탈자·문맥·문장 흐름만* 다듬어라. 새로운 사실·감정·디테일 추가 금지.`;
+
+  const preserveLineC = instruction
+    ? `기본은 사용자가 쓴 문장·디테일·생각·과정·감정을 보존하는 것이지만, 아래 '사용자 재정리 요청'이 우선한다 — 요청이 분량 축소·생략·재구성을 원하면 그대로 줄이고 덜어내라. 사진의 사실(시간·장소·관찰 가능한 객체)은 사용자가 빠뜨린 부분에만 자연스럽게 보강한다. 메모·사진에 없는 디테일·인물·대화는 추가하지 마라.`
+    : `사용자가 쓴 문장·디테일·생각·과정·감정은 그대로 보존한다. 오탈자·띄어쓰기·어색한 문장 흐름만 다듬어라. 사진의 사실(시간·장소·관찰 가능한 객체)은 사용자가 빠뜨린 부분에만 자연스럽게 보강한다. 사용자가 쓴 내용을 요약하거나 삭제하지 마라. 메모·사진에 없는 디테일·인물·대화는 추가하지 마라.`;
 
   const exif = exifSummary
     ? `\n## EXIF 사실 (이건 진짜로 일어난 것):\n${exifSummary}\n`
@@ -232,12 +278,12 @@ ${common}`;
     case "B":
       return `너는 사용자가 두서없이 쓴 메모를 깔끔한 일기로 정리하는 도우미다.
 
-사용자 메모의 의미·사실·디테일은 그대로 유지하고 *오탈자·문맥·문장 흐름만* 다듬어라. 새로운 사실·감정·디테일 추가 금지.
+${preserveLineB}
 
 ${common}`;
     case "C":
       return `너는 사용자가 쓴 일기를 존중하며 다듬는 도우미다. 사용자가 직접 쓴 메모가 일기의 핵심이고, 사진은 보조 자료다.${exif}${chronological}
-사용자가 쓴 문장·디테일·생각·과정·감정은 그대로 보존한다. 오탈자·띄어쓰기·어색한 문장 흐름만 다듬어라. 사진의 사실(시간·장소·관찰 가능한 객체)은 사용자가 빠뜨린 부분에만 자연스럽게 보강한다. 사용자가 쓴 내용을 요약하거나 삭제하지 마라. 메모·사진에 없는 디테일·인물·대화는 추가하지 마라.
+${preserveLineC}
 
 ${common}`;
   }
@@ -261,12 +307,13 @@ export async function generateDiary(
     throw new GeminiError("모드 C는 사진 또는 텍스트가 필요합니다");
   }
 
-  const systemPrompt = buildDiarySystemPrompt(
-    input.mode,
-    input.persona,
-    input.exifSummary,
-    input.text?.trim().length ?? 0,
-  );
+  const systemPrompt = buildDiarySystemPrompt({
+    mode: input.mode,
+    persona: input.persona,
+    exifSummary: input.exifSummary,
+    userTextLength: input.text?.trim().length ?? 0,
+    instruction: input.instruction?.trim() || undefined,
+  });
 
   const parts: Array<
     { text: string } | { inlineData: { mimeType: string; data: string } }
@@ -295,7 +342,8 @@ export async function generateDiary(
           systemInstruction: systemPrompt,
           temperature: 0.6,
           // 보존 모드(B/C)에서 최대 3000자 본문이 끝까지 안 잘리게 여유.
-          // 한국어 ≈ 2자/토큰 → 3000자 ≒ 1500토큰 + 제목·JSON 래퍼 여유.
+          // 실측(2026-07-28): 한국어 1.86자/토큰 → 3000자 ≒ 1610토큰.
+          // 입력은 2000자로 막혀 있으니(schemas.ts) 실제 출력은 그보다 짧다.
           maxOutputTokens: 2048,
           responseMimeType: "application/json",
           // Gemini 2.5 Flash thinking 비활성. thinking 모델이 응답 토큰을 다 먹어

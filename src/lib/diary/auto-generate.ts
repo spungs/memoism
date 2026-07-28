@@ -23,7 +23,7 @@ export type AutoGenerateInput = {
   userId: string;
   subscriptionStatus: SubscriptionStatus;
   plan: SubscriptionPlan;
-  photos: File[]; // 상한은 구독별(ACTIVE 10 / 그 외 5), 이미 1024px로 클라 측 압축됨
+  photos: File[]; // 상한은 일기당 10장 고정(limits.ts), 이미 1024px로 클라 측 압축됨
   exifs: ClientExif[];
   text?: string;
 };

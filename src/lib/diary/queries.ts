@@ -65,7 +65,7 @@ export async function getDiaries(
 /**
  * Single diary, scoped to the owner. Returns null if not found OR not owned —
  * we never differentiate so callers can't probe for foreign IDs.
- * Includes DiaryImage 1:N ordered by orderIndex (사진 상한은 구독별: ACTIVE 10 / 그 외 5).
+ * Includes DiaryImage 1:N ordered by orderIndex (사진 상한은 일기당 10장 고정).
  */
 export async function getDiary(id: string, userId: string) {
   return prisma.diary.findFirst({

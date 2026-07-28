@@ -1,13 +1,11 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { downloadAsBase64 } from "@/lib/storage";
-import {
-  generateDiary,
-  type DiaryGenerationMode,
-  type DiaryGenerationOutput,
-} from "@/lib/ai/gemini";
+import { generateDiary, type DiaryGenerationOutput } from "@/lib/ai/gemini";
 import { checkAndIncrement } from "@/lib/ai/usage";
 import { buildExifSummary } from "./exif-summary";
+import { deriveGenerationMode } from "./generation-mode";
+import { pickRegeneratedTitle } from "./regenerate-input";
 import { upsertDiaryEmbedding } from "./embedding";
 
 // 일기당 재생성 cap은 제거됨 (사용자 결정). 일일 cap이 비용·abuse 차단.
@@ -28,29 +26,28 @@ export type RegenerateResult =
       ok: false;
       error: string;
       capExhausted?: boolean; // 일일 cap
+      /** 입력이 아예 없는 경우 — AI 호출·차감 전이라 400으로 돌려준다. */
+      invalidInput?: boolean;
     };
-
-function modeFor(source: string, photoCount: number): DiaryGenerationMode {
-  if (source === "auto_a") return "A";
-  if (source === "auto_b") return "B";
-  if (source === "auto_c") return "C";
-  // manual 일기: 사진 있으면 C(통합), 없으면 B(텍스트 정리)
-  return photoCount > 0 ? "C" : "B";
-}
 
 /**
  * AI 재생성 + 백업 스왑 (NEW-7).
- *   - 일기당 cap 5회 검증 → 도달 시 429
  *   - 일일 cap 검증·증분 (호출 전 차감)
  *   - 사진은 Storage에서 base64로 재다운로드 (재업로드 없음)
- *   - 사용자가 손으로 수정한 현재 content를 *입력 텍스트*로 다시 보냄
- *     (mode A는 사진만이라 text 미전달)
- *   - 성공 시: previousContent = 직전 content, content = 새 본문,
+ *   - **입력 본문은 options.content(화면에서 편집 중인 현재 값)**. 클라이언트가 보내지
+ *     않으면 DB 본문으로 폴백한다. 예전에는 항상 DB 본문을 읽어서, 저장하지 않고
+ *     고친 내용이 무시된 채 덮어써졌다(사용자 글 유실).
+ *   - mode는 source 라벨이 아니라 실제 입력(본문·사진)으로 도출한다. source로 정하면
+ *     "auto_a"로 시작한 일기는 나중에 손으로 고쳐 저장한 본문까지 통째로 버렸다.
+ *   - 성공 시: previousContent = *입력으로 받은 본문*, content = 새 본문,
  *     aiGenerationVersion++, contentEditedAt = now
+ *     previousContent에 DB 옛 본문이 아니라 받은 본문을 넣는 이유: 되돌리기가
+ *     "사용자가 보고 있던 그 글"로 복귀해야 저장 안 한 편집이 유실되지 않는다.
  */
 export async function regenerateDiary(
   diaryId: string,
   userId: string,
+  options: { content?: string; title?: string; instruction?: string } = {},
 ): Promise<RegenerateResult> {
   const diary = await prisma.diary.findFirst({
     where: { id: diaryId, userId },
@@ -58,7 +55,6 @@ export async function regenerateDiary(
       id: true,
       title: true,
       content: true,
-      source: true,
       aiGenerationVersion: true,
       images: {
         select: {
@@ -72,6 +68,21 @@ export async function regenerateDiary(
     },
   });
   if (!diary) return { ok: false, error: "일기를 찾을 수 없습니다" };
+
+  // 화면에 보이는 현재 본문이 입력이다. 안 보내면(구 클라이언트) DB 본문으로 폴백.
+  const inputContent = (options.content ?? diary.content).trim();
+  // 입력이 아예 없으면 cap 검증 전에 막는다 — 사용 횟수를 차감하지 않기 위해서.
+  // (사진이 실제로 내려받아지는지는 아직 모른다. 최종 mode는 다운로드 후 다시 정한다.)
+  const hasAnyInput =
+    deriveGenerationMode(inputContent.length > 0, diary.images.length > 0) !==
+    null;
+  if (!hasAnyInput) {
+    return {
+      ok: false,
+      error: "정리할 내용이 없어요. 내용을 적거나 사진을 넣어주세요.",
+      invalidInput: true,
+    };
+  }
 
   const character = await prisma.character.findUnique({
     where: { userId },
@@ -87,8 +98,6 @@ export async function regenerateDiary(
       capExhausted: true,
     };
   }
-
-  const mode = modeFor(diary.source, diary.images.length);
 
   // 사진들을 base64로 재다운로드
   const photoResults = await Promise.all(
@@ -109,23 +118,40 @@ export async function regenerateDiary(
     },
   });
 
-  const exifSummary = buildExifSummary(
-    diary.images.map((img) => ({
-      takenAt: img.exifTakenAt,
-      lat: img.exifLat,
-      lng: img.exifLng,
-    })),
+  // Storage에서 못 받아온 사진은 없는 것과 같다. 실제로 붙일 수 있는 사진 기준으로
+  // mode를 다시 정한다 (자세한 이유는 preview-generate.ts의 같은 자리 주석 참고).
+  const effectiveMode = deriveGenerationMode(
+    inputContent.length > 0,
+    photos.length > 0,
   );
-  const text = mode === "A" ? undefined : diary.content;
+  if (!effectiveMode) {
+    return {
+      ok: false,
+      error: "사진을 불러오지 못했어요. 잠시 후 다시 시도해주세요.",
+    };
+  }
+
+  // EXIF도 사진이 실제로 붙을 때만 준다.
+  const exifSummary =
+    photos.length > 0
+      ? buildExifSummary(
+          diary.images.map((img) => ({
+            takenAt: img.exifTakenAt,
+            lat: img.exifLat,
+            lng: img.exifLng,
+          })),
+        )
+      : undefined;
 
   let draft: DiaryGenerationOutput;
   try {
     draft = await generateDiary({
-      mode,
+      mode: effectiveMode,
       photos: photos.length > 0 ? photos : undefined,
-      text,
+      text: inputContent || undefined,
       persona: persona ?? undefined,
       exifSummary,
+      instruction: options.instruction,
     });
   } catch (e) {
     return {
@@ -134,14 +160,18 @@ export async function regenerateDiary(
     };
   }
 
-  // 백업 스왑: 현재 content를 previousContent로, 새 본문을 content로
+  // 백업 스왑: 입력으로 받은 본문을 previousContent로, 새 본문을 content로
   const updated = await prisma.diary.update({
     where: { id: diaryId },
     data: {
-      previousContent: diary.content,
+      // 사용자가 보고 있던 본문(저장 안 한 편집 포함)을 백업한다.
+      // 클라이언트가 빈 값을 보냈으면 되돌릴 게 없으니 DB 본문을 유지한다.
+      previousContent: options.content?.trim() || diary.content,
       previousChangedAt: new Date(),
       content: draft.content,
-      title: draft.title,
+      // 제목도 본문과 같은 원칙: 사용자가 직접 고쳤으면 AI가 덮어쓰지 않는다.
+      // (제목은 백업 컬럼이 없어 덮어쓰면 되돌리기로도 복구가 안 된다)
+      title: pickRegeneratedTitle(options.title, diary.title, draft.title),
       aiGenerationVersion: { increment: 1 },
       contentEditedAt: new Date(),
     },

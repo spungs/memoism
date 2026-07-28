@@ -16,7 +16,7 @@ import {
 } from "./schemas";
 
 // MIG-3 정식판:
-//   - 다중 이미지(상한은 구독별: ACTIVE 10장 / 그 외 5장) 처리. DiaryImage 1:N 생성.
+//   - 다중 이미지(상한은 일기당 10장 고정, 티어 무관 — limits.ts) 처리. DiaryImage 1:N 생성.
 //   - source 필드 세팅 ("manual" | "auto_a" | "auto_b" | "auto_c").
 //   - 두 가지 입력 경로:
 //     A) "직접 작성" — formData.image[] = File[] → 서버에서 saveImage 호출

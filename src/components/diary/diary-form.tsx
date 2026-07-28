@@ -16,6 +16,10 @@ import {
 import { compressImage } from "@/lib/diary/image-compress";
 import { MAX_IMAGES_PER_DIARY } from "@/lib/diary/limits";
 import { DiaryAiActions } from "./diary-ai-actions";
+import {
+  ContentLengthHint,
+  isOverAiLimit,
+} from "./content-length-hint";
 import { DiaryDatePicker } from "./date-picker";
 import { MoodPicker, type MoodKey } from "./mood-picker";
 import { AiBusyOverlay, Spinner } from "@/components/ui/ai-busy-overlay";
@@ -592,10 +596,14 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
   };
 
   const canManualSave = content.trim().length > 0 && !pending && !aiPending;
+  // 본문이 상한을 넘으면 눌러봐야 400이다. 누르기 전에 막고 이유를 보여준다.
+  // (저장은 그대로 가능하다 — 상한은 AI 정리에만 걸린다)
+  const overAiLimit = isOverAiLimit(content);
   const canAiGenerate =
     mode === "create" &&
     !pending &&
     !aiPending &&
+    !overAiLimit &&
     (pickedImages.length > 0 || content.trim().length > 0);
 
   return (
@@ -862,6 +870,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
               {contentError}
             </p>
           )}
+          <ContentLengthHint value={content} />
         </div>
         </div>
 
@@ -1016,7 +1025,9 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
               )}
             </button>
             <p style={{ ...MUTED_LABEL, textTransform: "none", letterSpacing: "normal" }}>
-              사진만 있어도, 텍스트만 있어도, 둘 다 있어도 OK.
+              {overAiLimit
+                ? "내용이 길어 AI 정리는 어려워요. 저장은 그대로 됩니다."
+                : "사진만 있어도, 텍스트만 있어도, 둘 다 있어도 OK."}
             </p>
             <AiUsageCounter refreshSignal={usageSignal} />
             {aiError && (
@@ -1046,6 +1057,8 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
         {mode === "edit" && diaryId && (
           <DiaryAiActions
             diaryId={diaryId}
+            currentContent={content}
+            currentTitle={title}
             hasPreviousContent={hasPrev}
             aiGenerationVersion={aiVer}
             onUpdated={(data) => {
