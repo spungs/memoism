@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { createDiaryAction } from "@/lib/diary/actions";
 import { getDiaryImageSignedUrls } from "@/lib/storage/actions";
 import { DiaryDatePicker } from "./date-picker";
+import { AiInstructionInput } from "./ai-instruction-input";
+import { buildInstruction } from "@/lib/diary/ai-instruction";
 import { kstTodayKey } from "@/lib/diary/kst";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 
@@ -93,6 +95,9 @@ export function ReviewGate() {
   const [regenError, setRegenError] = useState<string | null>(null);
   const [usageSignal, setUsageSignal] = useState(0);
   const [usingOriginal, setUsingOriginal] = useState(false);
+  // 재정리 방향 지시 — 전송 직전 buildInstruction으로 한 문자열로 합친다.
+  const [instructionChips, setInstructionChips] = useState<string[]>([]);
+  const [instructionText, setInstructionText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // storagePaths가 있으면 signed URL 일괄 발급 (1h TTL).
@@ -223,8 +228,13 @@ export function ReviewGate() {
         body: JSON.stringify({
           storagePaths: draftState.storagePaths,
           exifs: draftState.exifs,
-          text: draftState.text,
-          mode: draftState.mode,
+          // 화면의 현재 본문. draftState.text(최초 입력)를 보내면 사용자가 검토화면에서
+          // 고친 내용이 통째로 무시된다 — 원래 버그가 바로 이것이었다.
+          // mode도 보내지 않는다(서버가 실제 입력으로 도출). draftState.mode 자체는
+          // 저장 시 source 라벨로 계속 쓰이므로 지우지 않는다.
+          text: editedContent,
+          instruction:
+            buildInstruction(instructionChips, instructionText) || undefined,
         }),
       });
       const data = await res.json();
@@ -241,6 +251,9 @@ export function ReviewGate() {
       setEditedTitle(data.data.title);
       setEditedContent(data.data.content);
       setUsingOriginal(false);
+      // 지시가 반영된 결과가 나왔으니 비운다. 남겨두면 다음 재생성에 또 적용된다.
+      setInstructionChips([]);
+      setInstructionText("");
       setDraftState((prev) =>
         prev
           ? {
@@ -650,6 +663,14 @@ export function ReviewGate() {
               추천 기분 · {draftState.draft.suggestedMood}
             </p>
           )}
+
+          <AiInstructionInput
+            chips={instructionChips}
+            onChipsChange={setInstructionChips}
+            freeText={instructionText}
+            onFreeTextChange={setInstructionText}
+            disabled={regenerating || pending}
+          />
 
           <button
             type="button"
