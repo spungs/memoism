@@ -342,7 +342,8 @@ export async function generateDiary(
           systemInstruction: systemPrompt,
           temperature: 0.6,
           // 보존 모드(B/C)에서 최대 3000자 본문이 끝까지 안 잘리게 여유.
-          // 한국어 ≈ 2자/토큰 → 3000자 ≒ 1500토큰 + 제목·JSON 래퍼 여유.
+          // 실측(2026-07-28): 한국어 1.86자/토큰 → 3000자 ≒ 1610토큰.
+          // 입력은 2000자로 막혀 있으니(schemas.ts) 실제 출력은 그보다 짧다.
           maxOutputTokens: 2048,
           responseMimeType: "application/json",
           // Gemini 2.5 Flash thinking 비활성. thinking 모델이 응답 토큰을 다 먹어
