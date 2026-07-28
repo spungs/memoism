@@ -184,19 +184,32 @@ export async function createDiaryAction(
     orderIndex: i,
   }));
 
+  const totalNewBytes = imagesCreate.reduce((sum, img) => sum + img.sizeBytes, 0);
+
   try {
-    const diary = await prisma.diary.create({
-      data: {
-        userId: session.userId,
-        title: parsed.data.title,
-        content: parsed.data.content,
-        source,
-        mood: parsed.data.mood ?? null,
-        createdAt: diaryDate,
-        images:
-          imagesCreate.length > 0 ? { create: imagesCreate } : undefined,
-      },
-      select: { id: true },
+    // 일기·이미지 insert와 사용량 카운터를 한 트랜잭션으로 — 한쪽만 반영되면
+    // storageUsedBytes 캐시가 드리프트한다(coinBalance와 같은 규약).
+    const diary = await prisma.$transaction(async (tx) => {
+      const created = await tx.diary.create({
+        data: {
+          userId: session.userId,
+          title: parsed.data.title,
+          content: parsed.data.content,
+          source,
+          mood: parsed.data.mood ?? null,
+          createdAt: diaryDate,
+          images:
+            imagesCreate.length > 0 ? { create: imagesCreate } : undefined,
+        },
+        select: { id: true },
+      });
+      if (totalNewBytes > 0) {
+        await tx.character.update({
+          where: { userId: session.userId },
+          data: { storageUsedBytes: { increment: BigInt(totalNewBytes) } },
+        });
+      }
+      return created;
     });
 
     // 임베딩 best-effort (실패해도 저장 결과엔 영향 없음)
@@ -263,12 +276,24 @@ export async function updateDiaryAction(
   if (removeImageIds.length > 0) {
     const toRemove = await prisma.diaryImage.findMany({
       where: { id: { in: removeImageIds }, diaryId: id },
-      select: { id: true, storagePath: true },
+      select: { id: true, storagePath: true, sizeBytes: true },
     });
     if (toRemove.length > 0) {
-      await prisma.diaryImage.deleteMany({
-        where: { id: { in: toRemove.map((img) => img.id) }, diaryId: id },
-      });
+      const removedBytes = toRemove.reduce((sum, img) => sum + img.sizeBytes, 0);
+      // row 삭제와 카운터 감산은 원자적으로
+      await prisma.$transaction([
+        prisma.diaryImage.deleteMany({
+          where: { id: { in: toRemove.map((img) => img.id) }, diaryId: id },
+        }),
+        ...(removedBytes > 0
+          ? [
+              prisma.character.update({
+                where: { userId: session.userId },
+                data: { storageUsedBytes: { decrement: BigInt(removedBytes) } },
+              }),
+            ]
+          : []),
+      ]);
       // Storage 정리는 best-effort (실패해도 DB는 이미 삭제됨)
       await Promise.all(toRemove.map((img) => deleteImage(img.storagePath)));
     }
@@ -293,26 +318,39 @@ export async function updateDiaryAction(
         where: { diaryId: id },
         _max: { orderIndex: true },
       });
-      let nextOrder = (agg._max.orderIndex ?? -1) + 1;
+      const nextOrder = (agg._max.orderIndex ?? -1) + 1;
       const uploaded: string[] = [];
       try {
-        for (let i = 0; i < accepted.length; i++) {
-          const path = await saveImage(accepted[i], session.userId);
-          uploaded.push(path);
-          await prisma.diaryImage.create({
-            data: {
-              diaryId: id,
-              storagePath: path,
-              sizeBytes: accepted[i].size,
-              exifTakenAt: exifs[i]?.takenAt ? new Date(exifs[i].takenAt!) : null,
-              exifLat: exifs[i]?.lat ?? null,
-              exifLng: exifs[i]?.lng ?? null,
-              orderIndex: nextOrder++,
-            },
-          });
+        // 업로드를 먼저 끝낸 뒤 DB 반영을 한 트랜잭션으로 묶는다. 업로드는 네트워크라
+        // 트랜잭션 안에 두면 오래 잡히고, 건건 insert면 중간 실패 시 앞선 row는 남은 채
+        // 파일만 정리돼 깨진 이미지가 된다.
+        for (const file of accepted) {
+          uploaded.push(await saveImage(file, session.userId));
         }
+        const addedBytes = accepted.reduce((sum, f) => sum + f.size, 0);
+        await prisma.$transaction([
+          ...uploaded.map((path, i) =>
+            prisma.diaryImage.create({
+              data: {
+                diaryId: id,
+                storagePath: path,
+                sizeBytes: accepted[i].size,
+                exifTakenAt: exifs[i]?.takenAt
+                  ? new Date(exifs[i].takenAt!)
+                  : null,
+                exifLat: exifs[i]?.lat ?? null,
+                exifLng: exifs[i]?.lng ?? null,
+                orderIndex: nextOrder + i,
+              },
+            }),
+          ),
+          prisma.character.update({
+            where: { userId: session.userId },
+            data: { storageUsedBytes: { increment: BigInt(addedBytes) } },
+          }),
+        ]);
       } catch (e) {
-        // 부분 실패: 업로드된 파일 정리 후 에러 반환 (DB row는 위 루프에서 함께 생성)
+        // 부분 실패: 업로드된 파일 정리 후 에러 반환 (DB는 트랜잭션이라 전부 롤백)
         await Promise.all(uploaded.map((p) => deleteImage(p)));
         return {
           ok: false,
@@ -404,17 +442,29 @@ export async function deleteDiaryAction(
   const session = await getSession();
   if (!session) return { ok: false, error: "로그인이 필요합니다" };
 
-  // 삭제 전에 이미지 storagePath 수집해 cascade 후 Storage에서도 제거
+  // 삭제 전에 이미지 storagePath 수집해 cascade 후 Storage에서도 제거.
+  // cascade는 DiaryImage별 삭제 이벤트를 주지 않으므로 감산할 바이트도 여기서 미리 합산한다.
   const existing = await prisma.diary.findFirst({
     where: { id, userId: session.userId },
     select: {
       id: true,
-      images: { select: { storagePath: true } },
+      images: { select: { storagePath: true, sizeBytes: true } },
     },
   });
   if (!existing) return { ok: false, error: "일기를 찾을 수 없습니다" };
 
-  await prisma.diary.delete({ where: { id } });
+  const freedBytes = existing.images.reduce((sum, img) => sum + img.sizeBytes, 0);
+  await prisma.$transaction([
+    prisma.diary.delete({ where: { id } }),
+    ...(freedBytes > 0
+      ? [
+          prisma.character.update({
+            where: { userId: session.userId },
+            data: { storageUsedBytes: { decrement: BigInt(freedBytes) } },
+          }),
+        ]
+      : []),
+  ]);
 
   // Storage 정리 (best-effort, 실패해도 DB는 이미 삭제됨)
   await Promise.all(existing.images.map((img) => deleteImage(img.storagePath)));

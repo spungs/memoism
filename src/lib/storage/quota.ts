@@ -33,7 +33,9 @@ export async function getStorageQuota(
   if (!c) throw new Error("character 없음");
   const tier = effectiveTier(c.subscriptionStatus, c.plan);
   return {
-    used: Number(c.storageUsedBytes),
+    // 캐시가 음수로 드리프트하면(백필로 sizeBytes만 채워진 중간 상태에서 삭제 등)
+    // 0으로 본다 — 게이트를 느슨한 쪽으로 실패시키고, 정확한 값은 백필이 재계산한다.
+    used: Math.max(0, Number(c.storageUsedBytes)),
     limit: TIER_STORAGE_BYTES[tier],
     tier,
   };
