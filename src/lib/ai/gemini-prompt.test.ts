@@ -59,6 +59,35 @@ describe("buildDiarySystemPrompt — instruction 있을 때 (지시 우선)", ()
     expect(p).toContain("본문에 그대로 옮겨 적지 마라");
   });
 
+  it("mode B 프리앰블의 하드 보존 규칙이 요청에 양보한다", () => {
+    // 프리앰블에 "오탈자·문맥·문장 흐름만 다듬어라"가 남아 있으면 뒤쪽 지시 블록보다
+    // 우선해서 "더 짧게" 요청이 먹지 않는다 (실측 206자 -> 208자).
+    const p = buildDiarySystemPrompt({
+      mode: "B",
+      userTextLength: 200,
+      instruction: "전체 분량을 지금의 절반 정도로 줄여라",
+    });
+    expect(p).not.toContain("*오탈자·문맥·문장 흐름만* 다듬어라");
+    expect(p).toContain("요청이 분량 축소");
+  });
+
+  it("mode C 프리앰블의 요약 금지가 요청에 양보한다", () => {
+    const p = buildDiarySystemPrompt({
+      mode: "C",
+      userTextLength: 200,
+      instruction: "전체 분량을 지금의 절반 정도로 줄여라",
+    });
+    expect(p).not.toContain("요약하거나 삭제하지 마라");
+    expect(p).toContain("요청이 분량 축소");
+  });
+
+  it("instruction 없으면 mode B/C 하드 보존 규칙은 그대로다 (회귀)", () => {
+    const b = buildDiarySystemPrompt({ mode: "B", userTextLength: 200 });
+    expect(b).toContain("*오탈자·문맥·문장 흐름만* 다듬어라");
+    const c = buildDiarySystemPrompt({ mode: "C", userTextLength: 200 });
+    expect(c).toContain("요약하거나 삭제하지 마라");
+  });
+
   it("mode A(사진만)에서도 지시 블록이 붙는다", () => {
     const p = buildDiarySystemPrompt({
       mode: "A",
