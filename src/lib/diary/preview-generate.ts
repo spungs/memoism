@@ -37,13 +37,12 @@ export type PreviewGenerateResult =
 export async function previewGenerateDiary(
   input: PreviewGenerateInput,
 ): Promise<PreviewGenerateResult> {
-  // mode 도출을 cap 검증보다 먼저 한다 — 입력이 없으면 사용 횟수를 차감하지 않는다.
+  // 입력이 아예 없으면 cap 검증 전에 막는다 — 사용 횟수를 차감하지 않기 위해서.
+  // (사진이 실제로 내려받아지는지는 아직 모른다. 최종 mode는 다운로드 후 다시 정한다.)
   const trimmedText = input.text?.trim();
-  const mode = deriveGenerationMode(
-    !!trimmedText,
-    input.storagePaths.length > 0,
-  );
-  if (!mode) {
+  const hasAnyInput =
+    deriveGenerationMode(!!trimmedText, input.storagePaths.length > 0) !== null;
+  if (!hasAnyInput) {
     return {
       ok: false,
       error: "정리할 내용이 없어요. 사진을 넣거나 내용을 적어주세요.",
@@ -88,12 +87,27 @@ export async function previewGenerateDiary(
     (p): p is NonNullable<typeof p> => p !== null,
   );
 
-  const exifSummary = buildExifSummary(input.exifs);
+  // Storage에서 못 받아온 사진은 없는 것과 같다. DB/클라이언트가 사진이 있다고 해도
+  // 실제로 모델에 붙일 수 없으면 mode를 다시 정해야 한다:
+  //   - 텍스트가 있으면 C -> B로 내려가 존재하지 않는 사진을 언급하지 않는다
+  //   - 텍스트도 없으면 A인데 사진이 0장 -> generateDiary가 "모드 A는 사진이 1장 이상
+  //     필요합니다"라는 내부 문구를 던져 사용자에게 그대로 노출됐다
+  const effectiveMode = deriveGenerationMode(!!trimmedText, photos.length > 0);
+  if (!effectiveMode) {
+    return {
+      ok: false,
+      error: "사진을 불러오지 못했어요. 잠시 후 다시 시도해주세요.",
+    };
+  }
+
+  // EXIF도 사진이 실제로 붙을 때만 준다. 사진 없이 "EXIF 사실"과 촬영순서 지시만
+  // 남으면 모델이 붙지 않은 사진을 전제로 서술한다.
+  const exifSummary = photos.length > 0 ? buildExifSummary(input.exifs) : undefined;
 
   let draft: DiaryGenerationOutput;
   try {
     draft = await generateDiary({
-      mode,
+      mode: effectiveMode,
       photos: photos.length > 0 ? photos : undefined,
       // 화면의 현재 본문이 그대로 입력이다. mode A일 때만 텍스트가 없다.
       text: trimmedText,
