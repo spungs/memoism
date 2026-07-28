@@ -174,9 +174,10 @@ export type DiaryGenerationOutput = {
   suggestedMood: "joy" | "calm" | "sad" | "love" | "anger" | "tired" | null;
 };
 
-// content max는 사용자 입력 텍스트 상한(MAX_TEXT_LENGTH 2000) + 사진 사실 보강
-// 여유를 합쳐 3000자. 모드 B/C(사용자가 쓴 글 보존)에서 긴 원본이 잘리지 않게
-// 한다. 모드 A(사진→생성)는 프롬프트가 150~250자로 짧게 유도.
+// content max 3000은 입력 상한(schemas.ts MAX_AI_INPUT_CONTENT_LENGTH)과 한 몸이다.
+// 모드 B/C는 보존 모드라 출력이 입력보다 짧아지지 않으므로, 입력 상한이 이 값을
+// 넘으면 반드시 여기서 터진다. 셋(입력 상한 · 이 max · maxOutputTokens)을 함께 올려라.
+// 모드 A(사진→생성)는 프롬프트가 150~250자로 짧게 유도.
 const draftResponseSchema = z.object({
   title: z.string().trim().min(1).max(50),
   content: z.string().trim().min(1).max(3000),

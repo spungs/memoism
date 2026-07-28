@@ -31,15 +31,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let parsed: z.infer<typeof bodySchema>;
-  try {
-    parsed = bodySchema.parse(await req.json());
-  } catch {
+  const body = await req.json().catch(() => null);
+  const result0 = bodySchema.safeParse(body);
+  if (!result0.success) {
+    // 길이 초과는 흔한 실패라 따로 안내한다.
+    const tooLong = result0.error.issues.some(
+      (i) => i.path[0] === "text" && i.code === "too_big",
+    );
     return NextResponse.json(
-      { ok: false, error: "잘못된 요청 형식이에요" },
+      {
+        ok: false,
+        error: tooLong
+          ? `내용이 너무 길어요. ${MAX_AI_INPUT_CONTENT_LENGTH}자 이내만 AI가 정리할 수 있어요.`
+          : "잘못된 요청 형식이에요",
+      },
       { status: 400 },
     );
   }
+  const parsed = result0.data;
 
   if (parsed.exifs.length !== parsed.storagePaths.length) {
     return NextResponse.json(
