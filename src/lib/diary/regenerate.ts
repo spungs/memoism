@@ -5,6 +5,7 @@ import { generateDiary, type DiaryGenerationOutput } from "@/lib/ai/gemini";
 import { checkAndIncrement } from "@/lib/ai/usage";
 import { buildExifSummary } from "./exif-summary";
 import { deriveGenerationMode } from "./generation-mode";
+import { pickRegeneratedTitle } from "./regenerate-input";
 import { upsertDiaryEmbedding } from "./embedding";
 
 // 일기당 재생성 cap은 제거됨 (사용자 결정). 일일 cap이 비용·abuse 차단.
@@ -46,7 +47,7 @@ export type RegenerateResult =
 export async function regenerateDiary(
   diaryId: string,
   userId: string,
-  options: { content?: string; instruction?: string } = {},
+  options: { content?: string; title?: string; instruction?: string } = {},
 ): Promise<RegenerateResult> {
   const diary = await prisma.diary.findFirst({
     where: { id: diaryId, userId },
@@ -70,11 +71,12 @@ export async function regenerateDiary(
 
   // 화면에 보이는 현재 본문이 입력이다. 안 보내면(구 클라이언트) DB 본문으로 폴백.
   const inputContent = (options.content ?? diary.content).trim();
-  const mode = deriveGenerationMode(
-    inputContent.length > 0,
-    diary.images.length > 0,
-  );
-  if (!mode) {
+  // 입력이 아예 없으면 cap 검증 전에 막는다 — 사용 횟수를 차감하지 않기 위해서.
+  // (사진이 실제로 내려받아지는지는 아직 모른다. 최종 mode는 다운로드 후 다시 정한다.)
+  const hasAnyInput =
+    deriveGenerationMode(inputContent.length > 0, diary.images.length > 0) !==
+    null;
+  if (!hasAnyInput) {
     return {
       ok: false,
       error: "정리할 내용이 없어요. 내용을 적거나 사진을 넣어주세요.",
@@ -116,17 +118,35 @@ export async function regenerateDiary(
     },
   });
 
-  const exifSummary = buildExifSummary(
-    diary.images.map((img) => ({
-      takenAt: img.exifTakenAt,
-      lat: img.exifLat,
-      lng: img.exifLng,
-    })),
+  // Storage에서 못 받아온 사진은 없는 것과 같다. 실제로 붙일 수 있는 사진 기준으로
+  // mode를 다시 정한다 (자세한 이유는 preview-generate.ts의 같은 자리 주석 참고).
+  const effectiveMode = deriveGenerationMode(
+    inputContent.length > 0,
+    photos.length > 0,
   );
+  if (!effectiveMode) {
+    return {
+      ok: false,
+      error: "사진을 불러오지 못했어요. 잠시 후 다시 시도해주세요.",
+    };
+  }
+
+  // EXIF도 사진이 실제로 붙을 때만 준다.
+  const exifSummary =
+    photos.length > 0
+      ? buildExifSummary(
+          diary.images.map((img) => ({
+            takenAt: img.exifTakenAt,
+            lat: img.exifLat,
+            lng: img.exifLng,
+          })),
+        )
+      : undefined;
+
   let draft: DiaryGenerationOutput;
   try {
     draft = await generateDiary({
-      mode,
+      mode: effectiveMode,
       photos: photos.length > 0 ? photos : undefined,
       text: inputContent || undefined,
       persona: persona ?? undefined,
@@ -149,7 +169,9 @@ export async function regenerateDiary(
       previousContent: options.content?.trim() || diary.content,
       previousChangedAt: new Date(),
       content: draft.content,
-      title: draft.title,
+      // 제목도 본문과 같은 원칙: 사용자가 직접 고쳤으면 AI가 덮어쓰지 않는다.
+      // (제목은 백업 컬럼이 없어 덮어쓰면 되돌리기로도 복구가 안 된다)
+      title: pickRegeneratedTitle(options.title, diary.title, draft.title),
       aiGenerationVersion: { increment: 1 },
       contentEditedAt: new Date(),
     },

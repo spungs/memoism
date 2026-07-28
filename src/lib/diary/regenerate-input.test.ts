@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { pickRegenerateText } from "./regenerate-input";
+import {
+  pickRegenerateText,
+  pickRegeneratedTitle,
+} from "./regenerate-input";
 
 const AI = "AI가 쓴 첫 결과. 공원을 걸었다.";
 
@@ -77,5 +80,37 @@ describe("pickRegenerateText", () => {
         hasPhotos: true,
       }),
     ).toBe("산책 감");
+  });
+});
+
+describe("pickRegeneratedTitle", () => {
+  it("제목을 고쳤으면 그 제목을 지킨다 (AI가 덮어쓰지 않는다)", () => {
+    expect(pickRegeneratedTitle("병원 다녀온 날", "공원 산책", "AI가 지은 제목")).toBe(
+      "병원 다녀온 날",
+    );
+  });
+
+  it("제목을 안 고쳤으면 AI가 새로 지은 제목을 쓴다 (기존 동작)", () => {
+    expect(pickRegeneratedTitle("공원 산책", "공원 산책", "AI가 지은 제목")).toBe(
+      "AI가 지은 제목",
+    );
+  });
+
+  it("앞뒤 공백 차이는 '고쳤다'로 보지 않는다", () => {
+    expect(pickRegeneratedTitle("  공원 산책  ", "공원 산책", "AI가 지은 제목")).toBe(
+      "AI가 지은 제목",
+    );
+  });
+
+  it("클라이언트가 제목을 안 보내면(구 클라이언트) AI 제목", () => {
+    expect(pickRegeneratedTitle(undefined, "공원 산책", "AI가 지은 제목")).toBe(
+      "AI가 지은 제목",
+    );
+  });
+
+  it("제목을 비웠으면 AI 제목 (title은 not null이라 빈 값을 쓸 수 없다)", () => {
+    expect(pickRegeneratedTitle("   ", "공원 산책", "AI가 지은 제목")).toBe(
+      "AI가 지은 제목",
+    );
   });
 });

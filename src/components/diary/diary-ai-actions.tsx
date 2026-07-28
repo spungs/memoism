@@ -19,6 +19,8 @@ interface Props {
   diaryId: string;
   /** 편집 중인 *현재* 본문. 저장 안 한 수정도 AI 입력이 된다. */
   currentContent: string;
+  /** 편집 중인 *현재* 제목. 사용자가 고쳤으면 AI 제목이 덮어쓰지 않는다. */
+  currentTitle: string;
   hasPreviousContent: boolean;
   aiGenerationVersion: number;
   /** 재생성·되돌리기 성공 시 부모에게 새 데이터 전달 (state lifting). */
@@ -28,6 +30,7 @@ interface Props {
 export function DiaryAiActions({
   diaryId,
   currentContent,
+  currentTitle,
   hasPreviousContent,
   aiGenerationVersion,
   onUpdated,
@@ -59,6 +62,7 @@ export function DiaryAiActions({
         // 보내 서버가 DB 본문만 읽었고, 사용자가 친 글은 무시된 채 덮어써졌다.
         body: JSON.stringify({
           content: currentContent,
+          title: currentTitle,
           instruction: showInstruction
             ? buildInstruction(instructionChips, instructionText) || undefined
             : undefined,

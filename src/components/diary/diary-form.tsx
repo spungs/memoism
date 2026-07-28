@@ -1051,6 +1051,7 @@ export function DiaryForm({
           <DiaryAiActions
             diaryId={diaryId}
             currentContent={content}
+            currentTitle={title}
             hasPreviousContent={hasPrev}
             aiGenerationVersion={aiVer}
             onUpdated={(data) => {
