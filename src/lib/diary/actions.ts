@@ -8,6 +8,7 @@ import { deleteImage, getObjectSize, saveImage } from "@/lib/storage";
 import { assertStorageQuota, STORAGE_FULL_MSG } from "@/lib/storage/quota";
 import { upsertDiaryEmbedding } from "./embedding";
 import { diaryCreatedAtForDateKey } from "./kst";
+import { MAX_IMAGES_PER_DIARY } from "./limits";
 import {
   diaryInputSchema,
   moodKeySchema,
@@ -153,7 +154,6 @@ export async function createDiaryAction(
   const exifs = parseExifs(formData.get("exifs"));
 
   // 이미지 경로 결정: AI 검토 통과(storagePaths) vs 직접 작성(image File[])
-  // 장수 제한은 없다 — 유일한 게이트는 용량 쿼터(assertStorageQuota).
   const parsedPaths = parseStoragePaths(
     formData.get("storagePaths"),
     session.userId,
@@ -164,6 +164,16 @@ export async function createDiaryAction(
     : formData
         .getAll("image")
         .filter((f): f is File => f instanceof File && f.size > 0);
+
+  // 개수 상한은 티어와 무관한 고정값. 초과분을 조용히 버리지 않고 이유를 알린다.
+  if ((preuploaded?.length ?? files.length) > MAX_IMAGES_PER_DIARY) {
+    return {
+      ok: false,
+      fieldErrors: {
+        image: `사진은 일기 한 건에 ${MAX_IMAGES_PER_DIARY}장까지 넣을 수 있어요`,
+      },
+    };
+  }
 
   const storagePaths: string[] = [];
   // storagePaths와 같은 인덱스의 바이트 크기 (스토리지 쿼터 카운터용).
@@ -331,12 +341,28 @@ export async function updateDiaryAction(
   }
 
   // 새로 추가된 사진 저장 — createDiaryAction과 동일한 File→saveImage 경로.
-  // 장수 제한은 없다(용량 쿼터가 유일 게이트). orderIndex는 기존 최대값 다음부터
-  // 이어 붙인다(기존 사진 순서 보존).
+  // orderIndex는 기존 최대값 다음부터 이어 붙인다(기존 사진 순서 보존).
   const newFiles = formData
     .getAll("image")
     .filter((f): f is File => f instanceof File && f.size > 0);
   if (newFiles.length > 0) {
+    // 제거 반영 후 남은 장수 기준으로 판정. 초과분을 조용히 버리지 않는다.
+    const currentCount = await prisma.diaryImage.count({
+      where: { diaryId: id },
+    });
+    const slots = MAX_IMAGES_PER_DIARY - currentCount;
+    if (newFiles.length > slots) {
+      return {
+        ok: false,
+        fieldErrors: {
+          image:
+            slots > 0
+              ? `사진은 일기 한 건에 ${MAX_IMAGES_PER_DIARY}장까지예요. ${slots}장 더 넣을 수 있어요.`
+              : `사진은 일기 한 건에 ${MAX_IMAGES_PER_DIARY}장까지예요. 기존 사진을 지우면 추가할 수 있어요.`,
+        },
+      };
+    }
+
     const addedBytes = newFiles.reduce((sum, f) => sum + f.size, 0);
     // 업로드 전 쿼터 판정. 초과 시 사진만 거부하고, 이미 반영된 본문 수정과
     // 기존 사진은 그대로 둔다(사용자가 쓴 글을 잃지 않게).

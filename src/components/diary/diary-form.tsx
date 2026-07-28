@@ -14,6 +14,7 @@ import {
   type ExifMeta,
 } from "@/lib/diary/exif";
 import { compressImage } from "@/lib/diary/image-compress";
+import { MAX_IMAGES_PER_DIARY } from "@/lib/diary/limits";
 import { DiaryAiActions } from "./diary-ai-actions";
 import { DiaryDatePicker } from "./date-picker";
 import { MoodPicker, type MoodKey } from "./mood-picker";
@@ -70,8 +71,6 @@ interface DiaryFormProps {
     mood: MoodKey | null;
     date?: string; // YYYY-MM-DD
   };
-  /** 사진 첨부 상한 — 구독 상태에 따라 서버에서 계산해 전달 (ACTIVE 10, 그 외 5). */
-  maxImages?: number;
 }
 
 type PickedImage = {
@@ -245,12 +244,7 @@ function PhotoThumb({
   );
 }
 
-export function DiaryForm({
-  mode,
-  diaryId,
-  initial,
-  maxImages = 5,
-}: DiaryFormProps) {
+export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -284,7 +278,7 @@ export function DiaryForm({
   // 사진이 2일 이상에 걸치면 → 배지에 날짜 표기 + 경고 배너 + 생성 전 확인.
   const isMultiDate = dateKeys.length >= 2;
   const totalImageCount = visibleExisting.length + pickedImages.length;
-  const slotsLeft = maxImages - totalImageCount;
+  const slotsLeft = MAX_IMAGES_PER_DIARY - totalImageCount;
 
   const [titleError, setTitleError] = useState<string | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
@@ -871,7 +865,7 @@ export function DiaryForm({
         </div>
         </div>
 
-        {/* 사진 (상한은 구독별, maxImages prop) — 작성·수정 공용. 가로 스크롤(개행 X). */}
+        {/* 사진 (상한은 티어 무관 고정값) — 작성·수정 공용. 가로 스크롤(개행 X). */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           <div
             style={{
@@ -881,7 +875,9 @@ export function DiaryForm({
               gap: "var(--space-2)",
             }}
           >
-            <p style={MUTED_LABEL}>사진 ({totalImageCount}/{maxImages})</p>
+            <p style={MUTED_LABEL}>
+              사진 ({totalImageCount}/{MAX_IMAGES_PER_DIARY})
+            </p>
             {!isMultiDate && pickedImages.length > 1 && (
               <span
                 style={{
