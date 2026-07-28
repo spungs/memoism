@@ -27,7 +27,8 @@ export function limitFor(tier: Tier, path: AiPath): number | null {
 }
 
 export type CapResult =
-  | { allowed: true; remaining: number; tier: Tier }
+  // remaining: null = 캡 없는 경로(capture). JSON 직렬화 안전하게 null을 쓴다.
+  | { allowed: true; remaining: number | null; tier: Tier }
   | { allowed: false; remaining: 0; tier: Tier; reason: "daily_cap" };
 
 /**
@@ -66,9 +67,17 @@ export async function checkAndIncrement(
   userId: string,
   subscriptionStatus: SubscriptionStatus,
   plan: SubscriptionPlan,
+  path: AiPath = "insight",
 ): Promise<CapResult> {
   const tier = effectiveTier(subscriptionStatus, plan);
-  const limit = TIER_LIMITS[tier];
+  const limit = limitFor(tier, path);
+
+  // 캡 없는 경로는 DB를 아예 건드리지 않는다. 캡처는 하루에 수십 번 일어나므로
+  // 매번 트랜잭션을 여는 것 자체가 낭비다.
+  if (limit === null) {
+    return { allowed: true, remaining: null, tier };
+  }
+
   const date = todayKST();
 
   return prisma.$transaction(async (tx) => {
@@ -103,7 +112,8 @@ export async function checkAndIncrement(
 }
 
 /**
- * 현재 사용량 조회 (cap UI 표시용).
+ * 현재 사용량 조회 (cap UI 표시용). **insight 경로 사용량**만 센다 —
+ * capture 경로는 카운터를 증가시키지 않으므로 여기 잡히지 않는다.
  * - FREE: 항상 표시 ("오늘 X/3")
  * - BASIC: 항상 표시 ("오늘 X/10")
  * - PRO: 도달 시만 안내 (V2)
