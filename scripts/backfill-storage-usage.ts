@@ -22,9 +22,15 @@ const CHUNK = 500;
 
 const mb = (bytes: number) => (bytes / 1024 / 1024).toFixed(2);
 
+function makeClient(url: string, key: string) {
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
 /** 버킷 전체를 나열해 path → size 맵을 만든다 (루트 폴더 = userId). */
 async function loadBucketSizes(
-  sb: ReturnType<typeof createClient>,
+  sb: ReturnType<typeof makeClient>,
 ): Promise<Map<string, number>> {
   const sizes = new Map<string, number>();
   const { data: roots, error } = await sb.storage
@@ -65,9 +71,7 @@ async function run(): Promise<number> {
 
   console.log(WRITE ? "MODE: --write (실제 반영)" : "MODE: dry-run (변경 없음)");
 
-  const sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const sb = makeClient(url, key);
   const prisma = new PrismaClient();
 
   try {
