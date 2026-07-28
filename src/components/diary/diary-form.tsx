@@ -1050,6 +1050,7 @@ export function DiaryForm({
         {mode === "edit" && diaryId && (
           <DiaryAiActions
             diaryId={diaryId}
+            currentContent={content}
             hasPreviousContent={hasPrev}
             aiGenerationVersion={aiVer}
             onUpdated={(data) => {

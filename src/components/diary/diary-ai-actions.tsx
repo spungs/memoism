@@ -3,6 +3,8 @@
 import { useRef, useState, useTransition } from "react";
 import { Sparkles, Undo2 } from "lucide-react";
 import { revertDiaryAction } from "@/lib/diary/actions";
+import { AiInstructionInput } from "./ai-instruction-input";
+import { buildInstruction } from "@/lib/diary/ai-instruction";
 import { AiBusyOverlay, Spinner } from "@/components/ui/ai-busy-overlay";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 
@@ -15,6 +17,8 @@ export interface DiaryAiUpdate {
 
 interface Props {
   diaryId: string;
+  /** 편집 중인 *현재* 본문. 저장 안 한 수정도 AI 입력이 된다. */
+  currentContent: string;
   hasPreviousContent: boolean;
   aiGenerationVersion: number;
   /** 재생성·되돌리기 성공 시 부모에게 새 데이터 전달 (state lifting). */
@@ -23,6 +27,7 @@ interface Props {
 
 export function DiaryAiActions({
   diaryId,
+  currentContent,
   hasPreviousContent,
   aiGenerationVersion,
   onUpdated,
@@ -31,6 +36,11 @@ export function DiaryAiActions({
   const [reverting, startRevert] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [usageSignal, setUsageSignal] = useState(0);
+  // 재정리 방향 지시 — 이미 한 번 정리한 뒤(version > 0)에만 노출한다.
+  // 최초 정리는 버튼 하나로 무마찰 유지.
+  const [instructionChips, setInstructionChips] = useState<string[]>([]);
+  const [instructionText, setInstructionText] = useState("");
+  const showInstruction = aiGenerationVersion > 0;
   // 진행 중인 재생성 요청 취소(Abort) 핸들.
   const aiAbortRef = useRef<AbortController | null>(null);
 
@@ -44,6 +54,15 @@ export function DiaryAiActions({
     try {
       const res = await fetch(`/api/diaries/${diaryId}/regenerate`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // 저장하지 않은 편집도 입력이 되게 현재 본문을 보낸다. 예전엔 body 없이
+        // 보내 서버가 DB 본문만 읽었고, 사용자가 친 글은 무시된 채 덮어써졌다.
+        body: JSON.stringify({
+          content: currentContent,
+          instruction: showInstruction
+            ? buildInstruction(instructionChips, instructionText) || undefined
+            : undefined,
+        }),
         signal: ac.signal,
       });
       const data = await res.json();
@@ -58,6 +77,9 @@ export function DiaryAiActions({
         hasPreviousContent: d.previousContent !== null,
         aiGenerationVersion: d.aiGenerationVersion,
       });
+      // 지시가 반영된 결과가 나왔으니 비운다. 남겨두면 다음 재정리에 또 적용된다.
+      setInstructionChips([]);
+      setInstructionText("");
     } catch (e) {
       // 사용자가 취소한 경우는 에러로 표시하지 않는다.
       if (e instanceof DOMException && e.name === "AbortError") return;
@@ -97,6 +119,16 @@ export function DiaryAiActions({
         gap: "var(--space-3)",
       }}
     >
+      {showInstruction && (
+        <AiInstructionInput
+          chips={instructionChips}
+          onChipsChange={setInstructionChips}
+          freeText={instructionText}
+          onFreeTextChange={setInstructionText}
+          disabled={busy}
+        />
+      )}
+
       <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
         {/* Tinted 버튼 — tint-soft 배경 + tint 글자 */}
         <button
