@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { captureServer } from "@/lib/analytics/server";
 import { getSession } from "@/lib/auth/session";
-import { getMaxImagesForUser } from "@/lib/character/queries";
 import { prisma } from "@/lib/db";
 import { deleteImage, getObjectSize, saveImage } from "@/lib/storage";
 import { assertStorageQuota, STORAGE_FULL_MSG } from "@/lib/storage/quota";
@@ -81,17 +80,31 @@ function parseExifs(raw: FormDataEntryValue | null): ExifInput[] {
   }
 }
 
+// 티어와 무관한 평평한 안전 상한 — 경로 하나당 버킷 조회가 1회씩 붙으므로
+// 조작된 대량 목록이 요청 하나로 수천 번 조회를 유발하는 걸 막는다.
+// (티어 차별은 용량 쿼터로만 한다 — 개수는 레버로 쓰지 않는다.)
+const MAX_STORAGE_PATHS = 100;
+
+/**
+ * 검토 게이트가 넘긴 storagePath 목록. 업로드는 항상 `{userId}/...`로 저장되므로
+ * 본인 접두사만 통과시킨다 — 남의 경로를 심어 사진을 노출시키거나
+ * 일기 삭제 시 남의 파일을 지우는 걸 차단.
+ */
 function parseStoragePaths(
   raw: FormDataEntryValue | null,
-  maxImages: number,
+  userId: string,
 ): string[] | null {
   if (typeof raw !== "string" || raw.length === 0) return null;
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return null;
+    const prefix = `${userId}/`;
     return parsed
-      .filter((p): p is string => typeof p === "string" && p.length > 0)
-      .slice(0, maxImages);
+      .filter(
+        (p): p is string =>
+          typeof p === "string" && p.length > 0 && p.startsWith(prefix),
+      )
+      .slice(0, MAX_STORAGE_PATHS);
   } catch {
     return null;
   }
@@ -138,17 +151,19 @@ export async function createDiaryAction(
   const diaryDate = parseDiaryDate(formData.get("date"));
   const source = parseSource(formData.get("source"));
   const exifs = parseExifs(formData.get("exifs"));
-  const maxImages = await getMaxImagesForUser(session.userId);
 
   // 이미지 경로 결정: AI 검토 통과(storagePaths) vs 직접 작성(image File[])
-  const parsedPaths = parseStoragePaths(formData.get("storagePaths"), maxImages);
+  // 장수 제한은 없다 — 유일한 게이트는 용량 쿼터(assertStorageQuota).
+  const parsedPaths = parseStoragePaths(
+    formData.get("storagePaths"),
+    session.userId,
+  );
   const preuploaded = parsedPaths && parsedPaths.length > 0 ? parsedPaths : null;
   const files = preuploaded
     ? []
     : formData
         .getAll("image")
-        .filter((f): f is File => f instanceof File && f.size > 0)
-        .slice(0, maxImages);
+        .filter((f): f is File => f instanceof File && f.size > 0);
 
   const storagePaths: string[] = [];
   // storagePaths와 같은 인덱스의 바이트 크기 (스토리지 쿼터 카운터용).
@@ -316,70 +331,62 @@ export async function updateDiaryAction(
   }
 
   // 새로 추가된 사진 저장 — createDiaryAction과 동일한 File→saveImage 경로.
-  // 제거 반영 후 남은 장수를 기준으로 구독별 상한(ACTIVE 10 / 그 외 5)을 지키고,
-  // orderIndex는 기존 최대값 다음부터 이어 붙인다(기존 사진 순서 보존).
+  // 장수 제한은 없다(용량 쿼터가 유일 게이트). orderIndex는 기존 최대값 다음부터
+  // 이어 붙인다(기존 사진 순서 보존).
   const newFiles = formData
     .getAll("image")
     .filter((f): f is File => f instanceof File && f.size > 0);
   if (newFiles.length > 0) {
-    const maxImages = await getMaxImagesForUser(session.userId);
-    const currentCount = await prisma.diaryImage.count({
-      where: { diaryId: id },
-    });
-    const slots = maxImages - currentCount;
-    if (slots > 0) {
-      const accepted = newFiles.slice(0, slots);
-      const addedBytes = accepted.reduce((sum, f) => sum + f.size, 0);
-      // 업로드 전 쿼터 판정. 초과 시 사진만 거부하고, 이미 반영된 본문 수정과
-      // 기존 사진은 그대로 둔다(사용자가 쓴 글을 잃지 않게).
-      const quota = await assertStorageQuota(session.userId, addedBytes);
-      if (!quota.ok) return { ok: false, error: STORAGE_FULL_MSG };
+    const addedBytes = newFiles.reduce((sum, f) => sum + f.size, 0);
+    // 업로드 전 쿼터 판정. 초과 시 사진만 거부하고, 이미 반영된 본문 수정과
+    // 기존 사진은 그대로 둔다(사용자가 쓴 글을 잃지 않게).
+    const quota = await assertStorageQuota(session.userId, addedBytes);
+    if (!quota.ok) return { ok: false, error: STORAGE_FULL_MSG };
 
-      const exifs = parseExifs(formData.get("exifs"));
-      const agg = await prisma.diaryImage.aggregate({
-        where: { diaryId: id },
-        _max: { orderIndex: true },
-      });
-      const nextOrder = (agg._max.orderIndex ?? -1) + 1;
-      const uploaded: string[] = [];
-      try {
-        // 업로드를 먼저 끝낸 뒤 DB 반영을 한 트랜잭션으로 묶는다. 업로드는 네트워크라
-        // 트랜잭션 안에 두면 오래 잡히고, 건건 insert면 중간 실패 시 앞선 row는 남은 채
-        // 파일만 정리돼 깨진 이미지가 된다.
-        for (const file of accepted) {
-          uploaded.push(await saveImage(file, session.userId));
-        }
-        await prisma.$transaction([
-          ...uploaded.map((path, i) =>
-            prisma.diaryImage.create({
-              data: {
-                diaryId: id,
-                storagePath: path,
-                sizeBytes: accepted[i].size,
-                exifTakenAt: exifs[i]?.takenAt
-                  ? new Date(exifs[i].takenAt!)
-                  : null,
-                exifLat: exifs[i]?.lat ?? null,
-                exifLng: exifs[i]?.lng ?? null,
-                orderIndex: nextOrder + i,
-              },
-            }),
-          ),
-          prisma.character.update({
-            where: { userId: session.userId },
-            data: { storageUsedBytes: { increment: BigInt(addedBytes) } },
-          }),
-        ]);
-      } catch (e) {
-        // 부분 실패: 업로드된 파일 정리 후 에러 반환 (DB는 트랜잭션이라 전부 롤백)
-        await Promise.all(uploaded.map((p) => deleteImage(p)));
-        return {
-          ok: false,
-          fieldErrors: {
-            image: e instanceof Error ? e.message : "이미지 업로드 실패",
-          },
-        };
+    const exifs = parseExifs(formData.get("exifs"));
+    const agg = await prisma.diaryImage.aggregate({
+      where: { diaryId: id },
+      _max: { orderIndex: true },
+    });
+    const nextOrder = (agg._max.orderIndex ?? -1) + 1;
+    const uploaded: string[] = [];
+    try {
+      // 업로드를 먼저 끝낸 뒤 DB 반영을 한 트랜잭션으로 묶는다. 업로드는 네트워크라
+      // 트랜잭션 안에 두면 오래 잡히고, 건건 insert면 중간 실패 시 앞선 row는 남은 채
+      // 파일만 정리돼 깨진 이미지가 된다.
+      for (const file of newFiles) {
+        uploaded.push(await saveImage(file, session.userId));
       }
+      await prisma.$transaction([
+        ...uploaded.map((path, i) =>
+          prisma.diaryImage.create({
+            data: {
+              diaryId: id,
+              storagePath: path,
+              sizeBytes: newFiles[i].size,
+              exifTakenAt: exifs[i]?.takenAt
+                ? new Date(exifs[i].takenAt!)
+                : null,
+              exifLat: exifs[i]?.lat ?? null,
+              exifLng: exifs[i]?.lng ?? null,
+              orderIndex: nextOrder + i,
+            },
+          }),
+        ),
+        prisma.character.update({
+          where: { userId: session.userId },
+          data: { storageUsedBytes: { increment: BigInt(addedBytes) } },
+        }),
+      ]);
+    } catch (e) {
+      // 부분 실패: 업로드된 파일 정리 후 에러 반환 (DB는 트랜잭션이라 전부 롤백)
+      await Promise.all(uploaded.map((p) => deleteImage(p)));
+      return {
+        ok: false,
+        fieldErrors: {
+          image: e instanceof Error ? e.message : "이미지 업로드 실패",
+        },
+      };
     }
   }
 

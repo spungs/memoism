@@ -7,7 +7,7 @@ import { DiaryDetailActions } from "@/components/diary/diary-detail-actions";
 import { MoodBadge } from "@/components/diary/mood-badge";
 import { getSession } from "@/lib/auth/session";
 import { getDiary } from "@/lib/diary/queries";
-import { getSignedUrls } from "@/lib/storage";
+import { getSignedUrlsForOwner } from "@/lib/storage";
 
 const dateFmt = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
@@ -46,7 +46,9 @@ export default async function DiaryDetailPage({ params }: PageProps) {
   // DiaryImage signed URL 일괄 발급 (1h TTL). 실패한 항목은 null.
   const imagePaths = diary.images.map((img) => img.storagePath);
   const imageUrls =
-    imagePaths.length > 0 ? await getSignedUrls(imagePaths) : [];
+    imagePaths.length > 0
+      ? await getSignedUrlsForOwner(imagePaths, session.userId)
+      : [];
 
   return (
     <main

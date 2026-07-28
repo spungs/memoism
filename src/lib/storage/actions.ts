@@ -3,6 +3,8 @@
 import { getSession } from "@/lib/auth/session";
 import { getSignedUrlsForOwner } from "./index";
 
+// 검토 게이트가 한 번에 요청하는 최대 path 수. 그 화면의 사진은 AI 생성분이므로
+// auto-generate.ts의 MAX_AI_PHOTOS 이상이어야 한다 — 그쪽을 올리면 여기도 올릴 것.
 const MAX_PATHS = 10;
 
 export type SignedUrlsResult =
