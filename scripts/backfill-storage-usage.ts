@@ -5,6 +5,10 @@
  *
  * 실행: pnpm backfill-storage-usage            (dry-run — 아무것도 안 바꿈)
  *       pnpm backfill-storage-usage -- --write (실제 반영)
+ *       ... -- --env .env.local.prod-backup    (운영 DB 대상)
+ *
+ * 기본 env는 .env.local(로컬 DB)이다. 이 도구의 주 용도는 운영 백필이므로
+ * --env로 대상 DB를 바꿀 수 있어야 한다(로컬 개발 설정을 건드리지 않고).
  *
  * 비파괴: 사진 파일·일기 본문은 건드리지 않는다. 채우는 건 크기 캐시뿐이다.
  * 이미 값이 있는 sizeBytes는 덮어쓰지 않고 불일치만 보고한다(라이브 쓰기와 다투지 않도록).
@@ -13,8 +17,11 @@ import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { PrismaClient } from "@prisma/client";
 
+const envIdx = process.argv.indexOf("--env");
+const ENV_PATH = envIdx >= 0 ? process.argv[envIdx + 1] : ".env.local";
+
 loadEnv({ path: ".env", quiet: true });
-loadEnv({ path: ".env.local", override: true, quiet: true });
+loadEnv({ path: ENV_PATH, override: true, quiet: true });
 
 const BUCKET = process.env.SUPABASE_STORAGE_BUCKET ?? "diary-images";
 const WRITE = process.argv.includes("--write");
