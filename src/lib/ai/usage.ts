@@ -12,6 +12,20 @@ const TIER_LIMITS: Record<SubscriptionPlan, number> = {
 
 export type Tier = SubscriptionPlan;
 
+/**
+ * AI 호출 경로. 캡은 **비싼 경로에만** 건다 (스펙 §10 하드룰: "캡처는 사실상 무제한").
+ *   - capture: 캡처 보조 — 의도 분류·날짜 라우팅·짧은 응답. 저가 모델, 캡 없음.
+ *   - insight: 회상(RAG)·AI 정리·재생성. 호출당 비용이 커서 캡을 소모한다.
+ *
+ * 캡처를 캡하면 습관 형성을 막아 자살골이다(FREE 3회/일이면 메신저가 첫날 죽는다).
+ */
+export type AiPath = "capture" | "insight";
+
+/** 순수: 티어·경로별 일일 한도. `null` = 무제한(캡 없음). */
+export function limitFor(tier: Tier, path: AiPath): number | null {
+  return path === "capture" ? null : TIER_LIMITS[tier];
+}
+
 export type CapResult =
   | { allowed: true; remaining: number; tier: Tier }
   | { allowed: false; remaining: 0; tier: Tier; reason: "daily_cap" };
