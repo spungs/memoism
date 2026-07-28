@@ -8,6 +8,7 @@ import { getDiaryImageSignedUrls } from "@/lib/storage/actions";
 import { DiaryDatePicker } from "./date-picker";
 import { AiInstructionInput } from "./ai-instruction-input";
 import { buildInstruction } from "@/lib/diary/ai-instruction";
+import { pickRegenerateText } from "@/lib/diary/regenerate-input";
 import { kstTodayKey } from "@/lib/diary/kst";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 
@@ -222,19 +223,28 @@ export function ReviewGate() {
     setRegenError(null);
     setRegenerating(true);
     try {
+      // 무엇을 입력으로 보낼지는 pickRegenerateText가 정한다 (판단 근거는 그 파일 주석).
+      // 고친 본문이면 그걸, 안 고쳤고 지시도 없으면 최초 입력으로 되돌려 새로 뽑는다.
+      // mode는 보내지 않는다(서버가 실제 입력으로 도출). draftState.mode 자체는
+      // 저장 시 source 라벨로 계속 쓰이므로 지우지 않는다.
+      const instruction =
+        buildInstruction(instructionChips, instructionText) || undefined;
+      const text = pickRegenerateText({
+        edited: editedContent,
+        lastAiContent: draftState.draft.content,
+        originalText: draftState.text,
+        hasInstruction: !!instruction,
+        hasPhotos: draftState.storagePaths.length > 0,
+      });
+
       const res = await fetch("/api/diaries/preview-regenerate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           storagePaths: draftState.storagePaths,
           exifs: draftState.exifs,
-          // 화면의 현재 본문. draftState.text(최초 입력)를 보내면 사용자가 검토화면에서
-          // 고친 내용이 통째로 무시된다 — 원래 버그가 바로 이것이었다.
-          // mode도 보내지 않는다(서버가 실제 입력으로 도출). draftState.mode 자체는
-          // 저장 시 source 라벨로 계속 쓰이므로 지우지 않는다.
-          text: editedContent,
-          instruction:
-            buildInstruction(instructionChips, instructionText) || undefined,
+          text,
+          instruction,
         }),
       });
       const data = await res.json();
