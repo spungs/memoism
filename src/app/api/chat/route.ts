@@ -249,7 +249,14 @@ export async function POST(req: NextRequest) {
     }),
   ]);
 
-  const cap = await checkAndIncrement(session.userId, character.subscriptionStatus, character.plan);
+  // 지금 채팅은 통째로 회상(비싼 경로)이다. Plan 04에서 의도 분류가 들어오면
+  // record 메시지만 "capture"로 내려가 캡을 소모하지 않는다.
+  const cap = await checkAndIncrement(
+    session.userId,
+    character.subscriptionStatus,
+    character.plan,
+    "insight",
+  );
   if (!cap.allowed) {
     return NextResponse.json(
       {

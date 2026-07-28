@@ -90,7 +90,12 @@ export async function regenerateDiary(
   });
   if (!character) return { ok: false, error: "사용자 정보를 찾을 수 없습니다" };
 
-  const cap = await checkAndIncrement(userId, character.subscriptionStatus, character.plan);
+  const cap = await checkAndIncrement(
+    userId,
+    character.subscriptionStatus,
+    character.plan,
+    "insight",
+  );
   if (!cap.allowed) {
     return {
       ok: false,

@@ -59,7 +59,12 @@ export async function previewGenerateDiary(
   }
 
   // 일일 cap 검증·증분 (호출 전 차감)
-  const cap = await checkAndIncrement(input.userId, character.subscriptionStatus, character.plan);
+  const cap = await checkAndIncrement(
+    input.userId,
+    character.subscriptionStatus,
+    character.plan,
+    "insight",
+  );
   if (!cap.allowed) {
     return {
       ok: false,
