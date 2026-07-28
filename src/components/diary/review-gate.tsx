@@ -7,6 +7,7 @@ import { createDiaryAction } from "@/lib/diary/actions";
 import { getDiaryImageSignedUrls } from "@/lib/storage/actions";
 import { DiaryDatePicker } from "./date-picker";
 import { AiInstructionInput } from "./ai-instruction-input";
+import { ContentLengthHint, isOverAiLimit } from "./content-length-hint";
 import { buildInstruction } from "@/lib/diary/ai-instruction";
 import { pickRegenerateText } from "@/lib/diary/regenerate-input";
 import { kstTodayKey } from "@/lib/diary/kst";
@@ -338,6 +339,8 @@ export function ReviewGate() {
   const exifTimeLabel = earliestExif ? formatExifTime(earliestExif.takenAt) : null;
   const exifHasLocation = draftState.exifs.some((e) => e.lat != null && e.lng != null);
   const photoCount = draftState.storagePaths.length;
+  // 상한 초과면 눌러봐야 400이다. 누르기 전에 막는다 (저장은 그대로 가능).
+  const overAiLimit = isOverAiLimit(editedContent);
 
   // 촬영 날짜(KST) distinct — 2일 이상이면 "섞임" 경고 표시
   const distinctKstDates = Array.from(
@@ -661,6 +664,8 @@ export function ReviewGate() {
               padding: 0,
             }}
           />
+          <ContentLengthHint value={editedContent} />
+
           {draftState.draft.suggestedMood && (
             <p
               style={{
@@ -685,18 +690,22 @@ export function ReviewGate() {
           <button
             type="button"
             onClick={handleRegenerate}
-            disabled={regenerating || pending}
+            disabled={regenerating || pending || overAiLimit}
             className="pressable"
             style={{
               alignSelf: "flex-start",
               fontFamily: "var(--font-sans)",
               fontSize: "var(--text-sm)",
               fontWeight: 600,
-              color: regenerating || pending ? "var(--fg-subtle)" : "var(--tint)",
+              color:
+                regenerating || pending || overAiLimit
+                  ? "var(--fg-subtle)"
+                  : "var(--tint)",
               backgroundColor: "transparent",
               border: "none",
               padding: "4px 0",
-              cursor: regenerating || pending ? "default" : "pointer",
+              cursor:
+                regenerating || pending || overAiLimit ? "default" : "pointer",
             }}
           >
             {regenerating ? "생성 중..." : "✨ 다시 생성"}

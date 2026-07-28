@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { Sparkles, Undo2 } from "lucide-react";
 import { revertDiaryAction } from "@/lib/diary/actions";
 import { AiInstructionInput } from "./ai-instruction-input";
+import { isOverAiLimit } from "./content-length-hint";
 import { buildInstruction } from "@/lib/diary/ai-instruction";
 import { AiBusyOverlay, Spinner } from "@/components/ui/ai-busy-overlay";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
@@ -48,6 +49,8 @@ export function DiaryAiActions({
   const aiAbortRef = useRef<AbortController | null>(null);
 
   const busy = aiPending || reverting;
+  // 상한 초과면 눌러봐야 400이다. 누르기 전에 막는다 (저장·수정은 그대로 가능).
+  const overAiLimit = isOverAiLimit(currentContent);
 
   const handleRegenerate = async () => {
     setAiPending(true);
@@ -138,7 +141,7 @@ export function DiaryAiActions({
         <button
           type="button"
           onClick={handleRegenerate}
-          disabled={busy}
+          disabled={busy || overAiLimit}
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -147,12 +150,14 @@ export function DiaryAiActions({
             height: 44,
             borderRadius: "var(--radius-md)",
             border: "none",
-            backgroundColor: busy ? "var(--fill-2)" : "var(--tint-soft)",
-            color: busy ? "var(--fg-placeholder)" : "var(--tint)",
+            backgroundColor:
+              busy || overAiLimit ? "var(--fill-2)" : "var(--tint-soft)",
+            color:
+              busy || overAiLimit ? "var(--fg-placeholder)" : "var(--tint)",
             fontFamily: "var(--font-sans)",
             fontSize: "var(--text-base)",
             fontWeight: 600,
-            cursor: busy ? "default" : "pointer",
+            cursor: busy || overAiLimit ? "default" : "pointer",
           }}
         >
           {aiPending ? <Spinner size={14} /> : <Sparkles size={14} aria-hidden />}
@@ -198,9 +203,11 @@ export function DiaryAiActions({
           margin: 0,
         }}
       >
-        {aiGenerationVersion > 0
-          ? "사진과 메모를 기반으로 AI가 다시 정리해줘요."
-          : "사진과 본문을 기반으로 AI가 1인칭 일기로 정리해줘요."}
+        {overAiLimit
+          ? "내용이 길어 AI 정리는 어려워요. 수정·저장은 그대로 됩니다."
+          : aiGenerationVersion > 0
+            ? "사진과 메모를 기반으로 AI가 다시 정리해줘요."
+            : "사진과 본문을 기반으로 AI가 1인칭 일기로 정리해줘요."}
       </p>
 
       <AiUsageCounter refreshSignal={usageSignal} />
