@@ -240,6 +240,39 @@ export async function listBucketObjects(): Promise<BucketObject[]> {
 }
 
 /**
+ * 버킷에 있는 객체 1건의 크기(bytes). 스토리지 쿼터 카운터용.
+ *
+ * 검토 게이트를 거친 사진은 확정 저장 시점에 `File`이 없어 크기를 알 수 없다.
+ * 클라이언트가 보낸 크기는 조작 가능(쿼터 우회)하므로 버킷의 실제 값만 신뢰한다.
+ * Supabase엔 단건 stat API가 없어 부모 폴더를 파일명으로 search한다.
+ *
+ * 조회 실패 시 0 (저장 자체는 막지 않는다 — 누락분은 백필 스크립트가 채움).
+ */
+export async function getObjectSize(storagePath: string): Promise<number> {
+  if (!storagePath || storagePath.startsWith("/uploads/")) return 0;
+  if (storagePath.includes("..")) return 0;
+
+  const slash = storagePath.lastIndexOf("/");
+  if (slash <= 0) return 0;
+  const dir = storagePath.slice(0, slash);
+  const name = storagePath.slice(slash + 1);
+
+  const { data, error } = await getClient()
+    .storage.from(BUCKET)
+    .list(dir, { limit: 100, search: name });
+  if (error || !data) {
+    console.warn(
+      `[storage] getObjectSize failed for ${storagePath}:`,
+      error?.message,
+    );
+    return 0;
+  }
+  // search는 부분 일치라 정확한 파일명으로 다시 좁힌다.
+  const hit = data.find((f) => f.name === name);
+  return Number(hit?.metadata?.size) || 0;
+}
+
+/**
  * Issue a short-lived (1h) signed URL for a private storage path.
  * Returns null if URL generation fails (caller should fall back to placeholder).
  */

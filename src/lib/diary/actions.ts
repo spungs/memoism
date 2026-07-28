@@ -5,7 +5,7 @@ import { captureServer } from "@/lib/analytics/server";
 import { getSession } from "@/lib/auth/session";
 import { getMaxImagesForUser } from "@/lib/character/queries";
 import { prisma } from "@/lib/db";
-import { deleteImage, saveImage } from "@/lib/storage";
+import { deleteImage, getObjectSize, saveImage } from "@/lib/storage";
 import { upsertDiaryEmbedding } from "./embedding";
 import { diaryCreatedAtForDateKey } from "./kst";
 import {
@@ -142,10 +142,14 @@ export async function createDiaryAction(
   // 이미지 경로 결정: AI 검토 통과(storagePaths) vs 직접 작성(image File[])
   const preuploaded = parseStoragePaths(formData.get("storagePaths"), maxImages);
   const storagePaths: string[] = [];
+  // storagePaths와 같은 인덱스의 바이트 크기 (스토리지 쿼터 카운터용).
+  const sizes: number[] = [];
   const uploadedToCleanup: string[] = [];
 
   if (preuploaded && preuploaded.length > 0) {
     storagePaths.push(...preuploaded);
+    // 검토 게이트에서 이미 업로드된 사진은 File이 없어 버킷에서 크기를 조회한다.
+    sizes.push(...(await Promise.all(preuploaded.map(getObjectSize))));
   } else {
     const files = formData
       .getAll("image")
@@ -156,6 +160,7 @@ export async function createDiaryAction(
       try {
         const path = await saveImage(file, session.userId);
         storagePaths.push(path);
+        sizes.push(file.size);
         uploadedToCleanup.push(path);
       } catch (e) {
         // 부분 실패: 이미 업로드된 파일 정리 후 에러 반환
@@ -172,6 +177,7 @@ export async function createDiaryAction(
 
   const imagesCreate = storagePaths.map((path, i) => ({
     storagePath: path,
+    sizeBytes: sizes[i] ?? 0,
     exifTakenAt: exifs[i]?.takenAt ? new Date(exifs[i].takenAt!) : null,
     exifLat: exifs[i]?.lat ?? null,
     exifLng: exifs[i]?.lng ?? null,
@@ -297,6 +303,7 @@ export async function updateDiaryAction(
             data: {
               diaryId: id,
               storagePath: path,
+              sizeBytes: accepted[i].size,
               exifTakenAt: exifs[i]?.takenAt ? new Date(exifs[i].takenAt!) : null,
               exifLat: exifs[i]?.lat ?? null,
               exifLng: exifs[i]?.lng ?? null,
