@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { getSignedUrl, getSignedUrlsByPath } from "@/lib/storage";
+import { fragmentPreview } from "./fragment-preview";
 import {
   diaryCreatedAtForDateKey,
   kstDateKey,
@@ -72,6 +73,8 @@ export async function getDiary(id: string, userId: string) {
     where: { id, userId },
     include: {
       images: { orderBy: { orderIndex: "asc" } },
+      // 조각 타임라인(스펙 §6 ②층). 정리 후에도 보존하므로 항상 함께 읽는다.
+      fragments: { orderBy: { createdAt: "asc" } },
     },
   });
 }
@@ -232,6 +235,8 @@ export interface CalendarEntry {
   mood: string | null;
   createdAt: string; // ISO
   thumbnailUrl: string | null; // 첫 사진 signed URL (없으면 null)
+  /** 본문이 비었을 때 카드에 보여줄 조각 요약 (조각 없으면 ""). */
+  fragmentPreview: string;
 }
 
 export interface CalendarMonthData {
@@ -267,6 +272,11 @@ export async function getDiariesForMonth(
         orderBy: { orderIndex: "asc" },
         take: 1,
       },
+      // 본문이 빈 chat 일기(메이 캡처만 있는 날)의 카드를 채우기 위한 조각 요약 재료.
+      fragments: {
+        select: { kind: true, content: true },
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
 
@@ -289,6 +299,7 @@ export async function getDiariesForMonth(
       mood: r.mood,
       createdAt: r.createdAt.toISOString(),
       thumbnailUrl: path ? urlMap.get(path) ?? null : null,
+      fragmentPreview: fragmentPreview(r.fragments),
     });
   }
   return { year, month, days };
