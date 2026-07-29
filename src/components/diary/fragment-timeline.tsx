@@ -45,7 +45,6 @@ export function FragmentTimeline({
 }: {
   fragments: TimelineFragment[];
 }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -69,7 +68,6 @@ export function FragmentTimeline({
       }
       setError(null);
       setEditingId(null);
-      setSelectedId(null);
     });
   };
 
@@ -81,7 +79,6 @@ export function FragmentTimeline({
       if (!r.ok) setError(r.error);
       else setError(null);
       setConfirmDeleteId(null);
-      setSelectedId(null);
     });
   };
 
@@ -116,7 +113,6 @@ export function FragmentTimeline({
       <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
         {fragments.map((f) => {
           const isEditing = editingId === f.id;
-          const isSelected = selectedId === f.id;
           return (
             <li
               key={f.id}
@@ -157,24 +153,18 @@ export function FragmentTimeline({
                     }}
                   />
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedId(isSelected ? null : f.id)}
+                  <span
+                    className="selectable"
                     style={{
                       flex: 1,
-                      border: "none",
-                      background: "none",
-                      padding: 0,
-                      textAlign: "left",
                       fontFamily: "var(--font-sans)",
                       fontSize: "var(--text-sm)",
                       color: "var(--fg)",
                       whiteSpace: "pre-wrap",
-                      cursor: "pointer",
                     }}
                   >
                     {f.kind === "photo" ? "📷 사진" : f.content}
-                  </button>
+                  </span>
                 )}
               </div>
 
@@ -202,8 +192,16 @@ export function FragmentTimeline({
                 </div>
               )}
 
-              {isSelected && !isEditing && (
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              {/* 액션은 **항상 보인다**. 탭해야 나타나면 수정·삭제가 가능한 줄 모른다
+                  (숨은 어포던스는 이 앱의 알려진 실패 지점이다). */}
+              {!isEditing && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    marginTop: 2,
+                  }}
+                >
                   {f.kind !== "photo" && (
                     <button
                       type="button"
