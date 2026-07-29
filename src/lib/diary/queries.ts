@@ -42,13 +42,32 @@ export type DiaryListItem = Awaited<
  * Cursor-paginated list of a user's diaries, newest first.
  * Pass `cursor` = the last item's id from the previous page.
  */
+/**
+ * 아무것도 없는 일기(제목·본문·사진·조각 전부 없음)를 목록·개수에서 제외한다.
+ *
+ * 왜 생기나: 채팅 캡처가 그날 컨테이너를 자동 생성하는데(`getOrCreateDiaryForDate`),
+ * 마지막 조각을 다른 날로 옮기거나 지우면 껍데기만 남는다. 그대로 두면 캘린더·목록에
+ * 날짜만 있는 빈 카드가 뜬다.
+ *
+ * **삭제하지 않고 숨기는 이유**: 채팅 칩(`ChatMessage.captureRef.diaryId`)이 그 일기를
+ * 가리키고 있다. 지우면 칩 링크가 깨진다. 껍데기는 남겨도 손해가 없다.
+ */
+const NOT_EMPTY_DIARY = {
+  OR: [
+    { title: { not: "" } },
+    { content: { not: "" } },
+    { images: { some: {} } },
+    { fragments: { some: {} } },
+  ],
+};
+
 export async function getDiaries(
   userId: string,
   opts: { cursor?: string; take?: number } = {},
 ): Promise<DiariesPage<DiaryListItem>> {
   const take = Math.min(opts.take ?? DEFAULT_TAKE, 100);
   const rows = await prisma.diary.findMany({
-    where: { userId },
+    where: { userId, ...NOT_EMPTY_DIARY },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: take + 1,
     ...(opts.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
@@ -81,7 +100,7 @@ export async function getDiary(id: string, userId: string) {
 
 export async function getRecentDiaries(userId: string, take = 3) {
   return prisma.diary.findMany({
-    where: { userId },
+    where: { userId, ...NOT_EMPTY_DIARY },
     orderBy: { createdAt: "desc" },
     take,
     select: {
@@ -110,9 +129,9 @@ export async function getDiaryCounts(userId: string) {
   );
 
   const [total, thisMonth] = await Promise.all([
-    prisma.diary.count({ where: { userId } }),
+    prisma.diary.count({ where: { userId, ...NOT_EMPTY_DIARY } }),
     prisma.diary.count({
-      where: { userId, createdAt: { gte: monthStartUtc } },
+      where: { userId, createdAt: { gte: monthStartUtc }, ...NOT_EMPTY_DIARY },
     }),
   ]);
 
@@ -258,7 +277,11 @@ export async function getDiariesForMonth(
 ): Promise<CalendarMonthData> {
   const { startUtc, endUtc } = kstMonthRangeUtc(year, month);
   const rows = await prisma.diary.findMany({
-    where: { userId, createdAt: { gte: startUtc, lt: endUtc } },
+    where: {
+      userId,
+      createdAt: { gte: startUtc, lt: endUtc },
+      ...NOT_EMPTY_DIARY,
+    },
     orderBy: { createdAt: "asc" },
     select: {
       id: true,
