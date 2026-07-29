@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { DiaryContent } from "@/components/diary/diary-content";
+import { FragmentTimeline } from "@/components/diary/fragment-timeline";
 import { DiaryDetailActions } from "@/components/diary/diary-detail-actions";
 import { MoodBadge } from "@/components/diary/mood-badge";
 import { getSession } from "@/lib/auth/session";
@@ -207,6 +208,9 @@ export default async function DiaryDetailPage({ params }: PageProps) {
         )}
 
         <DiaryContent>{diary.content}</DiaryContent>
+
+        {/* ②층: 조각 타임라인. AI 정리를 안 해도 이것만으로 그날이 설명된다(스펙 §6). */}
+        <FragmentTimeline fragments={diary.fragments} />
       </article>
     </main>
   );
