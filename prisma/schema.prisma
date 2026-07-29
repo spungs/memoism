@@ -233,6 +233,10 @@ model ChatMessage {
   // ASSISTANT 답변이 근거로 인용한 일기 칩 [{ id, title, createdAt }]. 답변과 함께 영구 저장해
   // 새로고침·스크롤 back 해도 "관련된 일기" 각주가 유지된다 (USER 메시지는 null).
   relatedDiaries Json?    @map("related_diaries")
+  // record 메시지가 어느 날 일기에 조각으로 들어갔는지 (USER 메시지에만 존재).
+  // { diaryId, dateKey, label } — "📖 …에 기록됨" 칩을 새로고침 후에도 유지한다.
+  // 조각 원본은 DiaryFragment다. 여기엔 포인터만 둔다(단일 원본 하드룰).
+  captureRef  Json?       @map("capture_ref")
   createdAt   DateTime    @default(now()) @map("created_at")
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
