@@ -19,6 +19,7 @@
     "storage-usage": "NODE_NO_WARNINGS=1 node scripts/storage-usage.ts",
     "backfill-storage-usage": "NODE_NO_WARNINGS=1 node scripts/backfill-storage-usage.ts",
     "verify-storage-quota": "NODE_NO_WARNINGS=1 node scripts/verify-storage-quota.ts",
+    "fix-chat-order": "NODE_NO_WARNINGS=1 node scripts/fix-chat-message-order.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

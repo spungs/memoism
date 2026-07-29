@@ -230,6 +230,10 @@ export async function POST(req: NextRequest) {
       character.plan,
       "capture",
     );
+    // createdAt을 명시한다. @default(now())는 Postgres now()로 컴파일되고 now()는
+    // **트랜잭션 시작 시각**을 돌려주므로, 한 트랜잭션 안의 두 행이 밀리초까지 같아진다.
+    // 그러면 createdAt 정렬이 순서를 보장하지 못해 답변이 질문보다 먼저 보인다.
+    const sentAt = new Date();
     await prisma.$transaction([
       prisma.chatMessage.create({
         data: {
@@ -238,6 +242,7 @@ export async function POST(req: NextRequest) {
           role: "USER",
           content: userMessage,
           captureRef: capture.captureRef ?? undefined,
+          createdAt: sentAt,
         },
       }),
       prisma.chatMessage.create({
@@ -246,6 +251,7 @@ export async function POST(req: NextRequest) {
           characterId: character.id,
           role: "ASSISTANT",
           content: capture.reply,
+          createdAt: new Date(sentAt.getTime() + 1),
         },
       }),
     ]);
@@ -379,6 +385,9 @@ export async function POST(req: NextRequest) {
             createdAt: d.createdAt.toISOString(),
           }));
 
+  // 캡처 경로와 같은 이유로 createdAt을 명시한다 (트랜잭션 안에서 now()가 동일해져
+  // 질문·답변 순서가 뒤집히는 것을 막는다).
+  const answeredAt = new Date();
   await prisma.$transaction([
     prisma.chatMessage.create({
       data: {
@@ -386,6 +395,7 @@ export async function POST(req: NextRequest) {
         characterId: character.id,
         role: "USER",
         content: userMessage,
+        createdAt: answeredAt,
       },
     }),
     prisma.chatMessage.create({
@@ -395,6 +405,7 @@ export async function POST(req: NextRequest) {
         role: "ASSISTANT",
         content: assistantText,
         relatedDiaries, // 답변과 함께 영구 저장 — 새로고침/스크롤 back 해도 칩 유지 ([]=칩 없음)
+        createdAt: new Date(answeredAt.getTime() + 1),
       },
     }),
   ]);
