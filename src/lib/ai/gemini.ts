@@ -9,8 +9,11 @@ const MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
  * 호출 빈도가 높다 — 비용 통제는 캡이 아니라 **모델 선택**으로 한다.
  * env로 덮어쓸 수 있게 해서 모델 교체 시 배포 없이 조정 가능.
  */
+// 2026-07-28 실측: gemini-2.5-flash-lite / 2.0-flash-lite는 404(신규 사용자 제공 중단),
+// gemini-flash-lite-latest·3.5-flash-lite는 thinkingBudget:0과 함께 보내면 400.
+// 3.1-flash-lite만 통과했다. 모델 교체는 배포 없이 env로.
 export const CAPTURE_MODEL =
-  process.env.GEMINI_CAPTURE_MODEL ?? "gemini-2.5-flash-lite";
+  process.env.GEMINI_CAPTURE_MODEL ?? "gemini-3.1-flash-lite";
 const TIMEOUT_MS = 20_000;
 // 한국어는 토큰당 글자 수가 영어의 1/2 정도라 영어 기준 300토큰 ≒ 한국어 600토큰.
 // "1~3문장" 응답 + 자연스러운 종결 보장을 위해 여유 있게 1000.
