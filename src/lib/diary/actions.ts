@@ -8,7 +8,7 @@ import { deleteImage, getObjectSize, saveImage } from "@/lib/storage";
 import { assertStorageQuota, STORAGE_FULL_MSG } from "@/lib/storage/quota";
 import { upsertDiaryEmbedding } from "./embedding";
 import { diaryCreatedAtForDateKey } from "./kst";
-import { MAX_IMAGES_PER_DIARY } from "./limits";
+import { MAX_IMAGES_PER_REQUEST } from "./limits";
 import {
   diaryInputSchema,
   moodKeySchema,
@@ -166,11 +166,11 @@ export async function createDiaryAction(
         .filter((f): f is File => f instanceof File && f.size > 0);
 
   // 개수 상한은 티어와 무관한 고정값. 초과분을 조용히 버리지 않고 이유를 알린다.
-  if ((preuploaded?.length ?? files.length) > MAX_IMAGES_PER_DIARY) {
+  if ((preuploaded?.length ?? files.length) > MAX_IMAGES_PER_REQUEST) {
     return {
       ok: false,
       fieldErrors: {
-        image: `사진은 일기 한 건에 ${MAX_IMAGES_PER_DIARY}장까지 넣을 수 있어요`,
+        image: `사진은 한 번에 ${MAX_IMAGES_PER_REQUEST}장까지 올릴 수 있어요`,
       },
     };
   }
@@ -346,19 +346,12 @@ export async function updateDiaryAction(
     .getAll("image")
     .filter((f): f is File => f instanceof File && f.size > 0);
   if (newFiles.length > 0) {
-    // 제거 반영 후 남은 장수 기준으로 판정. 초과분을 조용히 버리지 않는다.
-    const currentCount = await prisma.diaryImage.count({
-      where: { diaryId: id },
-    });
-    const slots = MAX_IMAGES_PER_DIARY - currentCount;
-    if (newFiles.length > slots) {
+    // 요청당 상한만 본다. 일기 총량은 용량 쿼터가 지킨다(로드맵 확정 결정).
+    if (newFiles.length > MAX_IMAGES_PER_REQUEST) {
       return {
         ok: false,
         fieldErrors: {
-          image:
-            slots > 0
-              ? `사진은 일기 한 건에 ${MAX_IMAGES_PER_DIARY}장까지예요. ${slots}장 더 넣을 수 있어요.`
-              : `사진은 일기 한 건에 ${MAX_IMAGES_PER_DIARY}장까지예요. 기존 사진을 지우면 추가할 수 있어요.`,
+          image: `사진은 한 번에 ${MAX_IMAGES_PER_REQUEST}장까지 올릴 수 있어요`,
         },
       };
     }

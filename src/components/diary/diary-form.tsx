@@ -14,7 +14,7 @@ import {
   type ExifMeta,
 } from "@/lib/diary/exif";
 import { compressImage } from "@/lib/diary/image-compress";
-import { MAX_IMAGES_PER_DIARY } from "@/lib/diary/limits";
+import { MAX_IMAGES_PER_REQUEST } from "@/lib/diary/limits";
 import { DiaryAiActions } from "./diary-ai-actions";
 import {
   ContentLengthHint,
@@ -282,7 +282,8 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
   // 사진이 2일 이상에 걸치면 → 배지에 날짜 표기 + 경고 배너 + 생성 전 확인.
   const isMultiDate = dateKeys.length >= 2;
   const totalImageCount = visibleExisting.length + pickedImages.length;
-  const slotsLeft = MAX_IMAGES_PER_DIARY - totalImageCount;
+  // 요청당 상한 — 이번에 고른 장수만 센다. 기존 저장분은 용량 쿼터가 지킨다.
+  const slotsLeft = MAX_IMAGES_PER_REQUEST - pickedImages.length;
 
   const [titleError, setTitleError] = useState<string | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
@@ -885,7 +886,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
             }}
           >
             <p style={MUTED_LABEL}>
-              사진 ({totalImageCount}/{MAX_IMAGES_PER_DIARY})
+              사진 ({totalImageCount})
             </p>
             {!isMultiDate && pickedImages.length > 1 && (
               <span
