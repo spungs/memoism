@@ -810,7 +810,8 @@ function DiaryListCard({
             overflow: "hidden",
           }}
         >
-          {e.title?.trim() || snippet(e.content)}
+          {/* 메이로만 기록한 날은 제목·본문이 비어 있다 → 조각 요약이 그 자리를 채운다. */}
+          {e.title?.trim() || snippet(e.content) || e.fragmentPreview}
         </p>
         {/* 본문 미리보기 (제목 있을 때만) */}
         {e.title?.trim() && (
@@ -827,7 +828,7 @@ function DiaryListCard({
               overflow: "hidden",
             }}
           >
-            {snippet(e.content, 80)}
+            {snippet(e.content, 80) || e.fragmentPreview}
           </p>
         )}
       </div>
