@@ -6,7 +6,13 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** 캡처 대상 날짜 판정 결과. ambiguous면 저장하지 않고 사용자에게 되묻는다. */
 export type CaptureDate =
-  | { kind: "resolved"; dateKey: string; label: string }
+  | {
+      kind: "resolved";
+      dateKey: string;
+      label: string;
+      /** 메시지에 명시적 날짜 표현이 있었나. true면 사진 EXIF보다 우선한다. */
+      fromExplicit: boolean;
+    }
   | { kind: "ambiguous"; question: string };
 
 /** KST 기준 시(0~23). */
@@ -31,6 +37,7 @@ export function resolveCaptureDate(message: string, now: Date): CaptureDate {
       kind: "resolved",
       dateKey: kstDateKey(refs[0].startUtc),
       label: refs[0].label,
+      fromExplicit: true,
     };
   }
 
@@ -49,8 +56,33 @@ export function resolveCaptureDate(message: string, now: Date): CaptureDate {
       kind: "resolved",
       dateKey: kstDateKey(new Date(now.getTime() - DAY_MS)),
       label: "어제",
+      fromExplicit: false,
     };
   }
 
-  return { kind: "resolved", dateKey: kstDateKey(now), label: "오늘" };
+  return {
+    kind: "resolved",
+    dateKey: kstDateKey(now),
+    label: "오늘",
+    fromExplicit: false,
+  };
+}
+
+/**
+ * **사진별** 날짜. 묶지 않는다 — 여러 날 사진을 한 날에 몰면 데이터가 틀린 날에 남는다.
+ *
+ *   - 메시지에 명시적 표현이 있으면(`fromExplicit`) 사용자 말이 이긴다 → 전부 base
+ *   - 아니면 각 사진의 EXIF 촬영일. 없거나 형식이 틀리거나 **미래**면 base
+ */
+export function resolvePhotoDates(
+  base: string,
+  fromExplicit: boolean,
+  exifDateKeys: (string | null)[],
+  todayKey: string,
+): string[] {
+  return exifDateKeys.map((k) => {
+    if (fromExplicit) return base;
+    if (!k || !/^\d{4}-\d{2}-\d{2}$/.test(k) || k > todayKey) return base;
+    return k;
+  });
 }
