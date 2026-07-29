@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db";
 import { chat } from "@/lib/ai/gemini";
 import { findRelevantDiaries, type RelevantDiary } from "@/lib/ai/rag";
 import { checkAndIncrement } from "@/lib/ai/usage";
+import { prefilterMessage } from "@/lib/ai/safety";
+import { handleCaptureMessage } from "@/lib/ai/capture";
 import { captureServer } from "@/lib/analytics/server";
 import { CHARACTER_NAME } from "@/lib/character/utils";
 
@@ -197,6 +199,12 @@ export async function POST(req: NextRequest) {
   }
   const userMessage = parsed.data.message;
 
+  // 모든 메시지가 안전 프리필터를 먼저 통과한다 (스펙 §8, 우회구멍 없음).
+  const gate = prefilterMessage(userMessage);
+  if (gate.blocked) {
+    return NextResponse.json({ message: gate.reply, relatedDiaries: [] });
+  }
+
   // 캐릭터 먼저 — chatResetAt(대화 경계)이 아래 history 쿼리 범위를 정한다.
   const character = await prisma.character.findUnique({
     where: { userId: session.userId },
@@ -204,6 +212,52 @@ export async function POST(req: NextRequest) {
   });
   if (!character) {
     return NextResponse.json({ error: "캐릭터를 찾을 수 없어요" }, { status: 404 });
+  }
+
+  // 캡처(record) 경로: 캡을 소모하지 않고 그날 일기에 조각으로 누적한다.
+  // recall/ambiguous면 handled:false로 떨어져 아래 기존 회상 경로를 그대로 탄다.
+  // 무거운 RAG 검색(Promise.all) **앞**에 둔다 — record 메시지가 불필요한 벡터 검색을 치르지 않게.
+  const capture = await handleCaptureMessage(
+    session.userId,
+    userMessage,
+    new Date(),
+  );
+  if (capture.handled) {
+    // 캡처도 AI 호출이지만 싼 경로라 캡을 소모하지 않는다(Plan 03 AiPath).
+    await checkAndIncrement(
+      session.userId,
+      character.subscriptionStatus,
+      character.plan,
+      "capture",
+    );
+    await prisma.$transaction([
+      prisma.chatMessage.create({
+        data: {
+          userId: session.userId,
+          characterId: character.id,
+          role: "USER",
+          content: userMessage,
+          captureRef: capture.captureRef ?? undefined,
+        },
+      }),
+      prisma.chatMessage.create({
+        data: {
+          userId: session.userId,
+          characterId: character.id,
+          role: "ASSISTANT",
+          content: capture.reply,
+        },
+      }),
+    ]);
+    await captureServer("chat_capture", session.userId, {
+      message_length: userMessage.length,
+      routed: capture.captureRef !== null,
+    });
+    return NextResponse.json({
+      message: capture.reply,
+      relatedDiaries: [],
+      captureRef: capture.captureRef,
+    });
   }
 
   // 모델 컨텍스트는 "현재 대화"만 — 경계(chatResetAt) 이후, 없으면 최근 24h. 표시(영구)와 분리.
