@@ -38,8 +38,19 @@ function toOrphan(o: BucketObject): OrphanObject {
 }
 
 async function referencedPaths(): Promise<Set<string>> {
-  const rows = await prisma.diaryImage.findMany({ select: { storagePath: true } });
-  return new Set(rows.map((r) => r.storagePath));
+  // 사진을 참조하는 테이블이 **둘**이다. 하나라도 빠뜨리면 GC가 살아있는 사진을
+  // 고아로 오판해 지운다(되돌릴 수 없음). 사진 조각을 만드는 경로가 아직 없어도
+  // 여기에 미리 넣어둔다 — 나중에 추가하는 걸 잊으면 사용자 사진이 사라진다.
+  const [images, fragments] = await Promise.all([
+    prisma.diaryImage.findMany({ select: { storagePath: true } }),
+    prisma.diaryFragment.findMany({
+      where: { storagePath: { not: null } },
+      select: { storagePath: true },
+    }),
+  ]);
+  const set = new Set(images.map((r) => r.storagePath));
+  for (const f of fragments) if (f.storagePath) set.add(f.storagePath);
+  return set;
 }
 
 /**
