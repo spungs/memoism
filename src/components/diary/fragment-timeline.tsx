@@ -2,8 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
+import { DiaryDatePicker } from "@/components/diary/date-picker";
+import { kstTodayKey } from "@/lib/diary/kst";
 import {
   deleteFragmentAction,
+  moveFragmentAction,
   updateFragmentAction,
 } from "@/lib/diary/fragment-actions";
 
@@ -42,10 +45,14 @@ const ACTION_BUTTON: React.CSSProperties = {
  */
 export function FragmentTimeline({
   fragments,
+  diaryDateKey,
 }: {
   fragments: TimelineFragment[];
+  /** 이 일기의 KST 날짜키 — 이동 선택기의 시작값. */
+  diaryDateKey: string;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [movingId, setMovingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +75,15 @@ export function FragmentTimeline({
       }
       setError(null);
       setEditingId(null);
+    });
+  };
+
+  const move = (id: string, dateKey: string) => {
+    startTransition(async () => {
+      const r = await moveFragmentAction(id, dateKey);
+      if (!r.ok) setError(r.error);
+      else setError(null);
+      setMovingId(null);
     });
   };
 
@@ -212,12 +228,30 @@ export function FragmentTimeline({
                   </button>
                   <button
                     type="button"
+                    style={ACTION_BUTTON}
+                    disabled={pending}
+                    onClick={() => setMovingId(movingId === f.id ? null : f.id)}
+                  >
+                    날짜 옮기기
+                  </button>
+                  <button
+                    type="button"
                     style={{ ...ACTION_BUTTON, color: "var(--danger)" }}
                     disabled={pending}
                     onClick={() => setConfirmDeleteId(f.id)}
                   >
                     삭제
                   </button>
+                </div>
+              )}
+
+              {movingId === f.id && !isEditing && (
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <DiaryDatePicker
+                    value={diaryDateKey}
+                    max={kstTodayKey()}
+                    onChange={(picked) => move(f.id, picked)}
+                  />
                 </div>
               )}
             </li>
