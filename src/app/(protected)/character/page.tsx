@@ -34,6 +34,7 @@ export default async function CharacterPage() {
         content: true,
         createdAt: true,
         relatedDiaries: true,
+        captureRef: true,
       },
     }),
   ]);
@@ -55,6 +56,12 @@ export default async function CharacterPage() {
       createdAt: m.createdAt.toISOString(),
       relatedDiaries:
         (m.relatedDiaries as unknown as RelatedDiary[] | null) ?? undefined,
+      captureRef:
+        (m.captureRef as unknown as {
+          diaryId: string;
+          dateKey: string;
+          label: string;
+        } | null) ?? undefined,
     }));
 
   return (

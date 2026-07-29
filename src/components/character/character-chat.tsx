@@ -8,12 +8,15 @@ import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 
 type Role = "user" | "assistant";
 type RelatedDiary = { id: string; title: string; createdAt: string };
+/** record 메시지가 들어간 일기 포인터. 조각 원본은 DiaryFragment다(단일 원본). */
+type CaptureRef = { diaryId: string; dateKey: string; label: string };
 type Message = {
   id: string;
   role: Role;
   content: string;
   createdAt: string;
   relatedDiaries?: RelatedDiary[];
+  captureRef?: CaptureRef | null;
 };
 
 // Asia/Seoul 기준 YYYY-MM-DD 키 (날짜 구분선 비교용). en-CA = YYYY-MM-DD 포맷.
@@ -116,7 +119,10 @@ export function CharacterChat({
         return;
       }
       setMessages((prev) => [
-        ...prev,
+        // 캡처된 경우 방금 보낸 내 메시지에 "기록됨" 칩을 붙인다(칩은 record 메시지 아래).
+        ...prev.map((m) =>
+          m.id === userMsg.id ? { ...m, captureRef: data.captureRef ?? null } : m,
+        ),
         {
           id: `local-${Date.now()}-a`,
           role: "assistant",
@@ -287,6 +293,20 @@ export function CharacterChat({
                 {m.role === "assistant" && m.relatedDiaries && m.relatedDiaries.length > 0 && (
                   <div style={{ paddingLeft: 36 }}>
                     <RelatedDiaryChips diaries={m.relatedDiaries} onNavigate={(id) => router.push(`/diary/${id}`)} />
+                  </div>
+                )}
+                {/* 저장 확인은 시스템 멘트가 아니라 은근한 칩으로 (스펙 §3). */}
+                {m.role === "user" && m.captureRef && (
+                  <div
+                    style={{
+                      marginTop: 4,
+                      textAlign: "right",
+                      fontFamily: "var(--font-sans)",
+                      fontSize: "var(--text-xs)",
+                      color: "var(--fg-placeholder)",
+                    }}
+                  >
+                    📖 {m.captureRef.label} 일기에 기록됨
                   </div>
                 )}
               </div>
