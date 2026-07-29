@@ -3,6 +3,14 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 
 const MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+
+/**
+ * 캡처 경로 전용 저가 모델 (의도 분류·짧은 응답). 캡을 소모하지 않는 경로라
+ * 호출 빈도가 높다 — 비용 통제는 캡이 아니라 **모델 선택**으로 한다.
+ * env로 덮어쓸 수 있게 해서 모델 교체 시 배포 없이 조정 가능.
+ */
+export const CAPTURE_MODEL =
+  process.env.GEMINI_CAPTURE_MODEL ?? "gemini-2.5-flash-lite";
 const TIMEOUT_MS = 20_000;
 // 한국어는 토큰당 글자 수가 영어의 1/2 정도라 영어 기준 300토큰 ≒ 한국어 600토큰.
 // "1~3문장" 응답 + 자연스러운 종결 보장을 위해 여유 있게 1000.
@@ -102,6 +110,8 @@ export type ChatInput = {
   history: ChatTurn[];
   query: string;
   maxOutputTokens?: number;
+  /** 미지정이면 기본 모델. 캡처 경로는 CAPTURE_MODEL을 넘긴다. */
+  model?: string;
 };
 
 export async function chat(input: ChatInput): Promise<string> {
@@ -116,7 +126,7 @@ export async function chat(input: ChatInput): Promise<string> {
   const response = await callWithRetry(() =>
     withTimeout(
       getClient().models.generateContent({
-        model: MODEL,
+        model: input.model ?? MODEL,
         contents,
         config: {
           systemInstruction: input.systemPrompt,
