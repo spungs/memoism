@@ -22,22 +22,10 @@ describe("fragmentPreview", () => {
     ).toBe("국수 먹었어 · 조각 2개 더");
   });
 
-  it("사진 조각만 있으면 사진 표시", () => {
-    expect(fragmentPreview([{ kind: "photo", content: null }])).toBe("사진 1장");
-  });
-
-  it("공백뿐인 텍스트 조각을 사진으로 세지 않는다", () => {
-    // 뺄셈으로 사진 수를 구하면 여기서 "사진 1장"이라고 거짓말한다.
+  it("보여줄 텍스트가 없으면 빈 문자열", () => {
+    // 공백뿐인 조각은 카드에 아무것도 쓰지 않는다.
     expect(fragmentPreview([{ kind: "text", content: "   " }])).toBe("");
-  });
-
-  it("텍스트와 사진이 섞이면 텍스트를 앞세우고 나머지를 센다", () => {
-    expect(
-      fragmentPreview([
-        { kind: "text", content: "국수 먹었어" },
-        { kind: "photo", content: null },
-      ]),
-    ).toBe("국수 먹었어 · 조각 1개 더");
+    expect(fragmentPreview([{ kind: "text", content: null }])).toBe("");
   });
 
   it("내용이 길면 잘라낸다", () => {

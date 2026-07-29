@@ -11,14 +11,10 @@ export function fragmentPreview(
 ): string {
   if (fragments.length === 0) return "";
 
+  // 조각은 텍스트뿐이다 — 채팅 사진은 조각이 아니라 DiaryImage로 저장한다
+  // (2026-07-29 결정: 사진 인프라를 두 벌로 만들지 않는다).
   const texts = fragments.filter((f) => f.kind === "text" && f.content?.trim());
-  // 종류를 직접 센다. `fragments.length - texts.length`로 빼면 공백만 있는
-  // 텍스트 조각이 사진으로 집계돼 "사진 1장"이라고 거짓말한다.
-  const photos = fragments.filter((f) => f.kind === "photo").length;
-
-  if (texts.length === 0) {
-    return photos > 0 ? `사진 ${photos}장` : "";
-  }
+  if (texts.length === 0) return "";
 
   const head = texts[0].content!.replace(/\s+/g, " ").trim();
   const clipped = head.length > MAX ? `${head.slice(0, MAX)}…` : head;

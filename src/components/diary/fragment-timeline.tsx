@@ -163,7 +163,7 @@ export function FragmentTimeline({
                       whiteSpace: "pre-wrap",
                     }}
                   >
-                    {f.kind === "photo" ? "📷 사진" : f.content}
+                    {f.content}
                   </span>
                 )}
               </div>
@@ -202,16 +202,14 @@ export function FragmentTimeline({
                     marginTop: 2,
                   }}
                 >
-                  {f.kind !== "photo" && (
-                    <button
-                      type="button"
-                      style={ACTION_BUTTON}
-                      disabled={pending}
-                      onClick={() => startEdit(f)}
-                    >
-                      수정
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    style={ACTION_BUTTON}
+                    disabled={pending}
+                    onClick={() => startEdit(f)}
+                  >
+                    수정
+                  </button>
                   <button
                     type="button"
                     style={{ ...ACTION_BUTTON, color: "var(--danger)" }}
