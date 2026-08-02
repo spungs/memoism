@@ -155,14 +155,14 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
     try {
       const res = await fetch("/api/chat/reset", { method: "POST" });
       if (!res.ok) {
-        setResetError("새 대화를 시작하지 못했어요. 잠시 후 다시 시도해주세요.");
+        setResetError("기억을 새로 고치지 못했어요. 잠시 후 다시 시도해주세요.");
         return;
       }
       setResetOpen(false);
       // 메이 화면은 서버에서 경계를 다시 읽는다 — 새로고침으로 반영.
       router.refresh();
     } catch {
-      setResetError("네트워크 오류로 새 대화를 시작하지 못했어요.");
+      setResetError("네트워크 오류로 기억을 새로 고치지 못했어요.");
     } finally {
       setResetting(false);
     }
@@ -325,7 +325,10 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
       <div style={{ padding: "0 var(--space-5)", marginBottom: "var(--space-6)" }}>
         <p style={SECTION_LABEL_STYLE}>메이</p>
         <div style={CARD_STYLE}>
-          <RowButton label="메이와 새 대화 시작" onClick={() => setResetOpen(true)} />
+          <RowButton
+            label="메이 기억 새로 고치기"
+            onClick={() => setResetOpen(true)}
+          />
         </div>
         <p
           style={{
@@ -337,7 +340,8 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
             lineHeight: "var(--leading-normal)",
           }}
         >
-          지금까지 나눈 이야기는 그대로 남고, 메이가 읽는 범위만 지금부터로 바뀌어요.
+          메이가 지난 대화를 자꾸 잘못 기억하거나 엉뚱한 말을 반복할 때 눌러주세요.
+          주고받은 이야기와 일기는 그대로 남고, 메이만 여기서부터 새로 시작해요.
         </p>
         {resetError && (
           <p
@@ -478,9 +482,9 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
         isOpen={resetOpen}
         onClose={() => setResetOpen(false)}
         onConfirm={() => void handleChatReset()}
-        title="메이와 새 대화를 시작할까요?"
-        description="지금까지 나눈 이야기는 그대로 남아요. 메이가 새로 시작하는 것만 달라져요."
-        confirmLabel="새 대화 시작"
+        title="메이 기억을 새로 고칠까요?"
+        description="주고받은 이야기와 일기는 그대로 남아요. 메이가 지난 대화를 참고하지 않고 여기서부터 새로 시작해요."
+        confirmLabel="새로 고치기"
         confirmVariant="primary"
         isLoading={resetting}
       />

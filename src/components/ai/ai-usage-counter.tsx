@@ -8,12 +8,22 @@ import { useEffect, useState } from "react";
 // "오늘 AI X/N"을 갱신한다. 캡은 전역(UsageLog)이라 모든 AI 표면에서 같은 값이고,
 // AI 동작 후 부모가 refreshSignal을 올리면 최신값으로 갱신된다.
 // (표시는 부가 정보 — 조회 실패 시 조용히 아무것도 렌더하지 않는다.)
+/** 이 수 이하로 남으면 조용한 자리에서도 알린다. */
+const LOW_REMAINING = 3;
+
 export function AiUsageCounter({
   refreshSignal = 0,
   align = "left",
+  variant = "always",
 }: {
   refreshSignal?: number;
   align?: "left" | "right" | "center";
+  /**
+   * `always` — AI 정리 버튼 옆처럼 **누르기 전에 잔여를 알아야 하는** 자리.
+   * `low-only` — 메이 대화처럼 상시 노출이 대화를 위축시키는 자리. 얼마 안 남았을
+   *   때만, 그것도 "몇 번 남았다"로 말한다. 정확한 수치는 설정 > 구독에 늘 있다.
+   */
+  variant?: "always" | "low-only";
 }) {
   const [usage, setUsage] = useState<{ used: number; limit: number } | null>(
     null,
@@ -38,6 +48,12 @@ export function AiUsageCounter({
 
   if (!usage) return null;
 
+  const remaining = Math.max(0, usage.limit - usage.used);
+  // 소진(0)은 입력창이 이미 비활성 + 안내 문구로 말하고 있어 중복이라 띄우지 않는다.
+  if (variant === "low-only" && (remaining === 0 || remaining > LOW_REMAINING)) {
+    return null;
+  }
+
   return (
     <span
       style={{
@@ -48,7 +64,10 @@ export function AiUsageCounter({
         color: "var(--fg-placeholder)",
       }}
     >
-      오늘 AI 정리·회상 {usage.used}/{usage.limit}
+      {variant === "low-only"
+        ? // 대화에서 캡을 쓰는 건 회상(질문)뿐이다 — 기록은 무제한이라 "질문"이라 부른다.
+          `오늘 질문 ${remaining}번 남았어요`
+        : `오늘 AI 정리·회상 ${usage.used}/${usage.limit}`}
     </span>
   );
 }

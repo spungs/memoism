@@ -540,7 +540,11 @@ export function CharacterChat({
         }}
       >
         <div style={{ padding: "0 var(--space-2) 4px" }}>
-          <AiUsageCounter refreshSignal={usageSignal} align="right" />
+          <AiUsageCounter
+            refreshSignal={usageSignal}
+            align="right"
+            variant="low-only"
+          />
         </div>
         {picked.length > 0 && (
           <div
@@ -641,7 +645,8 @@ export function CharacterChat({
             placeholder={
               capExhausted
                 ? "내일 다시 만나요"
-                : `${characterName}에게 물어보기`
+                : // "물어보기"는 회상만 가리켰다 — 이 입력창은 이제 기록이 주 용도다.
+                  `${characterName}에게 말하기`
             }
             aria-label="메시지 입력"
             style={{
