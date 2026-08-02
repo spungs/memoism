@@ -14,6 +14,11 @@ export type ExifMeta = {
  *   - GPS → lat/lng (없으면 null)
  *   - 스크린샷·다운로드·EXIF 제거 사진 → 모두 null (정상 케이스)
  */
+/** Invalid Date를 걸러낸다 — `instanceof Date`만으론 못 거른다. */
+function isValidDate(v: unknown): v is Date {
+  return v instanceof Date && !Number.isNaN(v.getTime());
+}
+
 export async function extractExif(file: File): Promise<ExifMeta> {
   try {
     const data = await exifr.parse(file, {
@@ -21,8 +26,11 @@ export async function extractExif(file: File): Promise<ExifMeta> {
     });
     if (!data) return { takenAt: null, lat: null, lng: null };
     return {
-      takenAt:
-        data.DateTimeOriginal instanceof Date ? data.DateTimeOriginal : null,
+      // Invalid Date도 `instanceof Date`는 true다. 손상된 EXIF가 그대로 통과하면
+      // 뒤에서 toISOString()이 RangeError를 던져 그 사진을 영영 못 보내게 된다.
+      takenAt: isValidDate(data.DateTimeOriginal)
+        ? data.DateTimeOriginal
+        : null,
       lat: typeof data.GPSLatitude === "number" ? data.GPSLatitude : null,
       lng: typeof data.GPSLongitude === "number" ? data.GPSLongitude : null,
     };

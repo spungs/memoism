@@ -63,6 +63,23 @@ const FALLBACK_REPLY = "그랬구나, 남겨뒀어.";
 /** 사진만 온 경우의 폴백 — 되묻기를 잃지 않게 별도로 둔다. */
 const PHOTO_ONLY_FALLBACK = "사진 잘 받았어. 무슨 날이었어?";
 
+/**
+ * 칩 라벨 — **실제로 저장된 날**을 말한다. 사진이 EXIF로 다른 날에 가면
+ * 메시지 날짜("오늘")를 그대로 쓰는 순간 칩이 거짓말을 한다.
+ *
+ * `messageDateLabel`은 대표 일기가 메시지 날짜와 같을 때만 넘긴다("오늘"/"어제").
+ */
+function captureLabel(
+  entries: CaptureEntry[],
+  primary: CaptureEntry,
+  messageDateLabel: string | null,
+): string {
+  if (entries.length > 1) {
+    return `${dateKeyLabel(primary.dateKey)} 외 ${entries.length - 1}일`;
+  }
+  return messageDateLabel ?? dateKeyLabel(primary.dateKey);
+}
+
 
 /**
  * record 메시지를 그날 일기에 조각으로 누적한다 (스펙 §3·4·5).
@@ -83,27 +100,44 @@ export async function handleCaptureMessage(
 
   // 텍스트(=메시지)의 날짜. 사진은 각자 EXIF 날짜로 따로 간다.
   const date = resolveCaptureDate(message, now);
-  if (date.kind === "ambiguous") {
-    // 저장하지 않고 되묻기만. 사용자가 날짜를 확정해 다시 보내면 그때 저장된다.
-    return { handled: true, reply: date.question, captureRef: null };
-  }
+  const todayKey = kstDateKey(now);
+
+  // **사진은 되묻기 전에 저장한다.** 사진엔 EXIF라는 확실한 날짜가 있어 애매하지
+  // 않다 — 애매한 건 텍스트뿐이다. 여기서 먼저 반환해버리면 사용자가 첨부한
+  // 사진이 저장도 안 된 채 사라진다(클라이언트는 이미 선택을 비운 뒤라 복구 불가).
+  const base = date.kind === "resolved" ? date.dateKey : todayKey;
+  const fromExplicit = date.kind === "resolved" ? date.fromExplicit : false;
 
   const entries: CaptureEntry[] = [];
   if (photos.length > 0) {
     const exifKeys = exifs.map((e) =>
       e.takenAt ? kstDateKey(new Date(e.takenAt)) : null,
     );
-    const photoDates = resolvePhotoDates(
-      date.dateKey,
-      date.fromExplicit,
-      exifKeys,
-      kstDateKey(now),
-    );
+    const photoDates = resolvePhotoDates(base, fromExplicit, exifKeys, todayKey);
     const saved = await savePhotosByDate(userId, photos, exifs, photoDates);
     if (!saved.ok) {
       return { handled: true, reply: saved.error, captureRef: null };
     }
     entries.push(...saved.entries);
+  }
+
+  if (date.kind === "ambiguous") {
+    // 사진은 이미 제 날짜로 저장됐다. 되묻는 대상은 텍스트뿐 — 사용자가 날짜를
+    // 확정해 다시 보내면 그때 조각으로 저장된다. 칩은 사진이 어디 갔는지 알린다.
+    return {
+      handled: true,
+      reply: date.question,
+      captureRef:
+        entries.length > 0
+          ? {
+              diaryId: entries[0].diaryId,
+              dateKey: entries[0].dateKey,
+              label: captureLabel(entries, entries[0], null),
+              entries,
+              fragmentId: null,
+            }
+          : null,
+    };
   }
 
   // 텍스트 조각은 메시지 날짜로. 조각은 하나뿐이라 여러 날로 쪼갤 수 없다.
@@ -157,14 +191,11 @@ export async function handleCaptureMessage(
     captureRef: {
       diaryId: primary.diaryId,
       dateKey: primary.dateKey,
-      // 라벨은 **실제로 저장된 날**을 말해야 한다. 사진이 EXIF로 다른 날에 가면
-      // 메시지 날짜("오늘")를 그대로 쓰는 순간 칩이 거짓말을 한다.
-      label:
-        entries.length > 1
-          ? `${dateKeyLabel(primary.dateKey)} 외 ${entries.length - 1}일`
-          : primary.dateKey === date.dateKey
-            ? date.label
-            : dateKeyLabel(primary.dateKey),
+      label: captureLabel(
+        entries,
+        primary,
+        primary.dateKey === date.dateKey ? date.label : null,
+      ),
       entries,
       fragmentId,
     },

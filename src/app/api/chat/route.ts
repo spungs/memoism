@@ -249,8 +249,14 @@ export async function POST(req: NextRequest) {
       }
       // 형태만 신뢰한다 — 조작된 값이 Prisma까지 가면 저장 전체가 실패한다
       // (diary/actions.ts의 parseExifs와 같은 규약).
+      // 날짜는 **파싱까지** 확인한다. 문자열이기만 하면 통과시키면 "hello" 같은
+      // 값이 Invalid Date가 되어 사진 저장이 통째로 깨진다.
       clientExifs = parsedExifs.map((item) => ({
-        takenAt: typeof item?.takenAt === "string" ? item.takenAt : null,
+        takenAt:
+          typeof item?.takenAt === "string" &&
+          !Number.isNaN(Date.parse(item.takenAt))
+            ? item.takenAt
+            : null,
         lat: typeof item?.lat === "number" ? item.lat : null,
         lng: typeof item?.lng === "number" ? item.lng : null,
       }));

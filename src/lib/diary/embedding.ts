@@ -53,6 +53,26 @@ export async function upsertDiaryEmbedding(
 }
 
 /**
+ * 일기 임베딩 삭제.
+ *
+ * 내용이 다 빠져나가 **빈 일기**가 됐을 때 부른다. 안 지우면 옛 벡터가 그대로
+ * 남아 회상 검색(findRelevantDiaries)에 계속 걸리고, 모델에는 제목·본문이 빈
+ * 껍데기가 전달된다 — topK 슬롯을 먹으면서 정작 옮겨간 진짜 기억을 밀어낸다.
+ *
+ * best-effort: 실패해도 호출자를 막지 않는다(임베딩은 항상 부가 기능).
+ */
+export async function deleteDiaryEmbedding(diaryId: string): Promise<void> {
+  try {
+    await prisma.diaryEmbedding.deleteMany({ where: { diaryId } });
+  } catch (e) {
+    console.warn(
+      `[embedding] delete failed for diary ${diaryId}:`,
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+}
+
+/**
  * 본인 일기 중 임베딩 누락분 채우기 (backfill).
  *   - dev/staging에서 일회성. V2에선 background queue로 자동.
  *   - 반환: 성공/실패 카운트.

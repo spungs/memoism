@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { upsertDiaryEmbedding } from "./embedding";
+import { deleteDiaryEmbedding, upsertDiaryEmbedding } from "./embedding";
 
 /** 일기 본문(prose) + 텍스트 조각들을 임베딩 입력 텍스트로 합성. 순수 함수. */
 export function composeDiaryEmbedText(
@@ -49,7 +49,12 @@ export async function reembedDiaryWithFragments(
       diary.content,
       diary.fragments,
     );
-    if (!embedText.trim()) return;
+    if (!embedText.trim()) {
+      // 내용이 다 빠져나간 일기 — 그냥 두면 옛 벡터가 회상에 계속 걸려
+      // 빈 껍데기를 인용하게 된다(조각을 다른 날로 옮긴 직후가 정확히 이 상황).
+      await deleteDiaryEmbedding(diaryId);
+      return;
+    }
     await upsertDiaryEmbedding(diaryId, diary.title, embedText);
   } catch (e) {
     console.warn(
