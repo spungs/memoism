@@ -4,6 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp, ImagePlus, X } from "lucide-react";
 import { CaptureCorrectionSheet } from "./capture-correction-sheet";
+import { getCapturePhotoUrls } from "@/lib/diary/capture-actions";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 import { SettingsLink } from "@/components/nav/settings-link";
 import { extractExif, exifToWire } from "@/lib/diary/exif";
@@ -37,12 +38,16 @@ type Message = {
   photoCount?: number;
 };
 
+/** 이 메시지에 붙은 사진 id들 — 썸네일 조회용. 구버전 행(entries 없음)은 빈 배열. */
+function photoIdsOf(m: Message): string[] {
+  return m.captureRef?.entries?.flatMap((e) => e.imageIds) ?? [];
+}
+
 /** 이 메시지에 붙은 사진 장수 — 본문이 비어도 빈 말풍선이 되지 않게. */
 function photoCountOf(m: Message): number {
-  if (m.photoCount != null) return m.photoCount;
-  return (
-    m.captureRef?.entries?.reduce((sum, e) => sum + e.imageIds.length, 0) ?? 0
-  );
+  const ids = photoIdsOf(m).length;
+  if (ids > 0) return ids;
+  return m.photoCount ?? 0;
 }
 
 type PickedPhoto = { id: string; file: File; previewUrl: string };
@@ -113,6 +118,32 @@ export function CharacterChat({
   const listRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // 대화에 보이는 사진의 signed URL (id → url). captureRef엔 id만 있어 서버에서 해석한다.
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  // 이미 조회를 시도한 id — 삭제된 사진이 계속 재조회되는 루프를 막는다.
+  const triedPhotoIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const missing = messages
+      .flatMap(photoIdsOf)
+      .filter((id) => !triedPhotoIds.current.has(id));
+    if (missing.length === 0) return;
+    missing.forEach((id) => triedPhotoIds.current.add(id));
+    let alive = true;
+    void getCapturePhotoUrls(missing)
+      .then((urls) => {
+        if (alive && Object.keys(urls).length > 0) {
+          setPhotoUrls((prev) => ({ ...prev, ...urls }));
+        }
+      })
+      .catch(() => {
+        // 썸네일은 부가 정보다 — 실패해도 대화를 막지 않는다("사진 N장"으로 남는다).
+      });
+    return () => {
+      alive = false;
+    };
+  }, [messages]);
 
   // 언마운트 시 미리보기 objectURL 회수 (SPA 이동으로는 문서가 안 죽어 남는다).
   const pickedRef = useRef<PickedPhoto[]>([]);
@@ -342,6 +373,10 @@ export function CharacterChat({
           const prev = messages[i - 1];
           const sameSenderAsPrev = prev?.role === m.role;
           const photoCount = photoCountOf(m);
+          // URL이 아직 안 온 사진은 "📷 사진 N장"으로 남는다(썸네일은 부가 정보).
+          const thumbs = photoIdsOf(m)
+            .map((id) => photoUrls[id])
+            .filter((u): u is string => !!u);
           const ref = m.captureRef ?? null;
           // entries 없는 구버전 행(Plan 04 배포분)은 대표 세 키로 폴백한다 —
           // 안 하면 운영에 쌓인 과거 칩이 전부 깨진다.
@@ -367,18 +402,45 @@ export function CharacterChat({
                   {/* 사진은 **텍스트가 있어도** 표시한다. 예전엔 본문이 있으면
                       사진 표시를 안 해서, 사진+글을 보내면 대화에서 사진의 흔적이
                       통째로 사라졌다("사진이 날아갔다"로 읽힘). */}
-                  {photoCount > 0 && (
-                    <span
-                      style={{
-                        display: "block",
-                        fontSize: "var(--text-sm)",
-                        opacity: 0.75,
-                        marginBottom: m.content ? 4 : 0,
-                      }}
-                    >
-                      📷 사진 {photoCount}장
-                    </span>
-                  )}
+                  {photoCount > 0 &&
+                    (thumbs.length > 0 ? (
+                      <span
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 4,
+                          marginBottom: m.content ? 6 : 0,
+                        }}
+                      >
+                        {thumbs.map((url, i) => (
+                          // 로컬/서명 URL이라 next/image 최적화 대상이 아니다.
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            key={i}
+                            src={url}
+                            alt=""
+                            style={{
+                              width: 96,
+                              height: 96,
+                              objectFit: "cover",
+                              borderRadius: "var(--radius-sm)",
+                              display: "block",
+                            }}
+                          />
+                        ))}
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          display: "block",
+                          fontSize: "var(--text-sm)",
+                          opacity: 0.75,
+                          marginBottom: m.content ? 4 : 0,
+                        }}
+                      >
+                        📷 사진 {photoCount}장
+                      </span>
+                    ))}
                   {m.content}
                 </Bubble>
                 {m.role === "assistant" && m.relatedDiaries && m.relatedDiaries.length > 0 && (

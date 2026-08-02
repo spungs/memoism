@@ -100,9 +100,11 @@ export async function handleCaptureMessage(
   photos: File[] = [],
   exifs: ClientExif[] = [],
 ): Promise<CaptureOutcome> {
-  // 사진이 있으면 무조건 기록이다 — 분류 호출을 아낀다.
-  const intent = photos.length > 0 ? "record" : await classifyIntent(message);
-  if (intent !== "record") return { handled: false };
+  // 사진 자체는 무조건 기록이다. 다만 **텍스트는 따로 판단한다** — "이거 뭐게?"
+  // 같은 대화체 질문까지 일기 조각으로 남기면 라이프DB가 잡담으로 오염된다.
+  // (사진이 없을 때의 동작은 예전 그대로: record가 아니면 회상 경로로 넘긴다.)
+  const textIsRecord = message ? (await classifyIntent(message)) === "record" : false;
+  if (photos.length === 0 && !textIsRecord) return { handled: false };
 
   // 텍스트(=메시지)의 날짜. 사진은 각자 EXIF 날짜로 따로 간다.
   const date = resolveCaptureDate(message, now);
@@ -149,7 +151,7 @@ export async function handleCaptureMessage(
   // 텍스트 조각은 메시지 날짜로. 조각은 하나뿐이라 여러 날로 쪼갤 수 없다.
   let fragmentId: string | null = null;
   let textDiaryId: string | null = null;
-  if (message) {
+  if (message && textIsRecord) {
     const f = await createFragment({
       userId,
       dateKey: date.dateKey,

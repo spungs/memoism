@@ -3,9 +3,48 @@
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
+import { getSignedUrlsForOwner } from "@/lib/storage";
 import { reembedDiaryWithFragments } from "./fragment-embed";
 import { getOrCreateDiaryForDate } from "./queries";
 import { dateKeyLabel, kstTodayKey } from "./kst";
+
+/**
+ * 대화에 보이는 사진 썸네일용 signed URL — `captureRef.entries[].imageIds`로 조회한다.
+ *
+ * id로 받는 이유: captureRef에는 storagePath가 없고, 넣어두면 채팅 메시지 JSON에
+ * 경로가 영구 복제된다. id → path 해석을 서버에서 하면 **소유자 검증이 쿼리 자체에
+ * 걸린다**(`diary: { userId }`).
+ */
+const MAX_CHAT_PHOTO_IDS = 60;
+
+export async function getCapturePhotoUrls(
+  imageIds: string[],
+): Promise<Record<string, string>> {
+  const session = await getSession();
+  if (!session || !Array.isArray(imageIds) || imageIds.length === 0) return {};
+
+  const ids = imageIds
+    .filter((id) => typeof id === "string" && id.length > 0)
+    .slice(0, MAX_CHAT_PHOTO_IDS);
+  if (ids.length === 0) return {};
+
+  const rows = await prisma.diaryImage.findMany({
+    where: { id: { in: ids }, diary: { userId: session.userId } },
+    select: { id: true, storagePath: true },
+  });
+  if (rows.length === 0) return {};
+
+  const urls = await getSignedUrlsForOwner(
+    rows.map((r) => r.storagePath),
+    session.userId,
+  );
+  const out: Record<string, string> = {};
+  rows.forEach((r, i) => {
+    const u = urls[i];
+    if (u) out[r.id] = u;
+  });
+  return out;
+}
 
 /** 옮겨간 일기 id를 함께 돌려준다 — 호출한 화면이 칩을 바로 갱신할 수 있게. */
 type Result = { ok: true; diaryId: string } | { ok: false; error: string };
