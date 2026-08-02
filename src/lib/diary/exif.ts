@@ -31,6 +31,19 @@ export async function extractExif(file: File): Promise<ExifMeta> {
   }
 }
 
+/** 서버로 보낼 형태(Date → ISO 문자열). 컴포저·채팅이 같은 모양을 보내게 한다. */
+export function exifToWire(e: ExifMeta): {
+  takenAt: string | null;
+  lat: number | null;
+  lng: number | null;
+} {
+  return {
+    takenAt: e.takenAt ? e.takenAt.toISOString() : null,
+    lat: e.lat,
+    lng: e.lng,
+  };
+}
+
 function kstDateKey(d: Date): string {
   const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
   return kst.toISOString().slice(0, 10);

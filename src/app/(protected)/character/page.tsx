@@ -61,6 +61,9 @@ export default async function CharacterPage() {
           diaryId: string;
           dateKey: string;
           label: string;
+          // 구버전 행엔 없다 — 옵셔널로 둬야 옛 칩이 깨지지 않는다.
+          entries?: { dateKey: string; diaryId: string; imageIds: string[] }[];
+          fragmentId?: string | null;
         } | null) ?? undefined,
     }));
 

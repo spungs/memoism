@@ -2,14 +2,28 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp, SquarePen } from "lucide-react";
+import { ArrowUp, ImagePlus, SquarePen, X } from "lucide-react";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
+import { extractExif, exifToWire } from "@/lib/diary/exif";
+import { compressImages } from "@/lib/diary/image-compress";
+import { MAX_IMAGES_PER_REQUEST } from "@/lib/diary/limits";
 
 type Role = "user" | "assistant";
 type RelatedDiary = { id: string; title: string; createdAt: string };
-/** record 메시지가 들어간 일기 포인터. 조각 원본은 DiaryFragment다(단일 원본). */
-type CaptureRef = { diaryId: string; dateKey: string; label: string };
+/**
+ * record 메시지가 들어간 일기 포인터. 조각 원본은 DiaryFragment다(단일 원본).
+ *
+ * `entries`·`fragmentId`는 **옵셔널**이다 — 운영에 세 키(diaryId/dateKey/label)만
+ * 있는 구버전 행이 쌓여 있어서, 없을 때도 칩이 그대로 그려져야 한다.
+ */
+type CaptureRef = {
+  diaryId: string;
+  dateKey: string;
+  label: string;
+  entries?: { dateKey: string; diaryId: string; imageIds: string[] }[];
+  fragmentId?: string | null;
+};
 type Message = {
   id: string;
   role: Role;
@@ -17,7 +31,19 @@ type Message = {
   createdAt: string;
   relatedDiaries?: RelatedDiary[];
   captureRef?: CaptureRef | null;
+  /** 전송 직후 낙관적 표시용(서버 응답 전). 새로고침 뒤엔 captureRef로 센다. */
+  photoCount?: number;
 };
+
+/** 이 메시지에 붙은 사진 장수 — 본문이 비어도 빈 말풍선이 되지 않게. */
+function photoCountOf(m: Message): number {
+  if (m.photoCount != null) return m.photoCount;
+  return (
+    m.captureRef?.entries?.reduce((sum, e) => sum + e.imageIds.length, 0) ?? 0
+  );
+}
+
+type PickedPhoto = { id: string; file: File; previewUrl: string };
 
 // Asia/Seoul 기준 YYYY-MM-DD 키 (날짜 구분선 비교용). en-CA = YYYY-MM-DD 포맷.
 function kstDayKey(iso: string): string {
@@ -75,8 +101,20 @@ export function CharacterChat({
   const [usageSignal, setUsageSignal] = useState(0);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [picked, setPicked] = useState<PickedPhoto[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // 언마운트 시 미리보기 objectURL 회수 (SPA 이동으로는 문서가 안 죽어 남는다).
+  const pickedRef = useRef<PickedPhoto[]>([]);
+  useEffect(() => {
+    pickedRef.current = picked;
+  }, [picked]);
+  useEffect(
+    () => () => pickedRef.current.forEach((p) => URL.revokeObjectURL(p.previewUrl)),
+    [],
+  );
 
   // 새 메시지 추가 / 새 대화 시작 시 스크롤 최하단으로 (리셋 땐 messages는 그대로라 boundaryAt도 의존)
   useEffect(() => {
@@ -92,9 +130,43 @@ export function CharacterChat({
     ta.style.height = Math.min(Math.max(ta.scrollHeight, INPUT_MIN_H), INPUT_MAX_H) + "px";
   }, [draft]);
 
+  function handlePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (fileRef.current) fileRef.current.value = "";
+    if (files.length === 0) return;
+    const room = MAX_IMAGES_PER_REQUEST - picked.length;
+    if (room <= 0) {
+      setError(`사진은 한 번에 ${MAX_IMAGES_PER_REQUEST}장까지 보낼 수 있어요`);
+      return;
+    }
+    // 초과분을 조용히 버리지 않는다 — 몇 장만 담겼는지 알린다.
+    if (files.length > room) {
+      setError(
+        `사진은 한 번에 ${MAX_IMAGES_PER_REQUEST}장까지예요. ${room}장만 담았어요.`,
+      );
+    }
+    setPicked((prev) => [
+      ...prev,
+      ...files.slice(0, room).map((f) => ({
+        id: crypto.randomUUID(),
+        file: f,
+        previewUrl: URL.createObjectURL(f),
+      })),
+    ]);
+  }
+
+  function removePhoto(id: string) {
+    setPicked((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((p) => p.id !== id);
+    });
+  }
+
   async function send(textArg?: string) {
     const text = (textArg ?? draft).trim();
-    if (!text || sending || capExhausted) return;
+    const photos = picked;
+    if ((!text && photos.length === 0) || sending || capExhausted) return;
     setSending(true);
     setError(null);
     const userMsg: Message = {
@@ -102,22 +174,42 @@ export function CharacterChat({
       role: "user",
       content: text,
       createdAt: new Date().toISOString(),
+      photoCount: photos.length || undefined,
     };
     setMessages((prev) => [...prev, userMsg]);
     setDraft("");
+    setPicked([]);
 
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
-      });
+      let res: Response;
+      if (photos.length > 0) {
+        // EXIF는 **압축 전에** 뽑는다 — 압축하면 메타데이터가 날아간다.
+        const metas = await Promise.all(photos.map((p) => extractExif(p.file)));
+        const files = await compressImages(photos.map((p) => p.file));
+        const fd = new FormData();
+        fd.set("message", text);
+        for (const f of files) fd.append("photo", f);
+        fd.set("exifs", JSON.stringify(metas.map(exifToWire)));
+        res = await fetch("/api/chat", { method: "POST", body: fd });
+      } else {
+        res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text }),
+        });
+      }
       const data = await res.json();
       if (!res.ok) {
         if (data?.capExhausted) setCapExhausted(true);
         setError(data?.error ?? "메이가 잠시 응답하지 못했어요. 잠시 후 다시 시도해주세요.");
+        // 사진은 되돌려준다 — 안 보냈는데 "사진 N장" 말풍선만 남으면 거짓말이 된다.
+        if (photos.length > 0) {
+          setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
+          setPicked(photos);
+        }
         return;
       }
+      photos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
       setMessages((prev) => [
         // 캡처된 경우 방금 보낸 내 메시지에 "기록됨" 칩을 붙인다(칩은 record 메시지 아래).
         ...prev.map((m) =>
@@ -133,6 +225,10 @@ export function CharacterChat({
       ]);
     } catch {
       setError("메이가 잠시 응답하지 못했어요. 잠시 후 다시 시도해주세요.");
+      if (photos.length > 0) {
+        setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
+        setPicked(photos);
+      }
     } finally {
       setSending(false);
       setUsageSignal((n) => n + 1);
@@ -166,7 +262,8 @@ export function CharacterChat({
     ? !messages.some((m) => m.createdAt >= boundaryAt)
     : messages.length === 0;
 
-  const canSend = !!draft.trim() && !sending && !capExhausted;
+  const canSend =
+    (!!draft.trim() || picked.length > 0) && !sending && !capExhausted;
 
   return (
     <div
@@ -288,7 +385,7 @@ export function CharacterChat({
                 }}
               >
                 <Bubble role={m.role} showAvatar={!sameSenderAsPrev}>
-                  {m.content}
+                  {m.content || `사진 ${photoCountOf(m)}장`}
                 </Bubble>
                 {m.role === "assistant" && m.relatedDiaries && m.relatedDiaries.length > 0 && (
                   <div style={{ paddingLeft: 36 }}>
@@ -373,6 +470,58 @@ export function CharacterChat({
         <div style={{ padding: "0 var(--space-2) 4px" }}>
           <AiUsageCounter refreshSignal={usageSignal} align="right" />
         </div>
+        {picked.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              gap: "var(--space-2)",
+              overflowX: "auto",
+              padding: "4px var(--space-2) var(--space-2)",
+            }}
+          >
+            {picked.map((p) => (
+              <div key={p.id} style={{ position: "relative", flexShrink: 0 }}>
+                {/* 로컬 objectURL이라 next/image의 최적화 대상이 아니다. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={p.previewUrl}
+                  alt=""
+                  style={{
+                    width: 56,
+                    height: 56,
+                    objectFit: "cover",
+                    borderRadius: "var(--radius-sm)",
+                    display: "block",
+                  }}
+                />
+                {/* 제거는 **항상 보이게** — 탭해야 나타나는 숨은 어포던스 금지. */}
+                <button
+                  type="button"
+                  onClick={() => removePhoto(p.id)}
+                  aria-label="사진 빼기"
+                  style={{
+                    position: "absolute",
+                    top: -5,
+                    right: -5,
+                    width: 20,
+                    height: 20,
+                    padding: 0,
+                    borderRadius: "var(--radius-pill)",
+                    border: "none",
+                    backgroundColor: "var(--fg)",
+                    color: "var(--bg)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  <X size={12} aria-hidden strokeWidth={2.5} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div
           style={{
             display: "flex",
@@ -380,6 +529,38 @@ export function CharacterChat({
             alignItems: "flex-end",
           }}
         >
+          {/* label이 아니라 button — label은 a11y 트리에 안 잡히고 키보드로도 못 간다. */}
+          <button
+            type="button"
+            className="pressable"
+            aria-label="사진 첨부"
+            disabled={sending || capExhausted}
+            onClick={() => fileRef.current?.click()}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 34,
+              height: 34,
+              padding: 0,
+              borderRadius: "var(--radius-pill)",
+              border: "none",
+              backgroundColor: "var(--fill-2)",
+              color: "var(--fg-muted)",
+              cursor: sending || capExhausted ? "not-allowed" : "pointer",
+              flexShrink: 0,
+            }}
+          >
+            <ImagePlus size={18} aria-hidden />
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handlePick}
+            style={{ display: "none" }}
+          />
           <textarea
             ref={textareaRef}
             value={draft}
