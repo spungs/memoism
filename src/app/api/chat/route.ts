@@ -9,13 +9,19 @@ import { prefilterMessage } from "@/lib/ai/safety";
 import { handleCaptureMessage } from "@/lib/ai/capture";
 import { captureServer } from "@/lib/analytics/server";
 import { CHARACTER_NAME } from "@/lib/character/utils";
+import { MAX_IMAGES_PER_REQUEST } from "@/lib/diary/limits";
+import type { ClientExif } from "@/lib/diary/auto-generate";
+
+// JSON·multipart 두 경로가 같은 상한을 쓰게 한 곳에 둔다.
+// (한쪽만 걸면 multipart로 상한을 우회할 수 있다.)
+const MAX_MESSAGE_LEN = 2000;
 
 const messageSchema = z.object({
   message: z
     .string()
     .trim()
     .min(1, "메시지를 입력해주세요")
-    .max(2000, "메시지는 2000자 이내여야 합니다"),
+    .max(MAX_MESSAGE_LEN, `메시지는 ${MAX_MESSAGE_LEN}자 이내여야 합니다`),
 });
 
 type Persona = {
@@ -189,15 +195,83 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json().catch(() => null);
-  const parsed = messageSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "잘못된 요청" },
-      { status: 400 },
-    );
+  // 사진이 있으면 multipart로 온다. JSON 경로는 그대로 둔다 — 지금 잘 도는
+  // 회상 경로에 위험을 옮기지 않기 위해 새 분기는 multipart일 때만 탄다.
+  let userMessage = "";
+  const photos: File[] = [];
+  let clientExifs: ClientExif[] = [];
+
+  if (req.headers.get("content-type")?.includes("multipart/form-data")) {
+    let form: FormData;
+    try {
+      form = await req.formData();
+    } catch {
+      return NextResponse.json({ error: "잘못된 요청 형식" }, { status: 400 });
+    }
+    userMessage = String(form.get("message") ?? "").trim();
+    for (const f of form.getAll("photo")) {
+      if (f instanceof File && f.size > 0) photos.push(f);
+    }
+    if (photos.length === 0 && !userMessage) {
+      return NextResponse.json(
+        { error: "메시지나 사진이 필요해요" },
+        { status: 400 },
+      );
+    }
+    if (userMessage.length > MAX_MESSAGE_LEN) {
+      return NextResponse.json(
+        { error: `메시지는 ${MAX_MESSAGE_LEN}자 이내여야 합니다` },
+        { status: 400 },
+      );
+    }
+    if (photos.length > MAX_IMAGES_PER_REQUEST) {
+      return NextResponse.json(
+        { error: `사진은 한 번에 ${MAX_IMAGES_PER_REQUEST}장까지 보낼 수 있어요` },
+        { status: 400 },
+      );
+    }
+    const rawExifs = form.get("exifs");
+    if (typeof rawExifs === "string" && rawExifs.length > 0) {
+      let parsedExifs: unknown;
+      try {
+        parsedExifs = JSON.parse(rawExifs);
+      } catch {
+        return NextResponse.json(
+          { error: "EXIF 형식이 잘못되었습니다" },
+          { status: 400 },
+        );
+      }
+      if (!Array.isArray(parsedExifs)) {
+        return NextResponse.json(
+          { error: "EXIF 형식이 잘못되었습니다" },
+          { status: 400 },
+        );
+      }
+      // 형태만 신뢰한다 — 조작된 값이 Prisma까지 가면 저장 전체가 실패한다
+      // (diary/actions.ts의 parseExifs와 같은 규약).
+      clientExifs = parsedExifs.map((item) => ({
+        takenAt: typeof item?.takenAt === "string" ? item.takenAt : null,
+        lat: typeof item?.lat === "number" ? item.lat : null,
+        lng: typeof item?.lng === "number" ? item.lng : null,
+      }));
+    }
+    if (clientExifs.length !== photos.length) {
+      return NextResponse.json(
+        { error: "사진과 EXIF 개수가 일치해야 합니다" },
+        { status: 400 },
+      );
+    }
+  } else {
+    const body = await req.json().catch(() => null);
+    const parsed = messageSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "잘못된 요청" },
+        { status: 400 },
+      );
+    }
+    userMessage = parsed.data.message;
   }
-  const userMessage = parsed.data.message;
 
   // 모든 메시지가 안전 프리필터를 먼저 통과한다 (스펙 §8, 우회구멍 없음).
   const gate = prefilterMessage(userMessage);
@@ -221,6 +295,8 @@ export async function POST(req: NextRequest) {
     session.userId,
     userMessage,
     new Date(),
+    photos,
+    clientExifs,
   );
   if (capture.handled) {
     // 캡처도 AI 호출이지만 싼 경로라 캡을 소모하지 않는다(Plan 03 AiPath).
@@ -257,6 +333,7 @@ export async function POST(req: NextRequest) {
     ]);
     await captureServer("chat_capture", session.userId, {
       message_length: userMessage.length,
+      photo_count: photos.length,
       routed: capture.captureRef !== null,
     });
     return NextResponse.json({

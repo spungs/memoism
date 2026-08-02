@@ -3,12 +3,9 @@ import { prisma } from "@/lib/db";
 import { deleteImage, saveImage } from "@/lib/storage";
 import { assertStorageQuota, STORAGE_FULL_MSG } from "@/lib/storage/quota";
 import { getOrCreateDiaryForDate } from "./queries";
-
-export type ClientExif = {
-  takenAt: string | null; // ISO 8601
-  lat: number | null;
-  lng: number | null;
-};
+// EXIF 입력 타입은 auto-generate가 단일 출처다(preview-generate도 같은 걸 쓴다).
+// 같은 모양을 여기 또 선언하면 이름만 같은 타입이 둘이 되어 import 출처가 헷갈린다.
+import type { ClientExif } from "./auto-generate";
 
 export type CaptureEntry = {
   dateKey: string;
