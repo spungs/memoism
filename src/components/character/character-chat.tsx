@@ -341,6 +341,7 @@ export function CharacterChat({
         {messages.map((m, i) => {
           const prev = messages[i - 1];
           const sameSenderAsPrev = prev?.role === m.role;
+          const photoCount = photoCountOf(m);
           const ref = m.captureRef ?? null;
           // entries 없는 구버전 행(Plan 04 배포분)은 대표 세 키로 폴백한다 —
           // 안 하면 운영에 쌓인 과거 칩이 전부 깨진다.
@@ -363,7 +364,22 @@ export function CharacterChat({
                 }}
               >
                 <Bubble role={m.role} showAvatar={!sameSenderAsPrev}>
-                  {m.content || `사진 ${photoCountOf(m)}장`}
+                  {/* 사진은 **텍스트가 있어도** 표시한다. 예전엔 본문이 있으면
+                      사진 표시를 안 해서, 사진+글을 보내면 대화에서 사진의 흔적이
+                      통째로 사라졌다("사진이 날아갔다"로 읽힘). */}
+                  {photoCount > 0 && (
+                    <span
+                      style={{
+                        display: "block",
+                        fontSize: "var(--text-sm)",
+                        opacity: 0.75,
+                        marginBottom: m.content ? 4 : 0,
+                      }}
+                    >
+                      📷 사진 {photoCount}장
+                    </span>
+                  )}
+                  {m.content}
                 </Bubble>
                 {m.role === "assistant" && m.relatedDiaries && m.relatedDiaries.length > 0 && (
                   <div style={{ paddingLeft: 36 }}>

@@ -45,23 +45,29 @@ const REPLY_SYSTEM = `너는 사용자의 일상을 함께 기억하는 친구�
  *
  * 사진 내용은 모델에 보내지 않는다 — 그래서 "추측 금지"를 명시한다.
  */
-function photoOnlyHint(dateLabels: string): string {
-  return `사용자가 사진만 보내고 아무 말도 하지 않았어.
+function photoHint(count: number, dateLabels: string, hasText: boolean): string {
+  return `사용자가 사진 ${count}장을 함께 보냈어. 사진은 ${dateLabels} 일기에 저장됐다.
 
-**너는 그 사진을 볼 수 없다.** 사진에 뭐가 찍혔는지, 어떤 분위기인지 단 한 마디도 하지 마.
-금지 예시: "풍경이 좋네", "사진 속 풍경이 인상적이네", "예뻐 보인다", "재밌었겠다".
+**너는 그 사진을 볼 수 없다.** 뭐가 찍혔는지, 어떤 분위기인지 단 한 마디도 하지 마.
+금지 예시: "풍경이 좋네", "맛있어 보인다", "예뻐 보인다", "재밌었겠다".
 전부 네가 본 적 없는 것에 대한 말이라 사용자를 혼란스럽게 한다.
 
-사진은 ${dateLabels} 날짜로 기록됐어.
-네가 할 일은 하나뿐이야 — **그 날이 어떤 날이었는지 한 문장으로 묻는 것.**
+${
+  hasText
+    ? `사용자가 사진에 대해 물으면 **사진을 저장해뒀다는 것과 네가 볼 수 없다는 것을 먼저 말하고**,
+그 다음에 뭐였는지 한 문장으로 물어봐. 못 봤다는 말 없이 되묻기만 하면 사용자는
+자기가 보낸 사진이 무시당했다고 느낀다.`
+    : `짧게 반응한 뒤, 그 날이 어떤 날이었는지 한 문장으로 물어봐.`
+}
 날짜는 위에 적힌 그대로 말해라. "오늘"이라고 바꿔 부르지 마.`;
 }
 
 /** 캡처 응답 생성 실패 시 쓰는 최소 응답 — 저장은 이미 끝났으므로 흐름을 막지 않는다. */
 const FALLBACK_REPLY = "그랬구나, 남겨뒀어.";
 
-/** 사진만 온 경우의 폴백 — 되묻기를 잃지 않게 별도로 둔다. */
-const PHOTO_ONLY_FALLBACK = "사진 잘 받았어. 무슨 날이었어?";
+/** 사진이 온 경우의 폴백 — "못 본다"는 사실과 되묻기를 잃지 않게 별도로 둔다. */
+const PHOTO_FALLBACK =
+  "사진은 일기에 넣어뒀어. 나는 사진을 볼 수가 없어서, 뭐였는지 알려줄래?";
 
 /**
  * 칩 라벨 — **실제로 저장된 날**을 말한다. 사진이 EXIF로 다른 날에 가면
@@ -161,14 +167,19 @@ export async function handleCaptureMessage(
 
   // 칩이 가리킬 대표 일기: 텍스트가 있으면 그쪽, 없으면 첫 사진의 날.
   const primary = entries.find((e) => e.diaryId === textDiaryId) ?? entries[0];
-  const photoOnly = photos.length > 0 && !message;
+  // 사진이 있으면 텍스트가 같이 왔든 아니든 "못 본다"는 사실을 알린다.
+  // 예전엔 사진만 온 경우에만 알려서, 사진+글을 보내면 메이가 사진을 아예
+  // 없었던 것처럼 되물어 사용자가 무시당했다고 느꼈다.
+  const hasPhotos = photos.length > 0;
 
   let reply: string;
   try {
     reply = await chat({
-      systemPrompt: photoOnly
-        ? `${REPLY_SYSTEM}\n\n${photoOnlyHint(
-            entries.map((e) => dateKeyLabel(e.dateKey)).join(", "),
+      systemPrompt: hasPhotos
+        ? `${REPLY_SYSTEM}\n\n${photoHint(
+            photos.length,
+            [...new Set(entries.map((e) => dateKeyLabel(e.dateKey)))].join(", "),
+            !!message,
           )}`
         : REPLY_SYSTEM,
       history: [],
@@ -181,13 +192,13 @@ export async function handleCaptureMessage(
       "[capture] 응답 생성 실패 — 폴백 사용:",
       e instanceof Error ? e.message : e,
     );
-    reply = photoOnly ? PHOTO_ONLY_FALLBACK : FALLBACK_REPLY;
+    reply = hasPhotos ? PHOTO_FALLBACK : FALLBACK_REPLY;
   }
 
   return {
     handled: true,
     reply:
-      reply.trim() || (photoOnly ? PHOTO_ONLY_FALLBACK : FALLBACK_REPLY),
+      reply.trim() || (hasPhotos ? PHOTO_FALLBACK : FALLBACK_REPLY),
     captureRef: {
       diaryId: primary.diaryId,
       dateKey: primary.dateKey,
