@@ -8,6 +8,7 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { PushToggle } from "@/components/settings/push-toggle";
 import { ThemeToggle } from "@/components/settings/theme-toggle";
 import { PageHeader } from "@/components/layout/page-header";
+import { BackButton } from "@/components/nav/back-button";
 
 const APP_VERSION = "v0.1.0";
 
@@ -151,7 +152,7 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
         paddingBottom: "var(--space-10)",
       }}
     >
-      <PageHeader title="설정" />
+      <PageHeader title="설정" leading={<BackButton />} />
 
       {/* 계정 프로필 카드 — 그룹 상단 */}
       <div style={{ padding: "0 var(--space-5)", marginBottom: "var(--space-8)" }}>

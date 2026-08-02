@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { DiaryMonthView } from "@/components/diary/diary-month-view";
+import { DiarySummaryStats } from "@/components/diary/diary-summary-stats";
 import { PageHeader } from "@/components/layout/page-header";
+import { SettingsLink } from "@/components/nav/settings-link";
 import { getSession } from "@/lib/auth/session";
 import { getDiariesForMonth, getDiaryCounts } from "@/lib/diary/queries";
 import { kstTodayKey } from "@/lib/diary/kst";
@@ -26,7 +28,9 @@ export default async function DiaryListPage() {
         padding: "0 var(--space-4) var(--space-12)",
       }}
     >
-      <PageHeader title="일기" subtitle={`총 ${counts.total}개`} />
+      <PageHeader title="일기" action={<SettingsLink />} />
+
+      <DiarySummaryStats thisMonth={counts.thisMonth} total={counts.total} />
 
       <DiaryMonthView initialYear={ty} initialMonth={tm} initialDays={monthData.days} />
     </div>

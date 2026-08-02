@@ -6,6 +6,7 @@ import { ArrowUp, ImagePlus, SquarePen, X } from "lucide-react";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 import { CaptureCorrectionSheet } from "./capture-correction-sheet";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
+import { SettingsLink } from "@/components/nav/settings-link";
 import { extractExif, exifToWire } from "@/lib/diary/exif";
 import { compressImages } from "@/lib/diary/image-compress";
 import { MAX_IMAGES_PER_REQUEST } from "@/lib/diary/limits";
@@ -323,35 +324,51 @@ export function CharacterChat({
         >
           내 일기를 기억하는 AI 친구
         </p>
-        {/* 새 대화하기 — 이전 대화 맥락을 비워 오염된 기억 반복을 끊는다 */}
-        <button
-          type="button"
-          onClick={() => setResetOpen(true)}
-          disabled={sending || currentEmpty}
-          aria-label="새 대화하기"
-          className="pressable"
+        {/* 좌: 새 대화하기 — 이전 대화 맥락을 비워 오염된 기억 반복을 끊는다.
+            우: 설정. 34px 아이콘 둘을 붙여두면 오탭이 나서 좌우로 나눈다. */}
+        <div
+          style={{
+            position: "absolute",
+            left: "var(--space-4)",
+            top: "50%",
+            transform: "translateY(-50%)",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setResetOpen(true)}
+            disabled={sending || currentEmpty}
+            aria-label="새 대화하기"
+            className="pressable"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 34,
+              height: 34,
+              borderRadius: "var(--radius-pill)",
+              border: "none",
+              backgroundColor: "transparent",
+              color:
+                sending || currentEmpty
+                  ? "var(--fg-placeholder)"
+                  : "var(--tint)",
+              cursor: sending || currentEmpty ? "default" : "pointer",
+            }}
+          >
+            <SquarePen size={19} aria-hidden strokeWidth={2} />
+          </button>
+        </div>
+        <div
           style={{
             position: "absolute",
             right: "var(--space-4)",
             top: "50%",
             transform: "translateY(-50%)",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 34,
-            height: 34,
-            borderRadius: "var(--radius-pill)",
-            border: "none",
-            backgroundColor: "transparent",
-            color:
-              sending || currentEmpty
-                ? "var(--fg-placeholder)"
-                : "var(--tint)",
-            cursor: sending || currentEmpty ? "default" : "pointer",
           }}
         >
-          <SquarePen size={19} aria-hidden strokeWidth={2} />
-        </button>
+          <SettingsLink />
+        </div>
       </header>
 
       {/* 메시지 목록 */}
