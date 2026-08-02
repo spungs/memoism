@@ -16,6 +16,12 @@ export function kstTodayKey(): string {
   return kstDateKey(new Date());
 }
 
+/** "2026-07-20" → "7월 20일". 칩·시트에서 날짜를 사람 말로 보여줄 때. */
+export function dateKeyLabel(key: string): string {
+  const [, m, d] = key.split("-");
+  return `${Number(m)}월 ${Number(d)}일`;
+}
+
 /** KST 연·월(month: 1~12)의 [startUtc, endUtc) UTC 경계. getDiaryCounts와 동일 방식. */
 export function kstMonthRangeUtc(
   year: number,

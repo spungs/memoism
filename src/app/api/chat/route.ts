@@ -310,7 +310,9 @@ export async function POST(req: NextRequest) {
     // **트랜잭션 시작 시각**을 돌려주므로, 한 트랜잭션 안의 두 행이 밀리초까지 같아진다.
     // 그러면 createdAt 정렬이 순서를 보장하지 못해 답변이 질문보다 먼저 보인다.
     const sentAt = new Date();
-    await prisma.$transaction([
+    // 저장된 USER 메시지 id를 응답에 실어준다 — 칩 교정 시트가 이 id로 서버를
+    // 호출하므로, 낙관적 `local-...` id를 그대로 두면 새로고침 전엔 못 연다.
+    const [userRow] = await prisma.$transaction([
       prisma.chatMessage.create({
         data: {
           userId: session.userId,
@@ -340,6 +342,7 @@ export async function POST(req: NextRequest) {
       message: capture.reply,
       relatedDiaries: [],
       captureRef: capture.captureRef,
+      userMessageId: userRow.id,
     });
   }
 

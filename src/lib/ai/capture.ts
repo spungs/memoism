@@ -3,7 +3,7 @@ import { chat, CAPTURE_MODEL } from "./gemini";
 import { classifyIntent } from "./intent";
 import { resolveCaptureDate, resolvePhotoDates } from "@/lib/diary/capture-date";
 import { createFragment } from "@/lib/diary/fragments";
-import { kstDateKey } from "@/lib/diary/kst";
+import { dateKeyLabel, kstDateKey } from "@/lib/diary/kst";
 import {
   savePhotosByDate,
   type CaptureEntry,
@@ -63,11 +63,6 @@ const FALLBACK_REPLY = "그랬구나, 남겨뒀어.";
 /** 사진만 온 경우의 폴백 — 되묻기를 잃지 않게 별도로 둔다. */
 const PHOTO_ONLY_FALLBACK = "사진 잘 받았어. 무슨 날이었어?";
 
-/** "2026-07-20" → "7월 20일". 메시지 날짜와 실제 저장 날짜가 다를 때 칩에 쓴다. */
-function dateKeyLabel(key: string): string {
-  const [, m, d] = key.split("-");
-  return `${Number(m)}월 ${Number(d)}일`;
-}
 
 /**
  * record 메시지를 그날 일기에 조각으로 누적한다 (스펙 §3·4·5).

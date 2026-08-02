@@ -4,10 +4,12 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp, ImagePlus, SquarePen, X } from "lucide-react";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
+import { CaptureCorrectionSheet } from "./capture-correction-sheet";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 import { extractExif, exifToWire } from "@/lib/diary/exif";
 import { compressImages } from "@/lib/diary/image-compress";
 import { MAX_IMAGES_PER_REQUEST } from "@/lib/diary/limits";
+import { dateKeyLabel } from "@/lib/diary/kst";
 
 type Role = "user" | "assistant";
 type RelatedDiary = { id: string; title: string; createdAt: string };
@@ -102,6 +104,12 @@ export function CharacterChat({
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [picked, setPicked] = useState<PickedPhoto[]>([]);
+  // 저장 칩을 탭해서 연 교정 대상(메시지 id + 그 메시지가 기록한 날들).
+  const [correcting, setCorrecting] = useState<{
+    messageId: string;
+    entries: { dateKey: string; diaryId: string; imageIds: string[] }[];
+    dateKey: string;
+  } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -213,7 +221,14 @@ export function CharacterChat({
       setMessages((prev) => [
         // 캡처된 경우 방금 보낸 내 메시지에 "기록됨" 칩을 붙인다(칩은 record 메시지 아래).
         ...prev.map((m) =>
-          m.id === userMsg.id ? { ...m, captureRef: data.captureRef ?? null } : m,
+          m.id === userMsg.id
+            ? {
+                ...m,
+                // 서버가 저장한 id로 교체 — 칩 교정 시트가 이 id로 호출한다.
+                id: data.userMessageId ?? m.id,
+                captureRef: data.captureRef ?? null,
+              }
+            : m,
         ),
         {
           id: `local-${Date.now()}-a`,
@@ -363,6 +378,14 @@ export function CharacterChat({
         {messages.map((m, i) => {
           const prev = messages[i - 1];
           const sameSenderAsPrev = prev?.role === m.role;
+          const ref = m.captureRef ?? null;
+          // entries 없는 구버전 행(Plan 04 배포분)은 대표 세 키로 폴백한다 —
+          // 안 하면 운영에 쌓인 과거 칩이 전부 깨진다.
+          const captureEntries = ref
+            ? (ref.entries ?? [
+                { dateKey: ref.dateKey, diaryId: ref.diaryId, imageIds: [] },
+              ])
+            : [];
           // 날짜가 바뀌면(또는 첫 메시지) 날짜 구분선 — 카톡식 연속 스크롤 + 날짜 divider.
           const showDateDivider =
             !prev || kstDayKey(prev.createdAt) !== kstDayKey(m.createdAt);
@@ -392,18 +415,35 @@ export function CharacterChat({
                     <RelatedDiaryChips diaries={m.relatedDiaries} onNavigate={(id) => router.push(`/diary/${id}`)} />
                   </div>
                 )}
-                {/* 저장 확인은 시스템 멘트가 아니라 은근한 칩으로 (스펙 §3). */}
-                {m.role === "user" && m.captureRef && (
-                  <div
-                    style={{
-                      marginTop: 4,
-                      textAlign: "right",
-                      fontFamily: "var(--font-sans)",
-                      fontSize: "var(--text-xs)",
-                      color: "var(--fg-placeholder)",
-                    }}
-                  >
-                    📖 {m.captureRef.label} 일기에 기록됨
+                {/* 저장 확인은 시스템 멘트가 아니라 은근한 칩으로 (스펙 §3).
+                    탭하면 교정 시트 — 날짜가 틀렸을 때 고칠 수 있는 유일한 입구다. */}
+                {m.role === "user" && ref && (
+                  <div style={{ marginTop: 4, textAlign: "right" }}>
+                    <button
+                      type="button"
+                      // 낙관적 메시지(local-)는 서버에 없어 교정할 수 없다.
+                      disabled={m.id.startsWith("local-")}
+                      onClick={() =>
+                        setCorrecting({
+                          messageId: m.id,
+                          entries: captureEntries,
+                          dateKey: ref.dateKey,
+                        })
+                      }
+                      style={{
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        cursor: m.id.startsWith("local-") ? "default" : "pointer",
+                        fontFamily: "var(--font-sans)",
+                        fontSize: "var(--text-xs)",
+                        color: "var(--fg-placeholder)",
+                      }}
+                    >
+                      {captureEntries.length === 1
+                        ? `📖 ${ref.label} 일기에 기록됨`
+                        : `📖 ${captureEntries.length}일에 나눠 기록됨`}
+                    </button>
                   </div>
                 )}
               </div>
@@ -624,6 +664,40 @@ export function CharacterChat({
         confirmVariant="primary"
         isLoading={resetting}
       />
+
+      {correcting && (
+        <CaptureCorrectionSheet
+          isOpen
+          onClose={() => setCorrecting(null)}
+          onMoved={({ dateKey, diaryId }) =>
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === correcting.messageId && m.captureRef
+                  ? {
+                      ...m,
+                      captureRef: {
+                        ...m.captureRef,
+                        diaryId,
+                        dateKey,
+                        label: dateKeyLabel(dateKey),
+                        entries: [
+                          {
+                            dateKey,
+                            diaryId,
+                            imageIds: correcting.entries[0]?.imageIds ?? [],
+                          },
+                        ],
+                      },
+                    }
+                  : m,
+              ),
+            )
+          }
+          chatMessageId={correcting.messageId}
+          entries={correcting.entries}
+          dateKey={correcting.dateKey}
+        />
+      )}
     </div>
   );
 }
