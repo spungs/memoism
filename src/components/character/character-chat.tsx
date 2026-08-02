@@ -2,8 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp, ImagePlus, SquarePen, X } from "lucide-react";
-import { ConfirmSheet } from "@/components/ui/confirm-sheet";
+import { ArrowUp, ImagePlus, X } from "lucide-react";
 import { CaptureCorrectionSheet } from "./capture-correction-sheet";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 import { SettingsLink } from "@/components/nav/settings-link";
@@ -95,15 +94,15 @@ export function CharacterChat({
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   // "새 대화" 경계 시각(ISO). 이 시각 이후가 현재 대화 — 그 앞에 "새 대화" 구분선을 그린다.
-  const [boundaryAt, setBoundaryAt] = useState<string | null>(initialBoundaryAt);
+  // 경계는 이제 설정 화면에서만 바뀐다 → 서버가 새 값을 내려주면 그대로 반영된다.
+  // (useState로 잡아두면 prop이 바뀌어도 갱신되지 않는 함정이 있다.)
+  const boundaryAt = initialBoundaryAt;
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [capExhausted, setCapExhausted] = useState(initialCapExhausted);
   // AI 사용량 카운터 갱신 신호 — 전송 후 올리면 "오늘 AI X/N"이 다시 조회된다.
   const [usageSignal, setUsageSignal] = useState(0);
-  const [resetOpen, setResetOpen] = useState(false);
-  const [resetting, setResetting] = useState(false);
   const [picked, setPicked] = useState<PickedPhoto[]>([]);
   // 저장 칩을 탭해서 연 교정 대상(메시지 id + 그 메시지가 기록한 날들).
   const [correcting, setCorrecting] = useState<{
@@ -252,28 +251,9 @@ export function CharacterChat({
     }
   }
 
-  async function handleReset() {
-    if (resetting) return;
-    setResetting(true);
-    try {
-      const res = await fetch("/api/chat/reset", { method: "POST" });
-      if (!res.ok) {
-        setError("새 대화를 시작하지 못했어요. 잠시 후 다시 시도해주세요.");
-        return;
-      }
-      // 비파괴: 기록은 그대로 두고 경계만 현재로 옮긴다 → 이전 대화는 구분선 위에 남는다.
-      setBoundaryAt(new Date().toISOString());
-      setError(null);
-      setResetOpen(false);
-    } catch {
-      setError("네트워크 오류로 새 대화를 시작하지 못했어요.");
-    } finally {
-      setResetting(false);
-    }
-  }
-
   // "현재 대화"(경계선 이후)가 비었는가 — 첫 사용이거나 방금 새 대화를 시작한 직후.
-  // 이때만 인사말+예시 칩을 보여주고, "새 대화하기"는 더 나눌 게 없으니 비활성화한다.
+  // 이때 인사말+예시 칩을 보여준다. `messages.length === 0`으로 바꾸면 설정에서
+  // 새 대화를 시작하고 돌아왔을 때 인사말이 안 떠 대화가 썰렁하게 시작된다.
   const currentEmpty = boundaryAt
     ? !messages.some((m) => m.createdAt >= boundaryAt)
     : messages.length === 0;
@@ -324,41 +304,7 @@ export function CharacterChat({
         >
           내 일기를 기억하는 AI 친구
         </p>
-        {/* 좌: 새 대화하기 — 이전 대화 맥락을 비워 오염된 기억 반복을 끊는다.
-            우: 설정. 34px 아이콘 둘을 붙여두면 오탭이 나서 좌우로 나눈다. */}
-        <div
-          style={{
-            position: "absolute",
-            left: "var(--space-4)",
-            top: "50%",
-            transform: "translateY(-50%)",
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setResetOpen(true)}
-            disabled={sending || currentEmpty}
-            aria-label="새 대화하기"
-            className="pressable"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 34,
-              height: 34,
-              borderRadius: "var(--radius-pill)",
-              border: "none",
-              backgroundColor: "transparent",
-              color:
-                sending || currentEmpty
-                  ? "var(--fg-placeholder)"
-                  : "var(--tint)",
-              cursor: sending || currentEmpty ? "default" : "pointer",
-            }}
-          >
-            <SquarePen size={19} aria-hidden strokeWidth={2} />
-          </button>
-        </div>
+        {/* 우: 설정. ("새 대화하기"는 설정 화면으로 옮겼다 — 여긴 설정 하나뿐) */}
         <div
           style={{
             position: "absolute",
@@ -383,7 +329,7 @@ export function CharacterChat({
           gap: 0,
         }}
       >
-        {messages.length === 0 && (
+        {currentEmpty && (
           <Greeting
             text={`안녕하세요, 저는 ${characterName}예요.\n일기에 대해 뭐든 편하게 물어보세요.`}
             sending={sending}
@@ -670,17 +616,6 @@ export function CharacterChat({
           </button>
         </div>
       </form>
-
-      <ConfirmSheet
-        isOpen={resetOpen}
-        onClose={() => setResetOpen(false)}
-        onConfirm={() => void handleReset()}
-        title="새 대화를 시작할까요?"
-        description="여기까지 마무리하고 새 대화를 시작해요. 이전 대화는 위로 넘기면 다시 볼 수 있어요."
-        confirmLabel="새 대화 시작"
-        confirmVariant="primary"
-        isLoading={resetting}
-      />
 
       {correcting && (
         <CaptureCorrectionSheet

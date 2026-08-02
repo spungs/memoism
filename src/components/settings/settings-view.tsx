@@ -96,6 +96,10 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // 메이 대화 경계 초기화 — 비파괴(기록은 그대로, 메이가 읽는 범위만 지금부터).
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   const handleLogout = async () => {
     setLogoutLoading(true);
@@ -141,6 +145,26 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
     } catch (e) {
       setDeleteError(e instanceof Error ? e.message : "탈퇴에 실패했어요");
       setDeleteLoading(false);
+    }
+  };
+
+  const handleChatReset = async () => {
+    if (resetting) return;
+    setResetting(true);
+    setResetError(null);
+    try {
+      const res = await fetch("/api/chat/reset", { method: "POST" });
+      if (!res.ok) {
+        setResetError("새 대화를 시작하지 못했어요. 잠시 후 다시 시도해주세요.");
+        return;
+      }
+      setResetOpen(false);
+      // 메이 화면은 서버에서 경계를 다시 읽는다 — 새로고침으로 반영.
+      router.refresh();
+    } catch {
+      setResetError("네트워크 오류로 새 대화를 시작하지 못했어요.");
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -294,6 +318,43 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
         </div>
       )}
 
+      {/* 메이 그룹 — 대화 경계 초기화.
+          구독 카드 안에 두면 안 된다: 그 카드는 `usage &&` 조건부라 사용량을 못 읽는
+          순간 이 항목이 통째로 사라지는데, 이건 메이가 틀린 사실을 반복할 때 쓰는
+          유일한 탈출구다. "구독" 라벨 아래라 찾기도 어렵다. */}
+      <div style={{ padding: "0 var(--space-5)", marginBottom: "var(--space-6)" }}>
+        <p style={SECTION_LABEL_STYLE}>메이</p>
+        <div style={CARD_STYLE}>
+          <RowButton label="메이와 새 대화 시작" onClick={() => setResetOpen(true)} />
+        </div>
+        <p
+          style={{
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-xs)",
+            color: "var(--fg-muted)",
+            margin: "var(--space-2) 0 0",
+            paddingLeft: "var(--space-4)",
+            lineHeight: "var(--leading-normal)",
+          }}
+        >
+          지금까지 나눈 이야기는 그대로 남고, 메이가 읽는 범위만 지금부터로 바뀌어요.
+        </p>
+        {resetError && (
+          <p
+            role="alert"
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-sm)",
+              color: "var(--danger)",
+              margin: "var(--space-2) 0 0",
+              paddingLeft: "var(--space-4)",
+            }}
+          >
+            {resetError}
+          </p>
+        )}
+      </div>
+
       {/* 알림 그룹 */}
       <div style={{ padding: "0 var(--space-5)", marginBottom: "var(--space-6)" }}>
         <p style={SECTION_LABEL_STYLE}>알림</p>
@@ -411,6 +472,17 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
         confirmLabel="탈퇴하기"
         confirmVariant="danger"
         isLoading={deleteLoading}
+      />
+
+      <ConfirmSheet
+        isOpen={resetOpen}
+        onClose={() => setResetOpen(false)}
+        onConfirm={() => void handleChatReset()}
+        title="메이와 새 대화를 시작할까요?"
+        description="지금까지 나눈 이야기는 그대로 남아요. 메이가 새로 시작하는 것만 달라져요."
+        confirmLabel="새 대화 시작"
+        confirmVariant="primary"
+        isLoading={resetting}
       />
     </div>
   );
