@@ -352,22 +352,14 @@ export function CharacterChat({
           // 날짜가 바뀌면(또는 첫 메시지) 날짜 구분선 — 카톡식 연속 스크롤 + 날짜 divider.
           const showDateDivider =
             !prev || kstDayKey(prev.createdAt) !== kstDayKey(m.createdAt);
-          // "새 대화" 경계를 넘는 첫 메시지 앞엔 경계 구분선 (날짜 구분선보다 우선).
-          const crossedBoundary =
-            !!boundaryAt &&
-            m.createdAt >= boundaryAt &&
-            (!prev || prev.createdAt < boundaryAt);
+          // 구분선은 날짜 하나로 통일한다. 예전엔 "새 대화" 경계선이 이 자리를
+          // 가로채서, 리셋한 날의 날짜 표시가 통째로 사라졌다.
           return (
             <Fragment key={m.id}>
-              {crossedBoundary ? (
-                <BoundaryDivider />
-              ) : (
-                showDateDivider && <DateDivider label={dayDividerLabel(m.createdAt)} />
-              )}
+              {showDateDivider && <DateDivider label={dayDividerLabel(m.createdAt)} />}
               <div
                 style={{
-                  marginTop:
-                    crossedBoundary || showDateDivider ? 0 : sameSenderAsPrev ? 4 : 12,
+                  marginTop: showDateDivider ? 0 : sameSenderAsPrev ? 4 : 12,
                 }}
               >
                 <Bubble role={m.role} showAvatar={!sameSenderAsPrev}>
@@ -414,19 +406,18 @@ export function CharacterChat({
           );
         })}
 
-        {/* 경계가 모든 메시지 뒤(방금 "새 대화" 누름)이면 맨 아래 구분선 + 인사말 — 다음 메시지가 그 아래로 */}
+        {/* 경계가 모든 메시지 뒤(방금 설정에서 새 대화 시작)이면 인사말로 다시 연다.
+            구분선은 두지 않는다 — 인사말 말풍선 자체가 "여기서 다시 시작"이라는 표시고,
+            선을 얹으면 날짜 구분선과 의미가 겹친다. */}
         {boundaryAt &&
           messages.length > 0 &&
           messages[messages.length - 1].createdAt < boundaryAt && (
-            <>
-              <BoundaryDivider />
-              <Greeting
-                text={"다시 만나서 반가워요.\n무엇이든 편하게 물어보세요."}
-                sending={sending}
-                capExhausted={capExhausted}
-                onPick={(q) => void send(q)}
-              />
-            </>
+            <Greeting
+              text={"다시 만나서 반가워요.\n무엇이든 편하게 물어보세요."}
+              sending={sending}
+              capExhausted={capExhausted}
+              onPick={(q) => void send(q)}
+            />
           )}
 
         {sending && (
@@ -845,33 +836,6 @@ function DateDivider({ label }: { label: string }) {
       >
         {label}
       </span>
-    </div>
-  );
-}
-
-// ── "새 대화" 경계 구분선 (비파괴) — 이 위는 이전 대화, 아래는 현재 대화 ──
-function BoundaryDivider() {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "var(--space-3)",
-        margin: "var(--space-5) 0 var(--space-2)",
-      }}
-    >
-      <span style={{ flex: 1, height: 1, backgroundColor: "var(--separator)" }} />
-      <span
-        style={{
-          fontFamily: "var(--font-sans)",
-          fontSize: "var(--text-xs)",
-          fontWeight: 500,
-          color: "var(--fg-placeholder)",
-        }}
-      >
-        새 대화
-      </span>
-      <span style={{ flex: 1, height: 1, backgroundColor: "var(--separator)" }} />
     </div>
   );
 }
