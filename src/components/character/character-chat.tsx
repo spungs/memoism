@@ -773,6 +773,8 @@ export function CharacterChat({
         isOpen={consentOpen}
         onAllow={() => void answerConsent(true)}
         onDeny={() => void answerConsent(false)}
+        // 오버레이로 닫으면 결정을 기록하지 않는다 — 다음 첨부 때 다시 묻는다.
+        onDismiss={() => setConsentOpen(false)}
         isLoading={consentSaving}
       />
     </div>
