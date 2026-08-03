@@ -49,10 +49,7 @@ export function AiUsageCounter({
   if (!usage) return null;
 
   const remaining = Math.max(0, usage.limit - usage.used);
-  // 소진(0)은 입력창이 이미 비활성 + 안내 문구로 말하고 있어 중복이라 띄우지 않는다.
-  if (variant === "low-only" && (remaining === 0 || remaining > LOW_REMAINING)) {
-    return null;
-  }
+  if (variant === "low-only" && remaining > LOW_REMAINING) return null;
 
   return (
     <span
@@ -66,7 +63,10 @@ export function AiUsageCounter({
     >
       {variant === "low-only"
         ? // 대화에서 캡을 쓰는 건 회상(질문)뿐이다 — 기록은 무제한이라 "질문"이라 부른다.
-          `오늘 질문 ${remaining}번 남았어요`
+          // 0일 때 "다 썼다"로만 끝내면 오늘 앱을 못 쓴다고 오해해 기록을 통째로 잃는다.
+          remaining === 0
+          ? "오늘 질문은 다 썼어요 · 기록은 계속할 수 있어요"
+          : `오늘 질문 ${remaining}번 남았어요`
         : `오늘 AI 정리·회상 ${usage.used}/${usage.limit}`}
     </span>
   );

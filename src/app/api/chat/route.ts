@@ -414,7 +414,11 @@ export async function POST(req: NextRequest) {
   if (!cap.allowed) {
     return NextResponse.json(
       {
-        error: "오늘 AI 사용 횟수를 모두 사용했어요. 내일 다시 만나요.",
+        // 화면은 이 문장을 **메이의 말풍선**으로 띄운다 — 빨간 에러가 아니라 대화다.
+        // "기록은 계속된다"를 반드시 담는다: 기록은 캡을 쓰지 않는데도 사용자가
+        // 오늘 앱을 못 쓴다고 오해하면 그날 기록을 통째로 잃는다.
+        error:
+          "오늘 기억을 꺼내보는 건 여기까지예요. 기록은 계속 남길 수 있으니 편하게 얘기해주세요.",
         capExhausted: true,
       },
       { status: 429 },

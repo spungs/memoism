@@ -231,7 +231,9 @@ export function CharacterChat({
   async function send(textArg?: string) {
     const text = (textArg ?? draft).trim();
     const photos = picked;
-    if ((!text && photos.length === 0) || sending || capExhausted) return;
+    // 한도가 차도 막지 않는다 — **기록은 캡을 쓰지 않는다.** 회상만 서버에서
+    // 429로 걸러지고, 그건 메이의 말로 설명된다.
+    if ((!text && photos.length === 0) || sending) return;
     setSending(true);
     setError(null);
     const userMsg: Message = {
@@ -265,7 +267,23 @@ export function CharacterChat({
       }
       const data = await res.json();
       if (!res.ok) {
-        if (data?.capExhausted) setCapExhausted(true);
+        // 한도 소진은 **에러가 아니라 대화**로 알린다. 빨간 배너로 띄우면 사용자가
+        // 뭘 잘못한 것처럼 읽히고, "기록은 계속된다"는 사실도 전달되지 않는다.
+        if (data?.capExhausted) {
+          setCapExhausted(true);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `local-${Date.now()}-cap`,
+              role: "assistant",
+              content:
+                data?.error ??
+                "오늘 기억을 꺼내보는 건 여기까지예요. 기록은 계속 남길 수 있으니 편하게 얘기해주세요.",
+              createdAt: new Date().toISOString(),
+            },
+          ]);
+          return;
+        }
         setError(data?.error ?? "메이가 잠시 응답하지 못했어요. 잠시 후 다시 시도해주세요.");
         // 사진은 되돌려준다 — 안 보냈는데 "사진 N장" 말풍선만 남으면 거짓말이 된다.
         if (photos.length > 0) {
@@ -316,7 +334,7 @@ export function CharacterChat({
     : messages.length === 0;
 
   const canSend =
-    (!!draft.trim() || picked.length > 0) && !sending && !capExhausted;
+    (!!draft.trim() || picked.length > 0) && !sending;
 
   return (
     <div
@@ -531,8 +549,8 @@ export function CharacterChat({
         )}
       </div>
 
-      {/* 에러 / cap 배너 */}
-      {(error || capExhausted) && (
+      {/* 에러 배너 — 한도 소진은 여기 오지 않는다(대화 말풍선으로 알린다) */}
+      {error && (
         <div
           role="alert"
           style={{
@@ -545,9 +563,7 @@ export function CharacterChat({
             textAlign: "center",
           }}
         >
-          {capExhausted
-            ? "오늘 AI 사용 횟수를 모두 사용했어요. 내일 다시 만나요."
-            : error}
+          {error}
         </div>
       )}
 
@@ -636,7 +652,7 @@ export function CharacterChat({
             type="button"
             className="pressable"
             aria-label="사진 첨부"
-            disabled={sending || capExhausted}
+            disabled={sending}
             onClick={() => {
               if (visionOptIn === null) setConsentOpen(true);
               else fileRef.current?.click();
@@ -652,7 +668,7 @@ export function CharacterChat({
               border: "none",
               backgroundColor: "var(--fill-2)",
               color: "var(--fg-muted)",
-              cursor: sending || capExhausted ? "not-allowed" : "pointer",
+              cursor: sending ? "not-allowed" : "pointer",
               flexShrink: 0,
             }}
           >
@@ -670,13 +686,10 @@ export function CharacterChat({
             ref={textareaRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            disabled={sending || capExhausted}
-            placeholder={
-              capExhausted
-                ? "내일 다시 만나요"
-                : // "물어보기"는 회상만 가리켰다 — 이 입력창은 이제 기록이 주 용도다.
-                  `${characterName}에게 말하기`
-            }
+            disabled={sending}
+            // 한도가 차도 입력은 열어둔다 — 기록은 캡을 쓰지 않는다.
+            // "물어보기"는 회상만 가리켰다 — 이 입력창은 이제 기록이 주 용도다.
+            placeholder={`${characterName}에게 말하기`}
             aria-label="메시지 입력"
             style={{
               flex: 1,
