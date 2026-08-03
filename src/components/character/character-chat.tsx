@@ -140,19 +140,21 @@ export function CharacterChat({
       .filter((id) => !triedPhotoIds.current.has(id));
     if (missing.length === 0) return;
     missing.forEach((id) => triedPhotoIds.current.add(id));
-    let alive = true;
+    // **cleanup에서 결과를 버리지 않는다.** StrictMode는 개발에서 effect를 두 번
+    // 실행하는데, 1회차가 tried 표시만 남기고 cleanup이 응답을 폐기하면 2회차는
+    // "이미 조회함"으로 건너뛰어 썸네일이 영영 안 뜬다(실제로 그렇게 죽어 있었다).
+    // 이건 단순 캐시 채우기라 늦게 도착한 응답을 반영해도 해롭지 않다.
     void getCapturePhotoUrls(missing)
       .then((urls) => {
-        if (alive && Object.keys(urls).length > 0) {
+        if (Object.keys(urls).length > 0) {
           setPhotoUrls((prev) => ({ ...prev, ...urls }));
         }
       })
       .catch(() => {
         // 썸네일은 부가 정보다 — 실패해도 대화를 막지 않는다("사진 N장"으로 남는다).
+        // 단, 다음 기회에 다시 시도할 수 있게 tried 표시는 되돌린다.
+        missing.forEach((id) => triedPhotoIds.current.delete(id));
       });
-    return () => {
-      alive = false;
-    };
   }, [messages]);
 
   // 언마운트 시 미리보기 objectURL 회수 (SPA 이동으로는 문서가 안 죽어 남는다).
