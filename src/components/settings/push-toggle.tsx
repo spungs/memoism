@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { IOSSwitch } from "@/components/ui/ios-switch";
 
 // 22:00 리마인드 Web Push 구독 토글 (NEW-15).
 // dev에선 PWA service worker가 비활성(next.config.ts `disable: true`)이라
@@ -197,6 +198,7 @@ export function PushToggle() {
           </p>
         </div>
         <IOSSwitch
+          label="22:00 리마인드 알림"
           checked={enabled}
           disabled={!interactive || busy}
           onToggle={handleToggle}
@@ -235,52 +237,3 @@ export function PushToggle() {
   );
 }
 
-// iOS 스위치: 트랙 51×31 캡슐, on=#34C759, off=fill-1, 노브 27px 흰 원 + shadow-sm
-function IOSSwitch({
-  checked,
-  disabled,
-  onToggle,
-}: {
-  checked: boolean;
-  disabled: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label="22:00 리마인드 알림"
-      disabled={disabled}
-      onClick={onToggle}
-      style={{
-        position: "relative",
-        width: 51,
-        height: 31,
-        flexShrink: 0,
-        borderRadius: "var(--radius-pill)",
-        border: "none",
-        backgroundColor: checked ? "var(--success)" : "var(--fill-1)",
-        cursor: disabled ? "default" : "pointer",
-        opacity: disabled ? 0.4 : 1,
-        transition: "background-color 200ms var(--ease-out)",
-        padding: 0,
-      }}
-    >
-      <span
-        aria-hidden
-        style={{
-          position: "absolute",
-          top: 2,
-          left: checked ? 22 : 2,
-          width: 27,
-          height: 27,
-          borderRadius: "var(--radius-pill)",
-          backgroundColor: "#ffffff",
-          boxShadow: "var(--shadow-sm)",
-          transition: "left 200ms var(--ease-out)",
-        }}
-      />
-    </button>
-  );
-}

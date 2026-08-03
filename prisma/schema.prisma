@@ -212,6 +212,10 @@ model Character {
   // "새 대화하기" 경계 — 이 시각 이후 메시지만 메이의 대화 컨텍스트로 쓴다 (비파괴, 삭제 아님).
   // 기록은 영구 보존·열람되고, 메이가 이전 대화를 "기억"하는 진짜 출처는 일기(RAG)다.
   chatResetAt           DateTime?          @map("chat_reset_at")
+  // 사진을 메이(Gemini)에게 보여줄지. **nullable이 핵심** — null=아직 묻지 않음,
+  // true=동의, false=거부. 세 상태를 구분해야 "묻지 않았을 때만 시트를 띄운다"가
+  // 성립한다. 사진 바이트를 외부 모델로 보내는 건 명시적 동의가 필요한 정책 변경.
+  photoVisionOptIn      Boolean?           @map("photo_vision_opt_in")
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   chatMessages ChatMessage[]

@@ -26,7 +26,13 @@ export default async function HomePage() {
   const [character, recentChat] = await Promise.all([
     prisma.character.findUnique({
       where: { userId: session.userId },
-      select: { id: true, chatResetAt: true, subscriptionStatus: true, plan: true },
+      select: {
+        id: true,
+        chatResetAt: true,
+        subscriptionStatus: true,
+        plan: true,
+        photoVisionOptIn: true,
+      },
     }),
     // 표시는 영구 저장된 대화를 그대로 보여준다 (24h 삭제 폐기 — 어젯밤 대화가 사라지면
     // "하룻밤 새 잊은 친구"처럼 차갑다). 최신 100개만 초기 로드. 모델 컨텍스트용 24h 쿼리는
@@ -83,6 +89,7 @@ export default async function HomePage() {
       initialMessages={initialMessages}
       initialBoundaryAt={character.chatResetAt?.toISOString() ?? null}
       initialCapExhausted={initialCapExhausted}
+      initialPhotoVisionOptIn={character.photoVisionOptIn}
     />
   );
 }

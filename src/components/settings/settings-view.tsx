@@ -3,12 +3,14 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { logoutAction, changePasswordAction, type ChangePasswordState } from "@/lib/auth/actions";
+import { setPhotoVisionConsentAction } from "@/lib/character/actions";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { PushToggle } from "@/components/settings/push-toggle";
 import { ThemeToggle } from "@/components/settings/theme-toggle";
 import { PageHeader } from "@/components/layout/page-header";
 import { BackButton } from "@/components/nav/back-button";
+import { IOSSwitch } from "@/components/ui/ios-switch";
 
 const APP_VERSION = "v0.1.0";
 
@@ -84,9 +86,10 @@ interface SettingsViewProps {
   hasPassword: boolean;
   googleNotice?: string;
   usage?: { tier: string; used: number; limit: number } | null;
+  photoVisionOptIn?: boolean | null;
 }
 
-export function SettingsView({ email, googleLinked, hasPassword, googleNotice, usage }: SettingsViewProps) {
+export function SettingsView({ email, googleLinked, hasPassword, googleNotice, usage, photoVisionOptIn }: SettingsViewProps) {
   const router = useRouter();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
@@ -100,6 +103,8 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
+  // 사진 보여주기 동의 — null(아직 안 물음)/false 는 모두 꺼짐.
+  const [visionOn, setVisionOn] = useState(photoVisionOptIn === true);
 
   const handleLogout = async () => {
     setLogoutLoading(true);
@@ -146,6 +151,12 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
       setDeleteError(e instanceof Error ? e.message : "탈퇴에 실패했어요");
       setDeleteLoading(false);
     }
+  };
+
+  const handleVisionToggle = async (next: boolean) => {
+    setVisionOn(next); // 낙관적
+    const r = await setPhotoVisionConsentAction(next);
+    if (!r.ok) setVisionOn(!next); // 실패하면 되돌린다
   };
 
   const handleChatReset = async () => {
@@ -325,11 +336,32 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
       <div style={{ padding: "0 var(--space-5)", marginBottom: "var(--space-6)" }}>
         <p style={SECTION_LABEL_STYLE}>메이</p>
         <div style={CARD_STYLE}>
+          <div style={ROW_STYLE}>
+            <span style={ROW_LABEL_STYLE}>사진 보여주기</span>
+            <IOSSwitch
+              checked={visionOn}
+              label="사진 보여주기"
+              onToggle={() => void handleVisionToggle(!visionOn)}
+            />
+          </div>
+          <div style={DIVIDER_STYLE} />
           <RowButton
             label="메이 기억 새로 고치기"
             onClick={() => setResetOpen(true)}
           />
         </div>
+        <p
+          style={{
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-xs)",
+            color: "var(--fg-muted)",
+            margin: "var(--space-2) 0 0",
+            paddingLeft: "var(--space-4)",
+            lineHeight: "var(--leading-normal)",
+          }}
+        >
+          켜면 메이가 사진을 보고 대화해요. 사진 설명이 일기에 저장되지는 않아요.
+        </p>
         <p
           style={{
             fontFamily: "var(--font-sans)",
@@ -532,6 +564,7 @@ function RowButton({
     </button>
   );
 }
+
 
 function ChevronIcon() {
   return (

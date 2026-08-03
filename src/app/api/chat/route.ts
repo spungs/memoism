@@ -288,7 +288,13 @@ export async function POST(req: NextRequest) {
   // 캐릭터 먼저 — chatResetAt(대화 경계)이 아래 history 쿼리 범위를 정한다.
   const character = await prisma.character.findUnique({
     where: { userId: session.userId },
-    select: { id: true, subscriptionStatus: true, plan: true, chatResetAt: true },
+    select: {
+      id: true,
+      subscriptionStatus: true,
+      plan: true,
+      chatResetAt: true,
+      photoVisionOptIn: true,
+    },
   });
   if (!character) {
     return NextResponse.json({ error: "캐릭터를 찾을 수 없어요" }, { status: 404 });
@@ -303,6 +309,8 @@ export async function POST(req: NextRequest) {
     new Date(),
     photos,
     clientExifs,
+    // null(아직 안 물어봄)·false(거부) 모두 "보여주지 않는다".
+    character.photoVisionOptIn === true,
   );
   if (capture.handled) {
     // 캡처도 AI 호출이지만 싼 경로라 캡을 소모하지 않는다(Plan 03 AiPath).

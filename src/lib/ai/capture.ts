@@ -45,6 +45,33 @@ const REPLY_SYSTEM = `너는 사용자의 일상을 함께 기억하는 친구�
  *
  * 사진 내용은 모델에 보내지 않는다 — 그래서 "추측 금지"를 명시한다.
  */
+/**
+ * 한 번에 모델에 보여주는 사진 수 상한.
+ *
+ * 요청당 10장까지 받지만 전부 보내면 base64가 10MB를 넘어 응답이 몇 초씩 늘어진다.
+ * 대화에서 사진 얘기는 보통 몇 장이면 충분해 지연을 사는 쪽을 택했다.
+ * 잘린 경우엔 모델에게 알려 "다 봤다"는 말을 못 하게 한다.
+ */
+const MAX_VISION_IMAGES = 4;
+
+/** 사진을 **볼 수 있을 때** 붙이는 지시. 환각 방지 규칙은 여기서도 유지한다. */
+function visionHint(
+  shown: number,
+  total: number,
+  dateLabels: string,
+): string {
+  return `사용자가 보낸 사진을 너도 함께 보고 있어${
+    shown < total ? ` (${total}장 중 ${shown}장만 보인다 — 다 봤다고 말하지 마)` : ""
+  }.
+
+**보이는 것만 말해라.** 사진에 없는 걸 지어내지 마.
+사람의 신원·관계·감정은 추정하지 마 — "친구로 보이는", "즐거워 보이는" 같은 말 금지.
+확신이 안 서면 단정하지 말고 물어봐.
+
+사진은 ${dateLabels} 일기에 저장됐어.
+짧게 반응한 뒤, 기록으로 남을 만한 걸 한 문장으로 물어봐 — 어디였는지, 무슨 날이었는지 같은 것.`;
+}
+
 function photoHint(count: number, dateLabels: string, hasText: boolean): string {
   return `사용자가 사진 ${count}장을 함께 보냈어. 사진은 ${dateLabels} 일기에 저장됐다.
 
@@ -68,6 +95,9 @@ const FALLBACK_REPLY = "그랬구나, 남겨뒀어.";
 /** 사진이 온 경우의 폴백 — "못 본다"는 사실과 되묻기를 잃지 않게 별도로 둔다. */
 const PHOTO_FALLBACK =
   "사진은 일기에 넣어뒀어. 나는 사진을 볼 수가 없어서, 뭐였는지 알려줄래?";
+
+/** 사진을 볼 수 있는데 응답 생성만 실패한 경우 — "못 본다"고 하면 거짓말이 된다. */
+const PHOTO_SEEN_FALLBACK = "사진은 일기에 넣어뒀어. 뭐였는지 한 줄 남겨줄래?";
 
 /**
  * 칩 라벨 — **실제로 저장된 날**을 말한다. 사진이 EXIF로 다른 날에 가면
@@ -99,6 +129,8 @@ export async function handleCaptureMessage(
   now: Date,
   photos: File[] = [],
   exifs: ClientExif[] = [],
+  /** 사진을 모델에게 보여줘도 되는지(사용자 동의). 기본은 보여주지 않는다. */
+  canSeePhotos = false,
 ): Promise<CaptureOutcome> {
   // 사진 자체는 무조건 기록이다. 다만 **텍스트는 따로 판단한다** — "이거 뭐게?"
   // 같은 대화체 질문까지 일기 조각으로 남기면 라이프DB가 잡담으로 오염된다.
@@ -173,17 +205,43 @@ export async function handleCaptureMessage(
   // 예전엔 사진만 온 경우에만 알려서, 사진+글을 보내면 메이가 사진을 아예
   // 없었던 것처럼 되물어 사용자가 무시당했다고 느꼈다.
   const hasPhotos = photos.length > 0;
+  const dateLabels = [
+    ...new Set(entries.map((e) => dateKeyLabel(e.dateKey))),
+  ].join(", ");
+
+  // 동의했을 때만 이미지를 모델에 넘긴다. **설명을 저장하지는 않는다** —
+  // 사진은 대화를 위해 그때만 보고, 일기에 남는 글은 사용자의 말뿐이다.
+  let images: { mimeType: string; data: string }[] | undefined;
+  if (hasPhotos && canSeePhotos) {
+    try {
+      images = await Promise.all(
+        photos.slice(0, MAX_VISION_IMAGES).map(async (p) => ({
+          mimeType: p.type || "image/jpeg",
+          data: Buffer.from(await p.arrayBuffer()).toString("base64"),
+        })),
+      );
+    } catch (e) {
+      // 못 읽으면 "볼 수 없다" 경로로 조용히 내려간다 — 저장은 이미 끝났다.
+      console.warn(
+        "[capture] 사진 인코딩 실패 — vision 없이 진행:",
+        e instanceof Error ? e.message : e,
+      );
+      images = undefined;
+    }
+  }
+  const seeing = !!images && images.length > 0;
 
   let reply: string;
   try {
     reply = await chat({
       systemPrompt: hasPhotos
-        ? `${REPLY_SYSTEM}\n\n${photoHint(
-            photos.length,
-            [...new Set(entries.map((e) => dateKeyLabel(e.dateKey)))].join(", "),
-            !!message,
-          )}`
+        ? `${REPLY_SYSTEM}\n\n${
+            seeing
+              ? visionHint(images!.length, photos.length, dateLabels)
+              : photoHint(photos.length, dateLabels, !!message)
+          }`
         : REPLY_SYSTEM,
+      images,
       history: [],
       query: message || "(사진만 보냄)",
       maxOutputTokens: 120,
@@ -194,13 +252,21 @@ export async function handleCaptureMessage(
       "[capture] 응답 생성 실패 — 폴백 사용:",
       e instanceof Error ? e.message : e,
     );
-    reply = hasPhotos ? PHOTO_FALLBACK : FALLBACK_REPLY;
+    reply = hasPhotos
+        ? seeing
+          ? PHOTO_SEEN_FALLBACK
+          : PHOTO_FALLBACK
+        : FALLBACK_REPLY;
   }
 
   return {
     handled: true,
     reply:
-      reply.trim() || (hasPhotos ? PHOTO_FALLBACK : FALLBACK_REPLY),
+      reply.trim() || (hasPhotos
+        ? seeing
+          ? PHOTO_SEEN_FALLBACK
+          : PHOTO_FALLBACK
+        : FALLBACK_REPLY),
     captureRef: {
       diaryId: primary.diaryId,
       dateKey: primary.dateKey,

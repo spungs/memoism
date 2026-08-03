@@ -115,6 +115,8 @@ export type ChatInput = {
   maxOutputTokens?: number;
   /** 미지정이면 기본 모델. 캡처 경로는 CAPTURE_MODEL을 넘긴다. */
   model?: string;
+  /** 이 요청에만 함께 보는 이미지. 히스토리엔 넣지 않는다(현재 메시지 범위). */
+  images?: { mimeType: string; data: string }[]; // data = base64 (no data: prefix)
 };
 
 export async function chat(input: ChatInput): Promise<string> {
@@ -123,7 +125,15 @@ export async function chat(input: ChatInput): Promise<string> {
       role: m.role,
       parts: [{ text: m.text }],
     })),
-    { role: "user" as const, parts: [{ text: input.query }] },
+    {
+      role: "user" as const,
+      parts: [
+        ...(input.images ?? []).map((im) => ({
+          inlineData: { mimeType: im.mimeType, data: im.data },
+        })),
+        { text: input.query },
+      ],
+    },
   ];
 
   const response = await callWithRetry(() =>

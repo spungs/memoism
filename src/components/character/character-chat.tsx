@@ -4,7 +4,9 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp, ImagePlus, X } from "lucide-react";
 import { CaptureCorrectionSheet } from "./capture-correction-sheet";
+import { PhotoConsentSheet } from "./photo-consent-sheet";
 import { getCapturePhotoUrls } from "@/lib/diary/capture-actions";
+import { setPhotoVisionConsentAction } from "@/lib/character/actions";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 import { SettingsLink } from "@/components/nav/settings-link";
 import { extractExif, exifToWire } from "@/lib/diary/exif";
@@ -88,6 +90,7 @@ interface Props {
   initialMessages: Message[];
   initialBoundaryAt: string | null;
   initialCapExhausted: boolean;
+  initialPhotoVisionOptIn: boolean | null;
 }
 
 export function CharacterChat({
@@ -95,6 +98,7 @@ export function CharacterChat({
   initialMessages,
   initialBoundaryAt,
   initialCapExhausted,
+  initialPhotoVisionOptIn,
 }: Props) {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -109,6 +113,12 @@ export function CharacterChat({
   // AI 사용량 카운터 갱신 신호 — 전송 후 올리면 "오늘 AI X/N"이 다시 조회된다.
   const [usageSignal, setUsageSignal] = useState(0);
   const [picked, setPicked] = useState<PickedPhoto[]>([]);
+  // null = 아직 묻지 않음 → 사진을 처음 첨부할 때 한 번 묻는다.
+  const [visionOptIn, setVisionOptIn] = useState<boolean | null>(
+    initialPhotoVisionOptIn,
+  );
+  const [consentOpen, setConsentOpen] = useState(false);
+  const [consentSaving, setConsentSaving] = useState(false);
   // 저장 칩을 탭해서 연 교정 대상(메시지 id + 그 메시지가 기록한 날들).
   const [correcting, setCorrecting] = useState<{
     messageId: string;
@@ -168,6 +178,22 @@ export function CharacterChat({
     ta.style.height = "1px";
     ta.style.height = Math.min(Math.max(ta.scrollHeight, INPUT_MIN_H), INPUT_MAX_H) + "px";
   }, [draft]);
+
+  async function answerConsent(allow: boolean) {
+    if (consentSaving) return;
+    setConsentSaving(true);
+    try {
+      await setPhotoVisionConsentAction(allow);
+      setVisionOptIn(allow);
+    } catch {
+      // 저장 실패해도 이번 첨부는 진행한다 — 다음에 다시 묻게 된다.
+    } finally {
+      setConsentSaving(false);
+      setConsentOpen(false);
+      // 동의하든 거부하든 사진은 첨부할 수 있다.
+      fileRef.current?.click();
+    }
+  }
 
   function handlePick(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -611,7 +637,10 @@ export function CharacterChat({
             className="pressable"
             aria-label="사진 첨부"
             disabled={sending || capExhausted}
-            onClick={() => fileRef.current?.click()}
+            onClick={() => {
+              if (visionOptIn === null) setConsentOpen(true);
+              else fileRef.current?.click();
+            }}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -724,6 +753,13 @@ export function CharacterChat({
           dateKey={correcting.dateKey}
         />
       )}
+
+      <PhotoConsentSheet
+        isOpen={consentOpen}
+        onAllow={() => void answerConsent(true)}
+        onDeny={() => void answerConsent(false)}
+        isLoading={consentSaving}
+      />
     </div>
   );
 }

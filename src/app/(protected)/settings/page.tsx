@@ -26,7 +26,7 @@ export default async function SettingsPage({
   // 요금제 배지 + 오늘 AI 사용량 (읽기전용 표시)
   const character = await prisma.character.findUnique({
     where: { userId: session.userId },
-    select: { subscriptionStatus: true, plan: true },
+    select: { subscriptionStatus: true, plan: true, photoVisionOptIn: true },
   });
   const usage = character
     ? await todayUsage(session.userId, character.subscriptionStatus, character.plan)
@@ -44,6 +44,7 @@ export default async function SettingsPage({
       usage={
         usage ? { tier: usage.tier, used: usage.used, limit: usage.limit } : null
       }
+      photoVisionOptIn={character?.photoVisionOptIn ?? null}
     />
   );
 }
