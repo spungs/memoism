@@ -43,6 +43,11 @@ export default async function DiaryDetailPage({ params }: PageProps) {
   if (!diary) notFound();
 
   const date = diary.createdAt;
+
+  // 아직 정리에 안 들어간 텍스트 조각 수 (넛지 조건). getDiary가 조각을 이미 싣고 온다.
+  const unfoldedCount = diary.fragments.filter(
+    (f) => f.kind === "text" && f.foldedAt === null,
+  ).length;
   const isAiSource = diary.source?.startsWith("auto_") ?? false;
 
   // DiaryImage signed URL 일괄 발급 (1h TTL). 실패한 항목은 null.
@@ -209,6 +214,27 @@ export default async function DiaryDetailPage({ params }: PageProps) {
         )}
 
         <DiaryContent>{diary.content}</DiaryContent>
+
+        {/* 넛지 — 이미 한 번 정리한 뒤 조각이 더 쌓였을 때만. 자동 재정리는 하지
+            않는다(하드룰). 정리 버튼은 편집 화면에 있으므로 링크로 보낸다 — 문구만
+            띄우면 막다른 길이 된다. */}
+        {diary.aiGenerationVersion > 0 && unfoldedCount > 0 && (
+          <Link
+            href={`/diary/${diary.id}/edit`}
+            style={{
+              display: "block",
+              marginTop: "var(--space-5)",
+              padding: "var(--space-3)",
+              borderRadius: "var(--radius-md)",
+              backgroundColor: "var(--fill-2)",
+              color: "var(--fg-muted)",
+              fontSize: "var(--text-sm)",
+              textDecoration: "none",
+            }}
+          >
+            {unfoldedCount}개 더 모였어요 — 다시 정리할까요?
+          </Link>
+        )}
 
         {/* ②층: 조각 타임라인. AI 정리를 안 해도 이것만으로 그날이 설명된다(스펙 §6). */}
         <FragmentTimeline

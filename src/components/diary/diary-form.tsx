@@ -72,6 +72,8 @@ interface DiaryFormProps {
     hasPreviousContent?: boolean;
     /** edit 모드용: 누적 AI 재생성 횟수 (라벨 분기용). */
     aiGenerationVersion?: number;
+    /** edit 모드용: 아직 정리에 안 들어간 텍스트 조각 수 — organize 경로 분기. */
+    unfoldedCount?: number;
     mood: MoodKey | null;
     date?: string; // YYYY-MM-DD
   };
@@ -1062,6 +1064,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
             currentTitle={title}
             hasPreviousContent={hasPrev}
             aiGenerationVersion={aiVer}
+            unfoldedCount={initial?.unfoldedCount ?? 0}
             onUpdated={(data) => {
               setTitle(data.title);
               setContent(data.content);

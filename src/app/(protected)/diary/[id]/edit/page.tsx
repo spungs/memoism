@@ -48,6 +48,12 @@ export default async function DiaryEditPage({ params }: PageProps) {
         entry.url !== null,
     );
 
+  // 아직 정리에 안 들어간 텍스트 조각 수. getDiary가 이미 조각을 싣고 오므로
+  // 별도 쿼리 없이 센다.
+  const unfoldedCount = diary.fragments.filter(
+    (f) => f.kind === "text" && f.foldedAt === null,
+  ).length;
+
   return (
     <DiaryForm
       mode="edit"
@@ -58,6 +64,7 @@ export default async function DiaryEditPage({ params }: PageProps) {
         existingImages,
         hasPreviousContent: diary.previousContent !== null,
         aiGenerationVersion: diary.aiGenerationVersion,
+        unfoldedCount,
         mood: parseStoredMood(diary.mood),
         date: diaryDate,
       }}
