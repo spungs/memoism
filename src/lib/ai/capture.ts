@@ -1,5 +1,7 @@
 import "server-only";
 import { chat, CAPTURE_MODEL, type ChatTurn } from "./gemini";
+import { CRISIS_REPLY } from "./safety";
+import { enforceVerifiedHotline } from "./hotline-guard";
 import { classifyIntent } from "./intent";
 import { resolveCaptureDate, resolvePhotoDates } from "@/lib/diary/capture-date";
 import { createFragment } from "@/lib/diary/fragments";
@@ -35,6 +37,7 @@ const REPLY_SYSTEM = `너는 사용자의 일상을 함께 기억하는 친구�
 - "기록했어요", "저장했습니다" 같은 시스템 멘트 금지. 저장 확인은 화면이 따로 보여준다.
 - 조언·평가·감정 단정 금지. 사용자가 말하지 않은 사실을 지어내지 마라.
 - 의료·법률·금융 판단 금지. 증상·계약·돈 얘기가 나와도 진단하거나 조언하지 말고 그냥 들은 대로 받아라.
+- 상담전화·긴급전화 번호를 절대 말하지 마라. 위기 안내는 시스템이 따로 처리한다. 네가 떠올린 번호는 틀릴 수 있고, 틀린 번호는 해가 된다.
 - 가벼운 맞장구나 짧은 호기심까지만.`;
 
 /**
@@ -270,6 +273,10 @@ export async function handleCaptureMessage(
           : PHOTO_FALLBACK
         : FALLBACK_REPLY;
   }
+
+  // 모델이 상담 번호를 말했으면 검증된 문구로 갈아끼운다.
+  // 프롬프트 지시만으론 뚫린다 — 실측에서 폐지된 1393까지 답했다(2026-09-22).
+  reply = enforceVerifiedHotline(reply, CRISIS_REPLY).text;
 
   return {
     handled: true,

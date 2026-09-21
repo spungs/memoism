@@ -5,7 +5,8 @@ import { prisma } from "@/lib/db";
 import { chat } from "@/lib/ai/gemini";
 import { findRelevantDiaries, type RelevantDiary } from "@/lib/ai/rag";
 import { checkAndIncrement } from "@/lib/ai/usage";
-import { screenUserText } from "@/lib/ai/safety";
+import { screenUserText, CRISIS_REPLY } from "@/lib/ai/safety";
+import { enforceVerifiedHotline } from "@/lib/ai/hotline-guard";
 import { handleCaptureMessage } from "@/lib/ai/capture";
 import { captureServer } from "@/lib/analytics/server";
 import { CHARACTER_NAME } from "@/lib/character/utils";
@@ -186,6 +187,11 @@ ${
 - 의료·법률·금융에 대해 진단·처방·단정을 하지 마. "그건 ○○인 것 같아", "○○하면 돼" 같은 판단 금지.
 - 사용자가 그런 걸 물으면 아는 척하지 말고 솔직히 말해: "나는 옆에서 듣고 기억하는 친구지 전문가는 아니야." 그리고 전문가에게 물어보길 권해.
 - 일기에 적힌 사실(병원에 갔다, 계약을 했다)을 그대로 언급하는 건 괜찮아. 판단을 얹지 않으면 된다.
+
+## 전화번호는 절대 만들어내지 않기:
+- 상담전화·긴급전화 번호를 네가 직접 말하지 마. 109·1577-0199·129·1388·1366 같은 번호를 안내하는 건 **시스템이 따로 처리한다.**
+- 사용자가 많이 힘들어 보여도 네가 번호를 적지 마. 대신 곁에서 들어주고, 혼자 감당하지 말라고만 말해.
+- 이건 네가 기억으로 떠올린 번호가 틀릴 수 있기 때문이야. 틀린 번호는 도움이 아니라 해가 된다.
 
 ## 근거 표시 (시스템용 — 반드시 지켜):
 - 답변을 다 쓴 뒤, 맨 마지막 줄에 방금 답변에서 실제로 근거로 삼은 일기의 [#번호]만 골라 [[refs: 1, 3]] 형식으로 적어.
@@ -472,7 +478,19 @@ export async function POST(req: NextRequest) {
   // → 칩 = 답변 근거. 날짜 갭·불일치가 구조적으로 사라진다.
   const RELATED_CHIP_MAX = 4;
   const { clean, indices, markerPresent } = extractRefs(rawAssistant, sources);
-  const assistantText = clean || rawAssistant.trim();
+  let assistantText = clean || rawAssistant.trim();
+
+  // 모델이 상담 번호를 말했으면 검증된 문구로 갈아끼운다.
+  // 프롬프트 지시만으론 뚫린다(실측 2026-09-22: 직접 물으니 폐지된 1393을 답했다).
+  const guarded = enforceVerifiedHotline(assistantText, CRISIS_REPLY);
+  if (guarded.replaced) {
+    assistantText = guarded.text;
+    void captureServer("safety_fence_triggered", session.userId, {
+      fence: "hotline_number",
+      path: "chat",
+      stage: "output",
+    });
+  }
 
   const relatedDiaries: { id: string; title: string; createdAt: string }[] =
     markerPresent
