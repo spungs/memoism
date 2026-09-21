@@ -56,4 +56,24 @@ describe("CRISIS_REPLY", () => {
     expect(CRISIS_REPLY).not.toContain("괜찮아질");
     expect(CRISIS_REPLY).not.toContain("우울증");
   });
+
+  // 2026-09-22 보건복지부 보건복지상담센터 확인. 바꾸려면 출처를 먼저 다시 확인할 것.
+  it("검증된 번호만 담는다", () => {
+    expect(CRISIS_REPLY).toContain("109");
+    expect(CRISIS_REPLY).toContain("1577-0199");
+  });
+
+  it("담당이 다른 번호는 넣지 않는다", () => {
+    // 펜스가 죽어 있던 동안 모델이 실제로 지어냈던 번호들.
+    // 129=보건복지상담센터(일반), 1388=청소년, 1366=여성 — 자살예방 전용이 아니다.
+    expect(CRISIS_REPLY).not.toContain("129");
+    expect(CRISIS_REPLY).not.toContain("1388");
+    expect(CRISIS_REPLY).not.toContain("1366");
+    expect(CRISIS_REPLY).not.toContain("1393"); // 2024-01-01 109로 통합됨
+  });
+
+  it("운영시간과 요금을 알린다 — 망설임을 줄인다", () => {
+    expect(CRISIS_REPLY).toContain("24시간");
+    expect(CRISIS_REPLY).toContain("무료");
+  });
 });
