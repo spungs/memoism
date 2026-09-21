@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { backfillLimitsFor, groupPhotosByExifDate } from "./backfill-group";
+import {
+  backfillLimitsFor,
+  chunkBySize,
+  groupPhotosByExifDate,
+  UPLOAD_CHUNK_BYTES,
+} from "./backfill-group";
 
 const TODAY = "2026-09-22";
 const at = (iso: string | null) => ({ takenAt: iso });
@@ -75,5 +80,50 @@ describe("backfillLimitsFor", () => {
 
   it("FREE는 만료 강등 사용자라 BASIC과 같게 둔다", () => {
     expect(backfillLimitsFor("FREE")).toEqual(backfillLimitsFor("BASIC"));
+  });
+});
+
+describe("chunkBySize", () => {
+  const MB = 1024 * 1024;
+
+  it("한도 안이면 한 요청으로 보낸다", () => {
+    expect(chunkBySize([MB, MB, MB], [0, 1, 2], 4 * MB)).toEqual([[0, 1, 2]]);
+  });
+
+  it("한도를 넘기 직전에 자른다", () => {
+    // 2MB씩 3장, 한도 5MB → [0,1] 4MB, [2] 2MB
+    expect(chunkBySize([2 * MB, 2 * MB, 2 * MB], [0, 1, 2], 5 * MB)).toEqual([
+      [0, 1],
+      [2],
+    ]);
+  });
+
+  it("혼자서도 한도를 넘는 사진은 버리지 않고 제 몫의 요청으로 보낸다", () => {
+    // 조용히 누락되면 사용자는 사진이 사라진 걸 나중에야 안다.
+    const r = chunkBySize([10 * MB, MB], [0, 1], 4 * MB);
+    expect(r).toEqual([[0], [1]]);
+  });
+
+  it("건너뛴 인덱스(선택 해제된 날)는 포함하지 않는다", () => {
+    expect(chunkBySize([MB, MB, MB], [0, 2], 4 * MB)).toEqual([[0, 2]]);
+  });
+
+  it("빈 선택은 빈 배열", () => {
+    expect(chunkBySize([MB], [], 4 * MB)).toEqual([]);
+  });
+
+  it("기본 한도는 Vercel 본문 상한(4.5MB) 아래다", () => {
+    // 이 값을 넘기면 함수가 돌기도 전에 413으로 끊긴다.
+    expect(UPLOAD_CHUNK_BYTES).toBeLessThan(4.5 * MB);
+  });
+
+  it("PRO 최대치(60장 × 1MB)도 전부 한도 안의 묶음으로 나뉜다", () => {
+    const sizes = Array.from({ length: 60 }, () => MB);
+    const chunks = chunkBySize(sizes, [...sizes.keys()]);
+    expect(chunks.flat()).toHaveLength(60);
+    for (const c of chunks) {
+      const bytes = c.reduce((sum, i) => sum + sizes[i], 0);
+      expect(bytes).toBeLessThanOrEqual(UPLOAD_CHUNK_BYTES);
+    }
   });
 });

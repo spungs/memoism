@@ -29,6 +29,47 @@ export function backfillLimitsFor(plan: SubscriptionPlan): BackfillLimits {
 }
 
 /**
+ * 한 업로드 요청에 담을 바이트 상한.
+ *
+ * Vercel 함수는 본문 4.5MB 를 넘으면 **핸들러에 닿기도 전에** 413
+ * `FUNCTION_PAYLOAD_TOO_LARGE` 로 끊는다(2026-09-22 운영에서 60장=18MB 로 확인).
+ * 멀티파트 경계·필드 오버헤드와 여유를 빼고 3.5MB 에서 자른다.
+ */
+export const UPLOAD_CHUNK_BYTES = 3.5 * 1024 * 1024;
+
+/**
+ * 업로드할 사진 인덱스를 요청 단위로 쪼갠다. **순수 함수.**
+ *
+ * 장수가 아니라 **바이트**로 자르는 이유: 압축은 장당 최대 1MB 까지 허용한다
+ * (`image-compress.ts`). 장수로 자르면 큰 사진 5장만으로 한도를 넘는다.
+ *
+ * 혼자서도 한도를 넘는 사진은 제 몫의 요청으로 보낸다 — 조용히 버리는 것보다
+ * 413 을 받고 사용자에게 말해주는 쪽이 낫다.
+ */
+export function chunkBySize(
+  sizes: number[],
+  indexes: number[],
+  limitBytes: number = UPLOAD_CHUNK_BYTES,
+): number[][] {
+  const chunks: number[][] = [];
+  let current: number[] = [];
+  let bytes = 0;
+
+  for (const i of indexes) {
+    const size = sizes[i] ?? 0;
+    if (current.length > 0 && bytes + size > limitBytes) {
+      chunks.push(current);
+      current = [];
+      bytes = 0;
+    }
+    current.push(i);
+    bytes += size;
+  }
+  if (current.length > 0) chunks.push(current);
+  return chunks;
+}
+
+/**
  * 밀린 날 채우기 — 사진을 EXIF 촬영일별로 묶는다. **순수 함수.**
  *
  * 업로드 **전에** 미리보기를 보여줘야 해서 클라이언트에서 돈다. 서버의

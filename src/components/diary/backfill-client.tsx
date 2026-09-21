@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImagePlus } from "lucide-react";
 import {
+  chunkBySize,
   groupPhotosByExifDate,
   type BackfillLimits,
   type PhotoGroup,
@@ -24,6 +25,27 @@ const rowStyle = {
   borderRadius: "var(--radius-md)",
   backgroundColor: "var(--fill-2)",
 } as const;
+
+
+/**
+ * 실패 응답에서 사용자에게 보여줄 문장을 뽑는다.
+ *
+ * `res.json()` 을 먼저 부르면 안 된다 — 플랫폼이 끊은 요청(413·502·504)은 본문이
+ * HTML 이라 파싱이 터지고, 그러면 진짜 원인이 "연결이 끊겼어요"로 뭉개진다.
+ * (2026-09-22 운영에서 실제로 413 이 이렇게 가려졌다.)
+ */
+async function readError(res: Response): Promise<string> {
+  try {
+    const data = await res.json();
+    if (typeof data?.error === "string") return data.error;
+  } catch {
+    // 아래 상태 코드 분기로 넘어간다.
+  }
+  if (res.status === 413) {
+    return "사진 용량이 한 번에 보내기엔 커요. 장수를 줄여서 다시 해주세요.";
+  }
+  return `사진을 저장하지 못했어요 (오류 ${res.status})`;
+}
 
 /**
  * 밀린 날 채우기 — 사진 선택 → 날짜별 묶음 미리보기 → 선택한 날만 정리.
@@ -85,34 +107,51 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
     }
 
     // ① 사진 저장 — 선택된 날짜의 사진만. null 묶음은 올리지 않는다.
-    setBusy("사진을 저장하는 중…");
-    const fd = new FormData();
-    const dateKeys: string[] = [];
+    //
+    // 요청을 **바이트로 쪼개서** 보낸다. Vercel 이 본문 4.5MB 에서 413 으로 끊기
+    // 때문에 60장을 한 번에 담으면 함수가 돌지도 못한다(2026-09-22 운영 장애).
+    const dateKeyByIndex = new Map<number, string>();
     for (const g of targets) {
-      for (const i of g.photoIndexes) {
-        fd.append("photo", files[i]);
-        dateKeys.push(g.dateKey!);
-      }
+      for (const i of g.photoIndexes) dateKeyByIndex.set(i, g.dateKey!);
     }
-    fd.append("exifs", JSON.stringify(keep.map((i) => wires[i])));
-    fd.append("dateKeys", JSON.stringify(dateKeys));
+    const chunks = chunkBySize(
+      files.map((f) => f.size),
+      keep,
+    );
 
-    let saveData: { error?: string };
-    try {
-      const saveRes = await fetch("/api/diaries/backfill/photos", {
-        method: "POST",
-        body: fd,
-      });
-      saveData = await saveRes.json();
-      if (!saveRes.ok) {
+    let sent = 0;
+    for (const chunk of chunks) {
+      setBusy(`사진 저장 중… ${sent}/${keep.length}장`);
+      const fd = new FormData();
+      for (const i of chunk) fd.append("photo", files[i]);
+      fd.append("exifs", JSON.stringify(chunk.map((i) => wires[i])));
+      fd.append(
+        "dateKeys",
+        JSON.stringify(chunk.map((i) => dateKeyByIndex.get(i)!)),
+      );
+
+      try {
+        const saveRes = await fetch("/api/diaries/backfill/photos", {
+          method: "POST",
+          body: fd,
+        });
+        if (!saveRes.ok) {
+          setBusy(null);
+          setError(await readError(saveRes));
+          return;
+        }
+      } catch {
         setBusy(null);
-        setError(saveData.error ?? "사진을 저장하지 못했어요.");
+        // 앞 묶음이 이미 저장됐으면 그렇게 말한다 — 전부 날아간 줄 알고 처음부터
+        // 다시 고르게 만들지 않는다.
+        setError(
+          sent > 0
+            ? `사진 ${sent}장까지 저장했어요. 연결을 확인하고 다시 시도해주세요.`
+            : "사진을 올리다가 연결이 끊겼어요.",
+        );
         return;
       }
-    } catch {
-      setBusy(null);
-      setError("사진을 올리다가 연결이 끊겼어요.");
-      return;
+      sent += chunk.length;
     }
 
     // ② 날짜를 하나씩 정리 — 진행률이 여기서 나온다(스펙 §9).
