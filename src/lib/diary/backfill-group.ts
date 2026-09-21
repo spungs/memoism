@@ -1,9 +1,32 @@
+import type { SubscriptionPlan } from "@prisma/client";
 import { kstDateKey } from "./kst";
 
-/** 한 번의 업로드 요청에 담을 수 있는 사진 수 (스펙 §7). */
-export const MAX_BACKFILL_PHOTOS = 30;
-/** 클라이언트가 한 번에 순회할 수 있는 날짜 수 (스펙 §7). */
-export const MAX_BACKFILL_DAYS = 14;
+export type BackfillLimits = {
+  /** 한 번의 업로드 요청에 담을 수 있는 사진 수. */
+  maxPhotos: number;
+  /** 한 번에 순회할 수 있는 날짜 수. */
+  maxDays: number;
+};
+
+/**
+ * 한 번에 채울 수 있는 양은 요금제를 따른다 (스펙 §7).
+ *
+ * 날짜 수를 실제로 제약하는 건 **하루 AI 캡**이다. BASIC 은 10회/일이라 14일을
+ * 골라도 뒤쪽 날은 어차피 "사진만 저장했어요"로 남는다. PRO 는 100회/일이라
+ * 한 달치를 한 번에 소화할 수 있어 31일까지 연다.
+ *
+ * FREE 는 BASIC 과 같게 둔다 — 구독 만료로 강등된 사용자의 기능을 좁히는 건
+ * 이번 요구사항이 아니다.
+ */
+const LIMITS: Record<SubscriptionPlan, BackfillLimits> = {
+  FREE: { maxPhotos: 30, maxDays: 14 },
+  BASIC: { maxPhotos: 30, maxDays: 14 },
+  PRO: { maxPhotos: 60, maxDays: 31 },
+};
+
+export function backfillLimitsFor(plan: SubscriptionPlan): BackfillLimits {
+  return LIMITS[plan] ?? LIMITS.FREE;
+}
 
 /**
  * 밀린 날 채우기 — 사진을 EXIF 촬영일별로 묶는다. **순수 함수.**
@@ -13,7 +36,7 @@ export const MAX_BACKFILL_DAYS = 14;
  * 보내지만, 여기선 `null` 묶음으로 뺀다. 밀린 날을 채우러 온 사용자의 오늘 일기에
  * 날짜 미상 사진이 섞이면 안 된다(스펙 §4.1).
  *
- * 상한 상수도 여기 둔다 — `backfill.ts`는 `server-only`라 클라이언트가 임포트하면
+ * 상한 테이블도 여기 둔다 — `backfill.ts`는 `server-only`라 클라이언트가 임포트하면
  * 빌드가 깨진다.
  */
 export type PhotoGroup = {

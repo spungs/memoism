@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import { ImagePlus } from "lucide-react";
 import {
   groupPhotosByExifDate,
-  MAX_BACKFILL_DAYS,
-  MAX_BACKFILL_PHOTOS,
+  type BackfillLimits,
   type PhotoGroup,
 } from "@/lib/diary/backfill-group";
 import { extractExif, exifToWire } from "@/lib/diary/exif";
@@ -32,8 +31,11 @@ const rowStyle = {
  * 흐름이 2단계인 이유(스펙 §3 D-1): 10일치를 즉시 생성하면 AI 캡을 한 번에 태우고,
  * 결과가 마음에 안 들면 되돌리기가 10번이다. 어느 사진이 어느 날로 갈지 **업로드
  * 전에** 보여주고 사용자가 고르게 한다.
+ *
+ * `limits`는 서버가 요금제로 계산해 내려준다. 여기서 다시 계산하지 않는다 —
+ * 화면이 자기 마음대로 한도를 정하면 서버 검증과 어긋난다.
  */
-export function BackfillClient() {
+export function BackfillClient({ limits }: { limits: BackfillLimits }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
@@ -45,7 +47,7 @@ export function BackfillClient() {
   const [error, setError] = useState<string | null>(null);
 
   async function handlePick(e: React.ChangeEvent<HTMLInputElement>) {
-    const chosen = Array.from(e.target.files ?? []).slice(0, MAX_BACKFILL_PHOTOS);
+    const chosen = Array.from(e.target.files ?? []).slice(0, limits.maxPhotos);
     if (chosen.length === 0) return;
     setError(null);
     setResults(null);
@@ -70,7 +72,7 @@ export function BackfillClient() {
 
   const dayGroups = groups.filter((g) => g.dateKey !== null);
   const unknown = groups.find((g) => g.dateKey === null);
-  const tooManyDays = dayGroups.length > MAX_BACKFILL_DAYS;
+  const tooManyDays = dayGroups.length > limits.maxDays;
   const canRun = !busy && picked.size > 0 && !tooManyDays;
 
   async function run() {
@@ -162,7 +164,7 @@ export function BackfillClient() {
         }}
       >
         사진을 고르면 찍은 날짜별로 일기를 만들어요. 한 번에 사진{" "}
-        {MAX_BACKFILL_PHOTOS}장 · {MAX_BACKFILL_DAYS}일까지 가능해요.
+        {limits.maxPhotos}장 · {limits.maxDays}일까지 가능해요.
       </p>
 
       <button
@@ -237,7 +239,7 @@ export function BackfillClient() {
                 color: "var(--danger)",
               }}
             >
-              {dayGroups.length}일치가 선택됐어요. {MAX_BACKFILL_DAYS}일 이하로
+              {dayGroups.length}일치가 선택됐어요. {limits.maxDays}일 이하로
               나눠서 해주세요.
             </p>
           )}

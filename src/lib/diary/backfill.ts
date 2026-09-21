@@ -4,8 +4,25 @@ import { savePhotosByDate } from "./capture-photos";
 import { organizeDiaryFromFragments } from "./organize";
 import { regenerateDiary } from "./regenerate";
 import { kstDayRangeFromKey } from "./kst";
-import { MAX_BACKFILL_DAYS, MAX_BACKFILL_PHOTOS } from "./backfill-group";
+import { backfillLimitsFor, type BackfillLimits } from "./backfill-group";
+import { effectiveTier } from "@/lib/ai/usage";
 import type { ClientExif } from "./auto-generate";
+
+/**
+ * 이 사용자가 한 번에 채울 수 있는 양. 화면과 서버 검증이 **같은 값**을 봐야
+ * "30장까지"라고 써놓고 서버가 60장을 받는 어긋남이 안 생긴다.
+ *
+ * 티어는 서버가 직접 조회한다 — 클라이언트가 보낸 요금제를 믿으면 한도가
+ * 무의미해진다.
+ */
+export async function getBackfillLimits(userId: string): Promise<BackfillLimits> {
+  const c = await prisma.character.findUnique({
+    where: { userId },
+    select: { subscriptionStatus: true, plan: true },
+  });
+  if (!c) return backfillLimitsFor("FREE");
+  return backfillLimitsFor(effectiveTier(c.subscriptionStatus, c.plan));
+}
 
 /**
  * ① 사진을 날짜별로 저장한다. **먼저 이것부터 끝낸다.**
@@ -22,20 +39,16 @@ export async function saveBackfillPhotos(
   dateKeys: string[],
 ): Promise<{ ok: true; savedDates: string[] } | { ok: false; error: string }> {
   if (photos.length === 0) return { ok: false, error: "사진이 없어요" };
-  if (photos.length > MAX_BACKFILL_PHOTOS) {
-    return {
-      ok: false,
-      error: `한 번에 ${MAX_BACKFILL_PHOTOS}장까지 올릴 수 있어요`,
-    };
-  }
   if (exifs.length !== photos.length || dateKeys.length !== photos.length) {
     return { ok: false, error: "사진과 메타데이터 개수가 맞지 않아요" };
   }
-  if (new Set(dateKeys).size > MAX_BACKFILL_DAYS) {
-    return {
-      ok: false,
-      error: `한 번에 ${MAX_BACKFILL_DAYS}일까지 채울 수 있어요`,
-    };
+
+  const { maxPhotos, maxDays } = await getBackfillLimits(userId);
+  if (photos.length > maxPhotos) {
+    return { ok: false, error: `한 번에 ${maxPhotos}장까지 올릴 수 있어요` };
+  }
+  if (new Set(dateKeys).size > maxDays) {
+    return { ok: false, error: `한 번에 ${maxDays}일까지 채울 수 있어요` };
   }
 
   const saved = await savePhotosByDate(userId, photos, exifs, dateKeys);

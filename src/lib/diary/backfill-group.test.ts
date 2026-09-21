@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupPhotosByExifDate } from "./backfill-group";
+import { backfillLimitsFor, groupPhotosByExifDate } from "./backfill-group";
 
 const TODAY = "2026-09-22";
 const at = (iso: string | null) => ({ takenAt: iso });
@@ -53,5 +53,27 @@ describe("groupPhotosByExifDate", () => {
 
   it("빈 입력은 빈 결과", () => {
     expect(groupPhotosByExifDate([], TODAY)).toEqual([]);
+  });
+});
+
+describe("backfillLimitsFor", () => {
+  it("PRO는 BASIC보다 많이 채울 수 있다", () => {
+    const basic = backfillLimitsFor("BASIC");
+    const pro = backfillLimitsFor("PRO");
+    expect(pro.maxPhotos).toBeGreaterThan(basic.maxPhotos);
+    expect(pro.maxDays).toBeGreaterThan(basic.maxDays);
+  });
+
+  it("BASIC 한도는 기존 값을 유지한다", () => {
+    expect(backfillLimitsFor("BASIC")).toEqual({ maxPhotos: 30, maxDays: 14 });
+  });
+
+  it("PRO 날짜 한도는 하루 AI 캡(100회) 안에 들어간다", () => {
+    // 날짜 하나당 insight 1회를 쓴다. 한도가 캡을 넘으면 사용자는 절대 끝낼 수 없다.
+    expect(backfillLimitsFor("PRO").maxDays).toBeLessThanOrEqual(100);
+  });
+
+  it("FREE는 만료 강등 사용자라 BASIC과 같게 둔다", () => {
+    expect(backfillLimitsFor("FREE")).toEqual(backfillLimitsFor("BASIC"));
   });
 });
