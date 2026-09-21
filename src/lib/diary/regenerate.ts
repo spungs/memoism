@@ -6,7 +6,7 @@ import { checkAndIncrement } from "@/lib/ai/usage";
 import { buildExifSummary } from "./exif-summary";
 import { deriveGenerationMode } from "./generation-mode";
 import { pickRegeneratedTitle } from "./regenerate-input";
-import { upsertDiaryEmbedding } from "./embedding";
+import { reembedDiaryWithFragments } from "./fragment-embed";
 
 // 일기당 재생성 cap은 제거됨 (사용자 결정). 일일 cap이 비용·abuse 차단.
 // aiGenerationVersion 컬럼은 통계·로깅용으로만 카운트.
@@ -189,8 +189,11 @@ export async function regenerateDiary(
     },
   });
 
-  // 새 본문으로 재임베딩
-  await upsertDiaryEmbedding(updated.id, updated.title, updated.content);
+  // 새 본문 + 보존된 조각으로 재임베딩.
+  // upsertDiaryEmbedding(본문만)을 쓰면 조각이 있는 일기를 재생성할 때마다 조각이
+  // 임베딩에서 빠져 회상 검색에서 그날 조각이 사라진다. createFragment가 다시
+  // 불릴 때까지 복구되지 않는다.
+  await reembedDiaryWithFragments(updated.id);
 
   return { ok: true, diary: updated };
 }
