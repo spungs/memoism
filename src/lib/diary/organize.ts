@@ -30,6 +30,12 @@ export type OrganizeResult =
       dateKey: string;
       /** "8월 3일". 호출자가 kst를 다시 임포트하지 않게 함께 돌려준다. */
       label: string;
+      /**
+       * 그 일기의 실제 작성 시각(ISO). 결과 칩이 **정리한 시각이 아니라 일기의 날짜**를
+       * 보여줘야 한다 — 8월 3일 일기를 오늘 정리하면 칩에 "9월 22일"이 찍혀서
+       * 눌렀을 때 나오는 일기와 날짜가 어긋난다.
+       */
+      diaryCreatedAt: string;
     }
   | {
       ok: false;
@@ -226,5 +232,6 @@ export async function organizeDiaryFromFragments(
     skippedCount,
     dateKey,
     label: dateKeyLabel(dateKey),
+    diaryCreatedAt: diary.createdAt.toISOString(),
   };
 }

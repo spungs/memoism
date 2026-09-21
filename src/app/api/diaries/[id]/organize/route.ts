@@ -80,7 +80,9 @@ export async function POST(
             {
               id: result.diary.id,
               title: result.diary.title,
-              createdAt: new Date().toISOString(),
+              // 정리한 시각이 아니라 *일기의 날짜*다. 8월 3일 일기를 오늘 정리하면
+              // 칩에 오늘 날짜가 찍혀서 눌렀을 때 나오는 일기와 어긋난다.
+              createdAt: result.diaryCreatedAt,
             },
           ],
         },
@@ -95,7 +97,7 @@ export async function POST(
           {
             id: result.diary.id,
             title: result.diary.title,
-            createdAt: new Date().toISOString(),
+            createdAt: result.diaryCreatedAt,
           },
         ],
       };
@@ -111,6 +113,7 @@ export async function POST(
     skippedCount: result.skippedCount,
     dateKey: result.dateKey,
     label: result.label,
+    diaryCreatedAt: result.diaryCreatedAt,
     chatMessage,
   });
 }

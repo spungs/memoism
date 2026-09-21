@@ -207,7 +207,8 @@ export function CharacterChat({
           {
             id: data.diary.id,
             title: data.diary.title,
-            createdAt: new Date().toISOString(),
+            // 정리한 시각이 아니라 일기의 날짜다(칩에 찍히는 날짜).
+            createdAt: data.diaryCreatedAt,
           },
         ],
       };
