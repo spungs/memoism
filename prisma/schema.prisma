@@ -151,10 +151,16 @@ model DiaryFragment {
   storagePath String?  @map("storage_path")
   exif        Json?
   createdAt   DateTime @default(now()) @map("created_at")
+  // foldedAt — 이 조각이 AI 정리로 일기 본문에 반영된 시각. NULL = 아직 미반영.
+  //   시각 경계(Diary.contentEditedAt)를 안 쓰는 이유: 조각 이동(fragment-actions.ts)이
+  //   있어 옮겨온 조각은 createdAt이 경계보다 과거라 영영 누락된다. 사용자가 본문을
+  //   손으로 먼저 써도 그 이전 조각이 통째로 "반영됨" 처리된다.
+  foldedAt    DateTime? @map("folded_at")
 
   diary Diary @relation(fields: [diaryId], references: [id], onDelete: Cascade)
 
   @@index([diaryId, createdAt])
+  @@index([diaryId, foldedAt])
   @@map("diary_fragments")
 }
 
