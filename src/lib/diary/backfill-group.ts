@@ -123,3 +123,74 @@ export function groupPhotosByExifDate(
   if (unknown.length > 0) groups.push({ dateKey: null, photoIndexes: unknown });
   return groups;
 }
+
+export type CapSelection = {
+  /** 이번에 담을 묶음. 최신 날짜부터, **날짜 단위로** 통째. */
+  kept: PhotoGroup[];
+  /** 한도에 걸려 미뤄진 사진 수 (0이면 전부 담겼다) */
+  droppedPhotos: number;
+  /** 미뤄지기 시작한 날짜 */
+  firstDroppedDate: string | null;
+  /** 그 날 하나가 혼자 사진 한도를 넘어 잘라 담은 날짜 */
+  truncatedDate: string | null;
+  /** 어느 한도에 먼저 걸렸는지 */
+  reason: "photos" | "days" | null;
+};
+
+/**
+ * 한도 안에 들어가는 만큼만 고른다. **순수 함수.**
+ *
+ * **날짜 단위로 통째** 담는 게 핵심이다. 사진 장수로 앞에서 끊으면 한 날짜가 반만
+ * 들어간다 — 그 날 일기가 3장으로 만들어진 뒤라 나머지 7장을 나중에 넣어도 본문은
+ * 이미 굳어 있다. 기록앱에서 이건 되돌리기 어려운 손해다.
+ *
+ * 한 날짜가 혼자 사진 한도를 넘으면 그 날만 잘라 담는다. 아무것도 못 담으면
+ * 사용자가 이 화면에서 할 수 있는 게 없어진다.
+ *
+ * 넘치는 날짜를 만나면 **거기서 멈춘다.** 건너뛰고 뒤의 작은 날짜를 주우면
+ * "9/13은 빠졌는데 9/12는 들어감" 같은 상태가 되어 설명할 수가 없다.
+ */
+export function selectGroupsWithinCap(
+  dayGroups: PhotoGroup[],
+  limits: BackfillLimits,
+): CapSelection {
+  const kept: PhotoGroup[] = [];
+  let used = 0;
+  let stopped = false;
+  let droppedPhotos = 0;
+  let firstDroppedDate: string | null = null;
+  let truncatedDate: string | null = null;
+  let reason: "photos" | "days" | null = null;
+
+  for (const g of dayGroups) {
+    const n = g.photoIndexes.length;
+
+    if (!stopped && kept.length < limits.maxDays && used + n <= limits.maxPhotos) {
+      kept.push(g);
+      used += n;
+      continue;
+    }
+
+    if (!stopped) {
+      stopped = true;
+      reason = kept.length >= limits.maxDays ? "days" : "photos";
+
+      // 첫 날짜가 혼자 사진 한도를 넘는 경우에만 잘라 담는다.
+      if (kept.length === 0 && n > limits.maxPhotos) {
+        kept.push({
+          dateKey: g.dateKey,
+          photoIndexes: g.photoIndexes.slice(0, limits.maxPhotos),
+        });
+        used += limits.maxPhotos;
+        truncatedDate = g.dateKey;
+        droppedPhotos += n - limits.maxPhotos;
+        continue;
+      }
+    }
+
+    if (firstDroppedDate === null) firstDroppedDate = g.dateKey;
+    droppedPhotos += n;
+  }
+
+  return { kept, droppedPhotos, firstDroppedDate, truncatedDate, reason };
+}

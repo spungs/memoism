@@ -6,7 +6,9 @@ import { ImagePlus } from "lucide-react";
 import {
   chunkBySize,
   groupPhotosByExifDate,
+  selectGroupsWithinCap,
   type BackfillLimits,
+  type CapSelection,
   type PhotoGroup,
 } from "@/lib/diary/backfill-group";
 import { extractExif, exifToWire } from "@/lib/diary/exif";
@@ -48,6 +50,24 @@ async function readError(res: Response): Promise<string> {
   return `사진을 저장하지 못했어요 (오류 ${res.status})`;
 }
 
+
+/**
+ * 한도에 걸려 미뤄진 사진을 알리는 한 줄. 전부 담겼으면 `null`.
+ *
+ * 조용히 버리지 않는 게 요점이다 — 기록앱에서 사용자가 모르는 사이 사진이 사라지는
+ * 건 되돌릴 방법이 없다. 대신 경고 박스로 키우지 않고 사실만 담백하게 적는다.
+ */
+function capNotice(sel: CapSelection, limits: BackfillLimits): string | null {
+  if (sel.droppedPhotos === 0) return null;
+  if (sel.truncatedDate) {
+    return `${dateKeyLabel(sel.truncatedDate)} 사진이 많아 ${limits.maxPhotos}장까지만 담았어요. 나머지 ${sel.droppedPhotos}장은 다음에 이어서 해주세요.`;
+  }
+  const cap =
+    sel.reason === "days"
+      ? `한 번에 ${limits.maxDays}일까지`
+      : `한 번에 ${limits.maxPhotos}장까지`;
+  return `${dateKeyLabel(sel.firstDroppedDate!)}부터 ${sel.droppedPhotos}장은 미뤄뒀어요. ${cap}만 돼서요 — 이번 걸 끝내고 다시 골라주세요.`;
+}
 
 /** 썸네일 배지에 쓸 촬영 시각(KST). EXIF 가 없으면 배지를 달지 않는다. */
 function photoTime(w: Wire | undefined): string | null {
@@ -169,6 +189,8 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [results, setResults] = useState<DayResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 한도에 걸려 미뤄진 사진 안내. 오류가 아니라 사실 통지라 톤을 낮춘다.
+  const [notice, setNotice] = useState<string | null>(null);
 
   // 새로 고르거나 화면을 떠날 때 이전 blob: URL 을 놓아준다.
   useEffect(() => {
@@ -178,26 +200,60 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
   }, [thumbs]);
 
   async function handlePick(e: React.ChangeEvent<HTMLInputElement>) {
-    const chosen = Array.from(e.target.files ?? []).slice(0, limits.maxPhotos);
+    const chosen = Array.from(e.target.files ?? []);
     if (chosen.length === 0) return;
     setError(null);
+    setNotice(null);
     setResults(null);
     setBusy("사진을 읽는 중…");
     try {
-      // EXIF는 **압축 전에** 뽑는다 — 압축이 메타데이터를 날린다.
+      // 순서가 중요하다. EXIF(가벼움) → 날짜 묶기 → 한도 적용 → 압축(비쌈).
+      // 압축을 먼저 하면 미뤄질 사진까지 다 줄이느라 헛일을 한다.
+      // EXIF는 **압축 전에** 뽑아야 한다 — 압축이 메타데이터를 날린다.
       const metas = await Promise.all(chosen.map(extractExif));
-      const w = metas.map(exifToWire);
-      const compressed = await compressImages(chosen);
+      const allWires = metas.map(exifToWire);
+      const allGroups = groupPhotosByExifDate(allWires, kstTodayKey());
+      const unknownGroup = allGroups.find((g) => g.dateKey === null);
+      const sel = selectGroupsWithinCap(
+        allGroups.filter((g) => g.dateKey !== null),
+        limits,
+      );
+
+      // 담기로 한 사진 + 날짜 미상 사진만 남기고 인덱스를 0부터 다시 매긴다.
+      // (날짜 미상은 업로드 대상이 아니지만 어떤 사진이 빠졌는지 보여줘야 한다.)
+      const keepIdx = [
+        ...sel.kept.flatMap((g) => g.photoIndexes),
+        ...(unknownGroup?.photoIndexes ?? []),
+      ];
+      const reindex = new Map(keepIdx.map((orig, i) => [orig, i]));
+
+      const compressed = await compressImages(keepIdx.map((i) => chosen[i]));
       setBusy("미리보기를 만드는 중…");
       const thumbFiles = await makeThumbnails(compressed);
-      const g = groupPhotosByExifDate(w, kstTodayKey());
+
+      const groupsForView: PhotoGroup[] = [
+        ...sel.kept.map((g) => ({
+          dateKey: g.dateKey,
+          photoIndexes: g.photoIndexes.map((i) => reindex.get(i)!),
+        })),
+        ...(unknownGroup
+          ? [
+              {
+                dateKey: null,
+                photoIndexes: unknownGroup.photoIndexes.map((i) => reindex.get(i)!),
+              },
+            ]
+          : []),
+      ];
+
       setFiles(compressed);
-      setWires(w);
-      setGroups(g);
+      setWires(keepIdx.map((i) => allWires[i]));
+      setGroups(groupsForView);
       setThumbs(thumbFiles.map((f) => URL.createObjectURL(f)));
       setRemoved(new Set());
       // 날짜가 있는 묶음만 기본 선택. null 묶음은 해제 상태(스펙 §4.1).
-      setPicked(new Set(g.filter((x) => x.dateKey).map((x) => x.dateKey!)));
+      setPicked(new Set(sel.kept.map((g) => g.dateKey!)));
+      setNotice(capNotice(sel, limits));
     } catch {
       setError("사진을 읽지 못했어요. 다시 골라주세요.");
     } finally {
@@ -214,11 +270,10 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
     .filter((g) => g.photoIndexes.length > 0);
   const dayGroups = visibleGroups.filter((g) => g.dateKey !== null);
   const unknown = visibleGroups.find((g) => g.dateKey === null);
-  const tooManyDays = dayGroups.length > limits.maxDays;
   // `picked` 는 사라진 날짜를 그대로 들고 있을 수 있다. 세는 건 항상 화면에 남은
   // 날짜 기준이어야 버튼 숫자와 실제 실행 대상이 어긋나지 않는다.
   const pickedDays = dayGroups.filter((g) => picked.has(g.dateKey!));
-  const canRun = !busy && pickedDays.length > 0 && !tooManyDays;
+  const canRun = !busy && pickedDays.length > 0;
 
   async function run() {
     setError(null);
@@ -389,23 +444,22 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
         </p>
       )}
 
+      {notice && !results && (
+        <p
+          style={{
+            margin: 0,
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-sm)",
+            color: "var(--fg-muted)",
+            lineHeight: 1.6,
+          }}
+        >
+          {notice}
+        </p>
+      )}
+
       {!results && dayGroups.length > 0 && (
         <>
-          {tooManyDays && (
-            <p
-              role="alert"
-              style={{
-                margin: 0,
-                fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-sm)",
-                color: "var(--danger)",
-              }}
-            >
-              {dayGroups.length}일치가 선택됐어요. {limits.maxDays}일 이하로
-              나눠서 해주세요.
-            </p>
-          )}
-
           {dayGroups.map((g) => (
             <div
               key={g.dateKey}

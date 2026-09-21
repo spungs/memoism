@@ -3,6 +3,7 @@ import {
   backfillLimitsFor,
   chunkBySize,
   groupPhotosByExifDate,
+  selectGroupsWithinCap,
   UPLOAD_CHUNK_BYTES,
 } from "./backfill-group";
 
@@ -125,5 +126,73 @@ describe("chunkBySize", () => {
       const bytes = c.reduce((sum, i) => sum + sizes[i], 0);
       expect(bytes).toBeLessThanOrEqual(UPLOAD_CHUNK_BYTES);
     }
+  });
+});
+
+describe("selectGroupsWithinCap", () => {
+  const L = { maxPhotos: 10, maxDays: 3 };
+  /** 최신순 묶음 만들기 — 인덱스 값 자체는 이 규칙과 무관하다. */
+  const g = (dateKey: string, n: number) => ({
+    dateKey,
+    photoIndexes: Array.from({ length: n }, (_, i) => i),
+  });
+
+  it("한도 안이면 전부 담는다", () => {
+    const r = selectGroupsWithinCap([g("2026-09-20", 4), g("2026-09-19", 3)], L);
+    expect(r.kept).toHaveLength(2);
+    expect(r.droppedPhotos).toBe(0);
+    expect(r.reason).toBeNull();
+  });
+
+  it("사진 한도를 넘는 날짜는 반쪽으로 담지 않고 통째로 미룬다", () => {
+    // 6 + 5 = 11 > 10 → 9/19 는 통째로 빠진다 (5장 중 4장만 담지 않는다)
+    const r = selectGroupsWithinCap([g("2026-09-20", 6), g("2026-09-19", 5)], L);
+    expect(r.kept.map((k) => k.dateKey)).toEqual(["2026-09-20"]);
+    expect(r.droppedPhotos).toBe(5);
+    expect(r.firstDroppedDate).toBe("2026-09-19");
+    expect(r.reason).toBe("photos");
+  });
+
+  it("한 번 멈추면 뒤의 작은 날짜도 줍지 않는다", () => {
+    // 9/18 은 1장이라 들어갈 수 있지만, 건너뛰면 "9/19는 빠지고 9/18은 들어감"이 된다.
+    const r = selectGroupsWithinCap(
+      [g("2026-09-20", 6), g("2026-09-19", 5), g("2026-09-18", 1)],
+      L,
+    );
+    expect(r.kept.map((k) => k.dateKey)).toEqual(["2026-09-20"]);
+    expect(r.firstDroppedDate).toBe("2026-09-19");
+    expect(r.droppedPhotos).toBe(6);
+  });
+
+  it("날짜 한도에 먼저 걸리면 reason이 days", () => {
+    const r = selectGroupsWithinCap(
+      [g("2026-09-20", 1), g("2026-09-19", 1), g("2026-09-18", 1), g("2026-09-17", 1)],
+      L,
+    );
+    expect(r.kept).toHaveLength(3);
+    expect(r.reason).toBe("days");
+    expect(r.firstDroppedDate).toBe("2026-09-17");
+  });
+
+  it("첫 날짜가 혼자 사진 한도를 넘으면 그 날만 잘라 담는다", () => {
+    // 아무것도 안 담으면 사용자가 이 화면에서 할 수 있는 게 없어진다.
+    const r = selectGroupsWithinCap([g("2026-09-20", 14)], L);
+    expect(r.kept).toHaveLength(1);
+    expect(r.kept[0].photoIndexes).toHaveLength(10);
+    expect(r.truncatedDate).toBe("2026-09-20");
+    expect(r.droppedPhotos).toBe(4);
+  });
+
+  it("잘라 담은 뒤의 날짜들도 전부 미뤄진다", () => {
+    const r = selectGroupsWithinCap([g("2026-09-20", 14), g("2026-09-19", 2)], L);
+    expect(r.truncatedDate).toBe("2026-09-20");
+    expect(r.firstDroppedDate).toBe("2026-09-19");
+    expect(r.droppedPhotos).toBe(6); // 4 + 2
+  });
+
+  it("빈 입력은 빈 선택", () => {
+    const r = selectGroupsWithinCap([], L);
+    expect(r.kept).toEqual([]);
+    expect(r.droppedPhotos).toBe(0);
   });
 });
