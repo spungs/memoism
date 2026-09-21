@@ -1,4 +1,3 @@
-import { hasCrisisKeyword } from "./crisis-keywords";
 import { confirmCrisis } from "./crisis-confirm";
 
 /**
@@ -62,14 +61,28 @@ export const CRISIS_REPLY = `지금 많이 힘든 것 같아서 그냥 지나칠
 나는 여기 있을게.`;
 
 /**
- * 진입점. 1단(키워드) → 걸리면 2단(모델).
+ * 진입점 — **모든 텍스트를 모델이 직접 판정한다.**
+ *
+ * 예전엔 키워드 목록을 게이트로 앞에 뒀는데, 실측에서 그게 재앙이었다
+ * (2026-09-22, 실제 쓰일 법한 위기 표현 22건 기준):
+ *
+ *   1단(키워드) 재현율  8/22 = 36%   ← 14건이 모델에 닿지도 못했다
+ *   2단(모델) 정확도    통과된 8건 전부 차단, 일상 표현 12건 오탐 0
+ *
+ * 놓친 것들: "이제 그만 살고 싶어", "손목을 그었어", "약을 모아두고 있어",
+ * "눈 감으면 안 깨어났으면 좋겠어", "내가 없어지면 다들 편해질 거야" …
+ * 한국어 위기 표현은 끝이 없어 목록으로는 못 따라간다. **모델은 잘하는데
+ * 앞에 세운 게이트가 기회를 뺏고 있었다.**
+ *
+ * 대가는 호출 1건(flash-lite, ~1초)이다. 채팅 경로는 이 판정을 캡처 처리와
+ * **병렬**로 돌려 체감 지연이 없다(chat/route.ts).
  *
  * **판정 불능은 통과다**(`confirmCrisis`가 `null`). 이 펜스가 막는 것은 AI의
  * 부적절한 반응이지 사용자의 기록이 아니다. 판정 불능에 차단하면 Gemini 장애가
- * 곧 앱 마비가 된다. 1단은 재현율 우선이라 단독 차단도 하지 않는다(스펙 §9).
+ * 곧 앱 마비가 된다(스펙 §4.2).
  */
 export async function screenUserText(text: string): Promise<SafetyVerdict> {
-  if (!hasCrisisKeyword(text)) return { blocked: false };
+  if (!text.trim()) return { blocked: false };
 
   // true일 때만 막는다 — false(위기 아님)도 null(판정 불능)도 통과.
   if ((await confirmCrisis(text)) !== true) return { blocked: false };

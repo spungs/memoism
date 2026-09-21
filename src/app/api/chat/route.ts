@@ -292,18 +292,16 @@ export async function POST(req: NextRequest) {
     userMessage = parsed.data.message;
   }
 
-  // 안전 펜스 체크포인트 ① — 캡처·RAG **앞**이다. 이 순서가 우회구멍을 막는다.
-  // 차단돼도 사용자 메시지는 아래에서 그대로 저장된다 — 기록은 막지 않는다.
-  const gate = await screenUserText(userMessage);
-  if (gate.blocked) {
-    // 원문도 걸린 키워드도 남기지 않는다 — 펜스가 도는지만 안다(스펙 §7).
-    void captureServer("safety_fence_triggered", session.userId, {
-      fence: gate.kind,
-      path: "chat",
-      stage: gate.stage,
-    });
-    return NextResponse.json({ message: gate.reply, relatedDiaries: [] });
-  }
+  // 안전 펜스 체크포인트 ① — **캡처와 병렬로 시작**한다.
+  //
+  // 판정은 모델 호출이라 ~1초 걸린다. 순차로 두면 모든 메시지가 1초 느려진다.
+  // 캡처 처리도 비슷하게 걸리므로 겹쳐 돌리면 체감 증가가 사실상 없다.
+  // **결과는 응답을 돌려주기 전에 반드시 확인한다**(아래 gate 검사) — 우회 아님.
+  //
+  // 차단돼도 사용자 메시지·조각은 그대로 저장된다 — 기록은 막지 않는다.
+  const gatePromise = screenUserText(userMessage);
+  // 위기 판정이 실패해도 대화를 막지 않는다. 미처리 거부만 방지.
+  gatePromise.catch(() => {});
 
   // 캐릭터 먼저 — chatResetAt(대화 경계)이 아래 history 쿼리 범위를 정한다.
   const character = await prisma.character.findUnique({
@@ -343,16 +341,33 @@ export async function POST(req: NextRequest) {
       text: m.content,
     }));
 
-  const capture = await handleCaptureMessage(
-    session.userId,
-    userMessage,
-    new Date(),
-    photos,
-    clientExifs,
-    // null(아직 안 물어봄)·false(거부) 모두 "보여주지 않는다".
-    character.photoVisionOptIn === true,
-    history,
-  );
+  // 펜스 판정과 캡처를 함께 기다린다 — 둘 다 ~1초라 겹쳐 돌면 하나치 시간이다.
+  const [gate, capture] = await Promise.all([
+    gatePromise,
+    handleCaptureMessage(
+      session.userId,
+      userMessage,
+      new Date(),
+      photos,
+      clientExifs,
+      // null(아직 안 물어봄)·false(거부) 모두 "보여주지 않는다".
+      character.photoVisionOptIn === true,
+      history,
+    ),
+  ]);
+
+  // **응답을 돌려주기 전 반드시 확인.** 캡처는 이미 끝나 조각이 저장됐고, 그게 맞다 —
+  // 기록은 막지 않고 AI 응답만 검증된 문구로 바꾼다.
+  if (gate.blocked) {
+    // 원문도 걸린 키워드도 남기지 않는다 — 펜스가 도는지만 안다(스펙 §7).
+    void captureServer("safety_fence_triggered", session.userId, {
+      fence: gate.kind,
+      path: "chat",
+      stage: gate.stage,
+    });
+    return NextResponse.json({ message: gate.reply, relatedDiaries: [] });
+  }
+
   if (capture.handled) {
     // 캡처도 AI 호출이지만 싼 경로라 캡을 소모하지 않는다(Plan 03 AiPath).
     await checkAndIncrement(

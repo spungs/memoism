@@ -3,6 +3,9 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     include: ["src/**/*.test.ts"],
+    // *.manual.test.ts 는 실제 Gemini를 호출한다 — 기본 실행(CI·개발)에서 제외하고
+    // `pnpm fence:recall` 처럼 손으로 돌린다.
+    exclude: ["**/node_modules/**", "**/dist/**", "src/**/*.manual.test.ts"],
     environment: "node",
   },
   resolve: {

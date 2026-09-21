@@ -12,10 +12,27 @@ const confirmMock = vi.mocked(confirmCrisis);
 beforeEach(() => confirmMock.mockReset());
 
 describe("screenUserText", () => {
-  it("키워드에 안 걸리면 2단을 부르지 않는다", async () => {
+  it("평범한 말도 모델이 직접 판정한다 — 키워드 게이트는 없앴다", async () => {
+    // 키워드 게이트가 실측 재현율 36%였다(2026-09-22). 목록으로 거르면
+    // "이제 그만 살고 싶어" 같은 표현이 모델에 닿지도 못한다.
+    confirmMock.mockResolvedValue(false);
     const r = await screenUserText("오늘 점심에 국수 먹었어");
     expect(r).toEqual({ blocked: false });
-    expect(confirmMock).not.toHaveBeenCalled();
+    expect(confirmMock).toHaveBeenCalledOnce();
+  });
+
+  it("키워드에 없던 표현도 모델이 잡으면 차단한다 (회귀 방지)", async () => {
+    confirmMock.mockResolvedValue(true);
+    // 옛 키워드 목록엔 없어서 통째로 새던 표현들.
+    for (const q of [
+      "이제 그만 살고 싶어",
+      "손목을 그었어",
+      "약을 모아두고 있어",
+      "눈 감으면 안 깨어났으면 좋겠어",
+    ]) {
+      const r = await screenUserText(q);
+      expect(r.blocked, q).toBe(true);
+    }
   });
 
   it("2단이 true면 차단하고 검증된 번호를 준다", async () => {
@@ -44,7 +61,7 @@ describe("screenUserText", () => {
     expect(confirmMock).toHaveBeenCalledOnce();
   });
 
-  it("빈 문자열은 2단 없이 통과", async () => {
+  it("빈 문자열은 모델 없이 통과 — 부를 이유가 없다", async () => {
     const r = await screenUserText("");
     expect(r).toEqual({ blocked: false });
     expect(confirmMock).not.toHaveBeenCalled();

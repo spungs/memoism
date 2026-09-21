@@ -20,7 +20,8 @@
     "backfill-storage-usage": "NODE_NO_WARNINGS=1 node scripts/backfill-storage-usage.ts",
     "verify-storage-quota": "NODE_NO_WARNINGS=1 node scripts/verify-storage-quota.ts",
     "fix-chat-order": "NODE_NO_WARNINGS=1 node scripts/fix-chat-message-order.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "fence:recall": "vitest run --config vitest.manual.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
