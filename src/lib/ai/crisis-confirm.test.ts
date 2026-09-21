@@ -46,6 +46,6 @@ describe("confirmCrisis — 모델 응답 해석", () => {
     await confirmCrisis("죽고 싶다");
     const arg = chatMock.mock.calls[0][0];
     expect(arg.model).toBeTruthy();
-    expect(arg.maxOutputTokens).toBeLessThanOrEqual(8);
+    expect(arg.maxOutputTokens).toBeLessThanOrEqual(32);
   });
 });

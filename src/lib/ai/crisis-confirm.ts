@@ -29,7 +29,10 @@ export async function confirmCrisis(text: string): Promise<boolean | null> {
       systemPrompt: CONFIRM_SYSTEM,
       history: [],
       query: `"""\n${text}\n"""`,
-      maxOutputTokens: 4,
+      // 4로 잡았더니 모델이 **빈 응답**을 돌려줘 항상 판정 불능(null)이 됐다
+      // (실측 2026-09-22: 4토큰 → "Gemini 응답이 비어 있습니다", 16토큰 → "no").
+      // 한 단어만 필요하지만 여유를 둬야 실제로 한 단어가 온다.
+      maxOutputTokens: 16,
       model: CAPTURE_MODEL,
     });
   } catch {
