@@ -7,6 +7,7 @@ import { buildExifSummary } from "./exif-summary";
 import { deriveGenerationMode } from "./generation-mode";
 import { pickRegeneratedTitle } from "./regenerate-input";
 import { reembedDiaryWithFragments } from "./fragment-embed";
+import { SafetyBlockedError } from "@/lib/ai/safety";
 
 // 일기당 재생성 cap은 제거됨 (사용자 결정). 일일 cap이 비용·abuse 차단.
 // aiGenerationVersion 컬럼은 통계·로깅용으로만 카운트.
@@ -28,6 +29,8 @@ export type RegenerateResult =
       capExhausted?: boolean; // 일일 cap
       /** 입력이 아예 없는 경우 — AI 호출·차감 전이라 400으로 돌려준다. */
       invalidInput?: boolean;
+      /** 안전 펜스에 걸림 — DB 본문은 손대지 않았다. */
+      safetyBlocked?: boolean;
     };
 
 /**
@@ -159,6 +162,10 @@ export async function regenerateDiary(
       instruction: options.instruction,
     });
   } catch (e) {
+    // 펜스에 걸려도 DB 본문은 손대지 않았다 — 사용자의 글은 그대로다.
+    if (e instanceof SafetyBlockedError) {
+      return { ok: false, error: e.reply, safetyBlocked: true };
+    }
     return {
       ok: false,
       error: e instanceof Error ? e.message : "AI 생성 실패",

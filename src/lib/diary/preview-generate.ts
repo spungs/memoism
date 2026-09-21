@@ -6,6 +6,7 @@ import { checkAndIncrement } from "@/lib/ai/usage";
 import { buildExifSummary } from "./exif-summary";
 import { deriveGenerationMode } from "./generation-mode";
 import type { ClientExif } from "./auto-generate";
+import { SafetyBlockedError } from "@/lib/ai/safety";
 
 // 저장 전 검토 게이트의 "다시 생성"용 (DB 저장 X).
 // auto-generate와 달리 사진은 *이미 Storage에 업로드돼 있어* storagePath로 재다운로드한다.
@@ -32,6 +33,8 @@ export type PreviewGenerateResult =
       capExhausted?: boolean;
       /** 입력이 아예 없는 경우 — AI 호출·차감 전이라 400으로 돌려준다. */
       invalidInput?: boolean;
+      /** 안전 펜스에 걸림 — 사용자가 쓴 텍스트는 화면에 그대로 남는다. */
+      safetyBlocked?: boolean;
     };
 
 export async function previewGenerateDiary(
@@ -121,6 +124,10 @@ export async function previewGenerateDiary(
       instruction: input.instruction,
     });
   } catch (e) {
+    // 미리보기다. 사용자가 쓴 텍스트는 화면에 그대로 남는다.
+    if (e instanceof SafetyBlockedError) {
+      return { ok: false, error: e.reply, safetyBlocked: true };
+    }
     return {
       ok: false,
       error: e instanceof Error ? e.message : "AI 생성 실패",

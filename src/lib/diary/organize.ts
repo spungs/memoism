@@ -8,6 +8,7 @@ import { deriveGenerationMode } from "./generation-mode";
 import { reembedDiaryWithFragments } from "./fragment-embed";
 import { MAX_AI_INPUT_CONTENT_LENGTH } from "./schemas";
 import { dateKeyLabel, kstDateKey } from "./kst";
+import { SafetyBlockedError } from "@/lib/ai/safety";
 import {
   selectFragmentsForFold,
   toPromptFragments,
@@ -43,6 +44,8 @@ export type OrganizeResult =
       capExhausted?: boolean;
       /** 미반영 텍스트 조각이 0건 — AI 호출·차감 전에 돌려준다. */
       nothingToFold?: boolean;
+      /** 안전 펜스에 걸림 — 저장된 조각·본문은 그대로다. AI 생성만 건너뛴다. */
+      safetyBlocked?: boolean;
     };
 
 /**
@@ -182,6 +185,11 @@ export async function organizeDiaryFromFragments(
       instruction: options.instruction,
     });
   } catch (e) {
+    // 펜스에 걸린 것은 실패가 아니다 — 조각은 그대로 남고 AI 생성만 건너뛴다.
+    // foldedAt도 안 찍히므로 나중에 다시 정리할 수 있다.
+    if (e instanceof SafetyBlockedError) {
+      return { ok: false, error: e.reply, safetyBlocked: true };
+    }
     // 실패 시 foldedAt은 찍히지 않는다 — 다음에 다시 시도할 수 있다.
     return { ok: false, error: e instanceof Error ? e.message : "AI 생성 실패" };
   }
