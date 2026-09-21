@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { chat } from "@/lib/ai/gemini";
 import { findRelevantDiaries, type RelevantDiary } from "@/lib/ai/rag";
 import { checkAndIncrement } from "@/lib/ai/usage";
-import { prefilterMessage } from "@/lib/ai/safety";
+import { screenUserText } from "@/lib/ai/safety";
 import { handleCaptureMessage } from "@/lib/ai/capture";
 import { captureServer } from "@/lib/analytics/server";
 import { CHARACTER_NAME } from "@/lib/character/utils";
@@ -279,8 +279,9 @@ export async function POST(req: NextRequest) {
     userMessage = parsed.data.message;
   }
 
-  // 모든 메시지가 안전 프리필터를 먼저 통과한다 (스펙 §8, 우회구멍 없음).
-  const gate = prefilterMessage(userMessage);
+  // 안전 펜스 체크포인트 ① — 캡처·RAG **앞**이다. 이 순서가 우회구멍을 막는다.
+  // 차단돼도 사용자 메시지는 아래에서 그대로 저장된다 — 기록은 막지 않는다.
+  const gate = await screenUserText(userMessage);
   if (gate.blocked) {
     return NextResponse.json({ message: gate.reply, relatedDiaries: [] });
   }

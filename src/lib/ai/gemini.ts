@@ -1,7 +1,6 @@
 import "server-only";
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
-import { screenUserText, SafetyBlockedError } from "./safety";
 
 const MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
 
@@ -357,6 +356,14 @@ export async function generateDiary(
     .filter((t) => t.trim().length > 0)
     .join("\n");
   if (screened) {
+    // **동적 임포트로 정적 순환을 끊는다.** safety → crisis-confirm → gemini 이므로
+    // 여기서 safety를 정적으로 import하면 gemini ↔ safety 순환이 된다. 런타임엔
+    // 문제가 없지만(최상위에서 서로를 부르지 않음) 테스트가 부분 초기화된 모듈을
+    // 받아 깨진다(실제로 깨졌다).
+    //
+    // 모듈은 첫 호출 후 캐시되므로 비용은 사실상 0이다. 임포트가 실패하면 생성이
+    // 막히는데, 그건 fail-closed라 안전한 방향이다(기록은 이미 저장돼 있다).
+    const { screenUserText, SafetyBlockedError } = await import("./safety");
     const verdict = await screenUserText(screened);
     if (verdict.blocked) throw new SafetyBlockedError(verdict.reply);
   }
