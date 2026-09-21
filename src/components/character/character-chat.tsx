@@ -238,10 +238,15 @@ export function CharacterChat({
   );
 
   // 새 메시지 추가 / 새 대화 시작 시 스크롤 최하단으로 (리셋 땐 messages는 그대로라 boundaryAt도 의존)
+  //
+  // suggestion도 의존한다: 제안 카드는 마운트 후 fetch로 **나중에** 도착해 입력 바
+  // 위에 끼어든다. 그만큼 대화 목록이 줄어드는데 따라 내리지 않으면 마지막 메시지가
+  // 잘린 채로 남는다(새로고침·탭 이동 후 돌아올 때마다 재현). 카드를 닫을 때도
+  // 같은 이유로 다시 맞춘다.
   useEffect(() => {
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, boundaryAt]);
+  }, [messages, boundaryAt, suggestion]);
 
   // 입력창 높이 자동 조정 — 내용 없을 때 minHeight로 리셋, 입력하면 최대 maxHeight까지 확장
   useEffect(() => {
