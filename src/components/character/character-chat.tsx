@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { ArrowUp, ImagePlus, X } from "lucide-react";
 import { CaptureCorrectionSheet } from "./capture-correction-sheet";
 import { PhotoConsentSheet } from "./photo-consent-sheet";
+import {
+  OrganizeSuggestionCard,
+  type OrganizeSuggestion,
+} from "./organize-suggestion-card";
 import { getCapturePhotoUrls } from "@/lib/diary/capture-actions";
 import { setPhotoVisionConsentAction } from "@/lib/character/actions";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
@@ -119,6 +123,9 @@ export function CharacterChat({
   );
   const [consentOpen, setConsentOpen] = useState(false);
   const [consentSaving, setConsentSaving] = useState(false);
+  // 지난 날의 미반영 조각 제안. 파생 상태라 진입할 때마다 서버에 새로 묻는다.
+  const [suggestion, setSuggestion] = useState<OrganizeSuggestion | null>(null);
+  const [organizing, setOrganizing] = useState(false);
   // 저장 칩을 탭해서 연 교정 대상(메시지 id + 그 메시지가 기록한 날들).
   const [correcting, setCorrecting] = useState<{
     messageId: string;
@@ -156,6 +163,66 @@ export function CharacterChat({
         missing.forEach((id) => triedPhotoIds.current.delete(id));
       });
   }, [messages]);
+
+  // 제안 조회. 저장하지 않는 파생 상태라 마운트마다 묻는다.
+  useEffect(() => {
+    let alive = true;
+    void fetch("/api/diaries/unfolded")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (alive && d?.suggestion) setSuggestion(d.suggestion);
+      })
+      .catch(() => {
+        // 제안은 부가 기능이다 — 실패해도 대화를 막지 않는다.
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function handleOrganize() {
+    if (!suggestion || organizing) return;
+    setOrganizing(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/diaries/${suggestion.diaryId}/organize`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "정리하다가 문제가 생겼어. 조금 뒤에 다시 해볼래?");
+        // 캡 소진·조각 없음은 다시 눌러도 같은 결과다 — 제안을 내린다.
+        if (data.capExhausted || data.nothingToFold) setSuggestion(null);
+        if (data.capExhausted) setCapExhausted(true);
+        return;
+      }
+      // 서버가 ChatMessage로 저장했으면 그 행을 그대로 붙인다(새로고침 후에도 남는다).
+      // 저장에 실패했으면 낙관적 메시지로 대체 — 이번 화면에만 보인다.
+      const msg: Message = data.chatMessage ?? {
+        id: `organize-${data.diary.id}-${Date.now()}`,
+        role: "assistant",
+        content: `${data.label} 일기로 정리했어.`,
+        createdAt: new Date().toISOString(),
+        relatedDiaries: [
+          {
+            id: data.diary.id,
+            title: data.diary.title,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      };
+      setMessages((prev) => [...prev, msg]);
+      setSuggestion(null);
+      // 정리는 비싼 경로라 캡을 하나 쓴다 — 카운터를 다시 읽게 한다.
+      setUsageSignal((n) => n + 1);
+      // 일기 목록·상세가 바뀌었다.
+      router.refresh();
+    } catch {
+      setError("정리하다가 연결이 끊겼어. 조금 뒤에 다시 해볼래?");
+    } finally {
+      setOrganizing(false);
+    }
+  }
 
   // 언마운트 시 미리보기 objectURL 회수 (SPA 이동으로는 문서가 안 죽어 남는다).
   const pickedRef = useRef<PickedPhoto[]>([]);
@@ -590,6 +657,17 @@ export function CharacterChat({
             variant="low-only"
           />
         </div>
+        {/* 제안은 입력창 바로 위 — 목록 안에 두면 스크롤과 함께 사라진다. */}
+        {suggestion && (
+          <OrganizeSuggestionCard
+            suggestion={suggestion}
+            busy={organizing}
+            onAccept={() => void handleOrganize()}
+            // 클라이언트 상태만 지운다. 서버에 스누즈를 기록하지 않으므로
+            // 다음 진입 때 다시 뜬다(스펙 §3.2).
+            onDismiss={() => setSuggestion(null)}
+          />
+        )}
         {picked.length > 0 && (
           <div
             style={{
