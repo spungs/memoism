@@ -3,10 +3,12 @@ import { prisma } from "@/lib/db";
 import { getSignedUrl, getSignedUrlsByPath } from "@/lib/storage";
 import { fragmentPreview } from "./fragment-preview";
 import {
+  dateKeyLabel,
   diaryCreatedAtForDateKey,
   kstDateKey,
   kstDayRangeFromKey,
   kstMonthRangeUtc,
+  kstTodayKey,
 } from "@/lib/diary/kst";
 
 const DEFAULT_TAKE = 20;
@@ -356,4 +358,44 @@ export async function getOrCreateDiaryForDate(
     select: { id: true },
   });
   return created;
+}
+
+/** 이 일기의 아직 정리에 안 들어간 텍스트 조각 수. 넛지·제안 문구의 N. */
+export async function countUnfoldedFragments(diaryId: string): Promise<number> {
+  return prisma.diaryFragment.count({
+    where: { diaryId, kind: "text", foldedAt: null },
+  });
+}
+
+/**
+ * 제안 대상 — 미반영 텍스트 조각이 있는 "지난 날" 중 가장 최근 1건.
+ *
+ * 오늘을 제외하는 이유(스펙 D-2): 하루가 닫혀야 조각이 완전하다. 오전에 정리하면
+ * 미완성 일기가 나오고 그 뒤로 재정리 넛지가 계속 붙는다.
+ */
+export async function findUnfoldedDiary(userId: string): Promise<{
+  diaryId: string;
+  dateKey: string;
+  label: string;
+  count: number;
+} | null> {
+  const { startUtc: todayStartUtc } = kstDayRangeFromKey(kstTodayKey());
+
+  const diary = await prisma.diary.findFirst({
+    where: {
+      userId,
+      createdAt: { lt: todayStartUtc },
+      fragments: { some: { kind: "text", foldedAt: null } },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, createdAt: true },
+  });
+  if (!diary) return null;
+
+  const count = await countUnfoldedFragments(diary.id);
+  // some 조건과 count 사이에 조각이 지워졌으면 제안할 게 없다.
+  if (count === 0) return null;
+
+  const dateKey = kstDateKey(diary.createdAt);
+  return { diaryId: diary.id, dateKey, label: dateKeyLabel(dateKey), count };
 }
