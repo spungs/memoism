@@ -7,6 +7,7 @@ import { buildExifSummary } from "./exif-summary";
 import { deriveGenerationMode } from "./generation-mode";
 import { reembedDiaryWithFragments } from "./fragment-embed";
 import { MAX_AI_INPUT_CONTENT_LENGTH } from "./schemas";
+import { dateKeyLabel, kstDateKey } from "./kst";
 import {
   selectFragmentsForFold,
   toPromptFragments,
@@ -25,6 +26,10 @@ export type OrganizeResult =
       };
       foldedCount: number;
       skippedCount: number;
+      /** 그 일기의 KST 날짜 키. 결과 칩 문구·링크에 쓴다. */
+      dateKey: string;
+      /** "8월 3일". 호출자가 kst를 다시 임포트하지 않게 함께 돌려준다. */
+      label: string;
     }
   | {
       ok: false;
@@ -57,6 +62,7 @@ export async function organizeDiaryFromFragments(
       id: true,
       title: true,
       content: true,
+      createdAt: true,
       images: {
         select: {
           storagePath: true,
@@ -212,10 +218,13 @@ export async function organizeDiaryFromFragments(
   // 조각은 정리 후에도 보존되므로 임베딩 입력에 계속 있어야 한다.
   await reembedDiaryWithFragments(updated.id);
 
+  const dateKey = kstDateKey(diary.createdAt);
   return {
     ok: true,
     diary: updated,
     foldedCount: selected.length,
     skippedCount,
+    dateKey,
+    label: dateKeyLabel(dateKey),
   };
 }
