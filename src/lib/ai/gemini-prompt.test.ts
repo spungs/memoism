@@ -97,3 +97,38 @@ describe("buildDiarySystemPrompt — instruction 있을 때 (지시 우선)", ()
     expect(p).toContain("## 사용자 재정리 요청");
   });
 });
+
+describe("buildDiarySystemPrompt — 조각이 있을 때", () => {
+  it("조각 섹션 설명이 들어간다", () => {
+    const p = buildDiarySystemPrompt({
+      mode: "B",
+      userTextLength: 0,
+      hasFragments: true,
+    });
+    expect(p).toContain("시간순 조각");
+  });
+
+  it("조각을 본문에 시각 그대로 옮겨 적지 말라고 못박는다", () => {
+    const p = buildDiarySystemPrompt({
+      mode: "B",
+      userTextLength: 0,
+      hasFragments: true,
+    });
+    expect(p).toContain("시각을 본문에 그대로 옮겨 적지");
+  });
+
+  it("조각이 없으면 조각 섹션이 아예 없다 (회귀 방지)", () => {
+    const p = buildDiarySystemPrompt({ mode: "C", userTextLength: 320 });
+    expect(p).not.toContain("시간순 조각");
+  });
+
+  it("조각이 있어도 기존 사용자 글 보존 규칙은 그대로다", () => {
+    const p = buildDiarySystemPrompt({
+      mode: "C",
+      userTextLength: 320,
+      hasFragments: true,
+    });
+    expect(p).toContain("절대 요약하지 말고");
+    expect(p).toContain("시간순 조각");
+  });
+});

@@ -189,6 +189,12 @@ export type DiaryGenerationInput = {
    * 분량·문체 규칙보다 우선하지만 환각 금지는 뚫지 못한다.
    */
   instruction?: string;
+  /**
+   * 메이 대화로 쌓인 시간순 조각. 사용자가 직접 쓴 `text`와 **분리해서** 넘긴다.
+   * 한 덩어리로 합치면 모델이 "사용자가 쓴 글"과 "조각"을 구분하지 못해
+   * 보존 규칙(하드룰)이 조각에까지 걸리고, 조각의 시각 정보도 사라진다.
+   */
+  fragments?: Array<{ at: string; text: string }>;
 };
 
 export type DiaryGenerationOutput = {
@@ -215,6 +221,8 @@ export type BuildDiarySystemPromptOptions = {
   exifSummary?: string;
   userTextLength: number;
   instruction?: string;
+  /** 시간순 조각이 별도 파트로 함께 전달되는가. 조각 전용 규칙 블록을 켠다. */
+  hasFragments?: boolean;
 };
 
 // 인자가 5개가 되면서 인접한 string|undefined 두 개(exifSummary·instruction)를
@@ -225,6 +233,7 @@ export function buildDiarySystemPrompt({
   exifSummary,
   userTextLength,
   instruction,
+  hasFragments,
 }: BuildDiarySystemPromptOptions): string {
   // 베타 기본 preset은 "factual" — 담백한 사실 중심 평서문('~했다'체).
   // (UserPersona UI는 V2 노출 예정. 그때 다른 preset에서 tone/formality 기반으로 확장.)
@@ -263,13 +272,26 @@ ${instruction}
 """`
     : "";
 
+  // 조각은 '[시간순 조각]'이라는 별도 파트로 전달된다. 모델이 조각을 사용자가 쓴
+  // 글과 같은 것으로 보면 보존 규칙이 조각에까지 걸려 "14:30 국수 먹음"이 본문에
+  // 그대로 박힌다. 조각은 *재료*이지 보존 대상이 아니다.
+  const fragmentBlock = hasFragments
+    ? `
+
+## 시간순 조각 (메이 대화로 그날 남긴 기록)
+'[시간순 조각]' 파트는 사용자가 하루 동안 툭툭 남긴 짧은 기록이다. 이걸 재료로 하루의 흐름이 이어지는 하나의 글을 만들어라.
+- 조각을 목록처럼 나열하지 말고 자연스러운 문장으로 엮어라.
+- 조각의 시각을 본문에 그대로 옮겨 적지 마라 ('14:30' 금지). 필요하면 '점심쯤', '저녁에' 정도로만.
+- 조각에 없는 사실·감정·대화를 지어내지 마라.`
+    : "";
+
   const common = `## 출력 규칙
 ${lengthLine}
 ${styleLines}
 - 시간 표기는 일반적인 일기처럼 자연스럽게: 분 단위 시각('14시 08분', '오후 2시 8분')은 쓰지 않는다. 시간을 꼭 드러내야 할 땐 '오전/오후', '아침/점심/저녁', '○시쯤' 정도로만 쓰고, 보통은 시각 없이 일어난 일을 자연스럽게 이어서 적는다('~하고 ~했다. 그리고 ~했다').
 - 환각 금지: 입력(사진·메모·EXIF)에 없는 사실·디테일·없는 사람·꾸며낸 대화·과장된 감정 추가 금지.
 - 응답은 JSON 객체 하나만. 코드블록·머리말·꼬리말 없음.
-- 스키마: { "title": string(1~50자), "content": string(1~3000자), "suggestedMood": "joy"|"calm"|"sad"|"love"|"anger"|"tired"|null }${instructionBlock}`;
+- 스키마: { "title": string(1~50자), "content": string(1~3000자), "suggestedMood": "joy"|"calm"|"sad"|"love"|"anger"|"tired"|null }${fragmentBlock}${instructionBlock}`;
 
   // 모드 B/C 프리앰블의 "보존" 규칙. instruction이 없을 때는 절대 규칙이지만,
   // 있을 때는 요청에 양보해야 한다. 프리앰블에 하드 보존이 남아 있으면 뒤쪽 지시
@@ -315,17 +337,22 @@ ${common}`;
 export async function generateDiary(
   input: DiaryGenerationInput,
 ): Promise<DiaryGenerationOutput> {
-  // 모드 검증
+  // 모드 검증.
+  // 조각도 텍스트 입력이다 — 채팅으로만 기록한 날은 본문(text)이 비어 있고 조각만
+  // 있다. 조각을 텍스트로 안 세면 그 날이 "모드 B는 텍스트가 필요합니다"로 막힌다.
+  const hasTextInput =
+    !!input.text?.trim() || (input.fragments?.length ?? 0) > 0;
+
   if (input.mode === "A" && (!input.photos || input.photos.length === 0)) {
     throw new GeminiError("모드 A는 사진이 1장 이상 필요합니다");
   }
-  if (input.mode === "B" && !input.text?.trim()) {
+  if (input.mode === "B" && !hasTextInput) {
     throw new GeminiError("모드 B는 텍스트가 필요합니다");
   }
   if (
     input.mode === "C" &&
     (!input.photos || input.photos.length === 0) &&
-    !input.text?.trim()
+    !hasTextInput
   ) {
     throw new GeminiError("모드 C는 사진 또는 텍스트가 필요합니다");
   }
@@ -336,6 +363,7 @@ export async function generateDiary(
     exifSummary: input.exifSummary,
     userTextLength: input.text?.trim().length ?? 0,
     instruction: input.instruction?.trim() || undefined,
+    hasFragments: (input.fragments?.length ?? 0) > 0,
   });
 
   const parts: Array<
@@ -344,8 +372,17 @@ export async function generateDiary(
 
   if (input.text?.trim()) {
     parts.push({ text: `[사용자 메모]\n${input.text.trim()}` });
+  } else if ((input.fragments?.length ?? 0) > 0) {
+    // 조각만 있는 날(채팅으로만 기록). "사진만으로 작성"이라고 하면 모델이 바로
+    // 뒤에 오는 조각 파트를 재료가 아니라 잡음으로 취급한다.
+    parts.push({ text: "[사용자 메모 없음 — 아래 조각으로 일기 작성]" });
   } else {
     parts.push({ text: "[사용자 메모 없음 — 사진만으로 일기 작성]" });
+  }
+
+  if (input.fragments && input.fragments.length > 0) {
+    const lines = input.fragments.map((f) => `${f.at} ${f.text}`).join("\n");
+    parts.push({ text: `[시간순 조각]\n${lines}` });
   }
 
   if (input.photos) {
