@@ -9,6 +9,7 @@ import { reembedDiaryWithFragments } from "./fragment-embed";
 import { MAX_AI_INPUT_CONTENT_LENGTH } from "./schemas";
 import { dateKeyLabel, kstDateKey } from "./kst";
 import { SafetyBlockedError } from "@/lib/ai/safety";
+import { captureServer } from "@/lib/analytics/server";
 import {
   selectFragmentsForFold,
   toPromptFragments,
@@ -188,6 +189,12 @@ export async function organizeDiaryFromFragments(
     // 펜스에 걸린 것은 실패가 아니다 — 조각은 그대로 남고 AI 생성만 건너뛴다.
     // foldedAt도 안 찍히므로 나중에 다시 정리할 수 있다.
     if (e instanceof SafetyBlockedError) {
+      // 원문 미저장 — 이벤트만(스펙 §7).
+      void captureServer("safety_fence_triggered", userId, {
+        fence: "crisis",
+        path: "diary",
+        stage: "model",
+      });
       return { ok: false, error: e.reply, safetyBlocked: true };
     }
     // 실패 시 foldedAt은 찍히지 않는다 — 다음에 다시 시도할 수 있다.

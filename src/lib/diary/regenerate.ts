@@ -8,6 +8,7 @@ import { deriveGenerationMode } from "./generation-mode";
 import { pickRegeneratedTitle } from "./regenerate-input";
 import { reembedDiaryWithFragments } from "./fragment-embed";
 import { SafetyBlockedError } from "@/lib/ai/safety";
+import { captureServer } from "@/lib/analytics/server";
 
 // 일기당 재생성 cap은 제거됨 (사용자 결정). 일일 cap이 비용·abuse 차단.
 // aiGenerationVersion 컬럼은 통계·로깅용으로만 카운트.
@@ -164,6 +165,12 @@ export async function regenerateDiary(
   } catch (e) {
     // 펜스에 걸려도 DB 본문은 손대지 않았다 — 사용자의 글은 그대로다.
     if (e instanceof SafetyBlockedError) {
+      // 원문 미저장 — 이벤트만(스펙 §7).
+      void captureServer("safety_fence_triggered", userId, {
+        fence: "crisis",
+        path: "diary",
+        stage: "model",
+      });
       return { ok: false, error: e.reply, safetyBlocked: true };
     }
     return {

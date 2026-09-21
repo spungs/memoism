@@ -7,6 +7,7 @@ import { buildExifSummary } from "./exif-summary";
 import { deriveGenerationMode } from "./generation-mode";
 import type { ClientExif } from "./auto-generate";
 import { SafetyBlockedError } from "@/lib/ai/safety";
+import { captureServer } from "@/lib/analytics/server";
 
 // 저장 전 검토 게이트의 "다시 생성"용 (DB 저장 X).
 // auto-generate와 달리 사진은 *이미 Storage에 업로드돼 있어* storagePath로 재다운로드한다.
@@ -126,6 +127,12 @@ export async function previewGenerateDiary(
   } catch (e) {
     // 미리보기다. 사용자가 쓴 텍스트는 화면에 그대로 남는다.
     if (e instanceof SafetyBlockedError) {
+      // 원문 미저장 — 이벤트만(스펙 §7).
+      void captureServer("safety_fence_triggered", input.userId, {
+        fence: "crisis",
+        path: "diary",
+        stage: "model",
+      });
       return { ok: false, error: e.reply, safetyBlocked: true };
     }
     return {

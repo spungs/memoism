@@ -290,6 +290,12 @@ export async function POST(req: NextRequest) {
   // 차단돼도 사용자 메시지는 아래에서 그대로 저장된다 — 기록은 막지 않는다.
   const gate = await screenUserText(userMessage);
   if (gate.blocked) {
+    // 원문도 걸린 키워드도 남기지 않는다 — 펜스가 도는지만 안다(스펙 §7).
+    void captureServer("safety_fence_triggered", session.userId, {
+      fence: gate.kind,
+      path: "chat",
+      stage: gate.stage,
+    });
     return NextResponse.json({ message: gate.reply, relatedDiaries: [] });
   }
 
