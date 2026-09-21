@@ -303,6 +303,26 @@ export async function POST(req: NextRequest) {
   // 캡처(record) 경로: 캡을 소모하지 않고 그날 일기에 조각으로 누적한다.
   // recall/ambiguous면 handled:false로 떨어져 아래 기존 회상 경로를 그대로 탄다.
   // 무거운 RAG 검색(Promise.all) **앞**에 둔다 — record 메시지가 불필요한 벡터 검색을 치르지 않게.
+  // 모델 컨텍스트는 "현재 대화"만 — 경계(chatResetAt) 이후, 없으면 최근 24h. 표시(영구)와 분리.
+  // **캡처보다 먼저** 조회한다: 기록 경로도 직전 대화를 알아야 "방금 한 말"을 되묻지
+  // 않는다. 가벼운 인덱스 쿼리 1건이고, 회상 경로는 어차피 같은 걸 썼다.
+  const contextFloor =
+    character.chatResetAt ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const recentHistory = await prisma.chatMessage.findMany({
+    where: { userId: session.userId, createdAt: { gte: contextFloor } },
+    orderBy: { createdAt: "desc" }, // 최근 20개를 집으려 desc → 사용 시 reverse
+    take: 20,
+    select: { role: true, content: true },
+  });
+  const history = recentHistory
+    .slice()
+    .reverse() // desc 조회 → 시간순(오래된→최신)
+    .filter((m) => m.role !== "SYSTEM")
+    .map((m) => ({
+      role: (m.role === "USER" ? "user" : "model") as "user" | "model",
+      text: m.content,
+    }));
+
   const capture = await handleCaptureMessage(
     session.userId,
     userMessage,
@@ -311,6 +331,7 @@ export async function POST(req: NextRequest) {
     clientExifs,
     // null(아직 안 물어봄)·false(거부) 모두 "보여주지 않는다".
     character.photoVisionOptIn === true,
+    history,
   );
   if (capture.handled) {
     // 캡처도 AI 호출이지만 싼 경로라 캡을 소모하지 않는다(Plan 03 AiPath).
@@ -360,11 +381,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // 모델 컨텍스트는 "현재 대화"만 — 경계(chatResetAt) 이후, 없으면 최근 24h. 표시(영구)와 분리.
-  const contextFloor =
-    character.chatResetAt ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
-
-  const [recentDiaries, recentHistory, persona, relevant] = await Promise.all([
+  const [recentDiaries, persona, relevant] = await Promise.all([
     prisma.diary.findMany({
       where: { userId: session.userId },
       orderBy: { createdAt: "desc" },
@@ -376,15 +393,6 @@ export async function POST(req: NextRequest) {
         mood: true,
         createdAt: true,
       },
-    }),
-    prisma.chatMessage.findMany({
-      where: {
-        userId: session.userId,
-        createdAt: { gte: contextFloor },
-      },
-      orderBy: { createdAt: "desc" }, // 최근 20개를 집으려 desc → 사용 시 reverse
-      take: 20,
-      select: { role: true, content: true },
     }),
     prisma.userPersona.findUnique({
       where: { userId: session.userId },
@@ -431,15 +439,6 @@ export async function POST(req: NextRequest) {
     recentDiaries,
     relevant,
   });
-  const history = recentHistory
-    .slice()
-    .reverse() // desc 조회 → 시간순(오래된→최신)
-    .filter((m) => m.role !== "SYSTEM")
-    .map((m) => ({
-      role: (m.role === "USER" ? "user" : "model") as "user" | "model",
-      text: m.content,
-    }));
-
   let rawAssistant: string;
   try {
     rawAssistant = await chat({

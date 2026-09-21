@@ -1,5 +1,5 @@
 import "server-only";
-import { chat, CAPTURE_MODEL } from "./gemini";
+import { chat, CAPTURE_MODEL, type ChatTurn } from "./gemini";
 import { classifyIntent } from "./intent";
 import { resolveCaptureDate, resolvePhotoDates } from "@/lib/diary/capture-date";
 import { createFragment } from "@/lib/diary/fragments";
@@ -131,6 +131,17 @@ export async function handleCaptureMessage(
   exifs: ClientExif[] = [],
   /** 사진을 모델에게 보여줘도 되는지(사용자 동의). 기본은 보여주지 않는다. */
   canSeePhotos = false,
+  /**
+   * 현재 대화 이력(시간순). 회상 경로가 쓰는 것과 **같은 이력**을 받는다.
+   *
+   * 예전엔 빈 배열을 넘겨 기록 경로가 직전 메시지 하나만 보고 답했다. 그래서
+   * 사용자가 방금 "알리오올리오 해먹었어"라고 했는데 메이가 "어떤 메뉴였어?"라고
+   * 되물었다 — "기억하는 친구"라는 정체성과 정면으로 어긋난다.
+   *
+   * 길이 걱정은 없다: 호출부가 이미 chatResetAt 이후 · 최근 24h · 20건으로 자르고,
+   * pg_cron이 24시간 지난 메시지를 지운다.
+   */
+  history: ChatTurn[] = [],
 ): Promise<CaptureOutcome> {
   // 사진 자체는 무조건 기록이다. 다만 **텍스트는 따로 판단한다** — "이거 뭐게?"
   // 같은 대화체 질문까지 일기 조각으로 남기면 라이프DB가 잡담으로 오염된다.
@@ -242,7 +253,7 @@ export async function handleCaptureMessage(
           }`
         : REPLY_SYSTEM,
       images,
-      history: [],
+      history,
       query: message || "(사진만 보냄)",
       maxOutputTokens: 120,
       model: CAPTURE_MODEL,
