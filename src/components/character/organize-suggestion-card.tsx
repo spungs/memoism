@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { ChevronDown, Sparkles } from "lucide-react";
 
 export type OrganizeSuggestion = {
   diaryId: string;
@@ -16,20 +16,55 @@ export type OrganizeSuggestion = {
  * 일어난 사건이 아니다. 저장하면 정리한 뒤에도 대화에 남아, 누르면 "정리할 조각이
  * 없어요"가 뜬다. 결과 칩은 반대로 저장한다(사건이므로).
  *
- * 위치는 **입력창 바로 위 고정**. 대화 목록 최상단에 두면 스크롤과 함께 밀려 사라져서,
- * 발견을 보장하려고 메이를 진입점으로 고른 이유가 없어진다.
+ * 위치는 **헤더 바로 아래 고정**. 대화 목록 *안*에 두면 스크롤과 함께 밀려 사라지고,
+ * 입력창 위에 두면 마지막 대화를 밀어올린다 — 둘 다 실제로 겪었다. 여기가 둘 다 피하면서
+ * 발견도 보장한다(메이를 진입점으로 고른 이유).
+ *
+ * "나중에"는 **지우지 않고 접는다.** 조각은 그대로 남아 있는데 제안만 사라지면
+ * 다시 정리할 길이 채팅에 없어진다(일기 상세까지 들어가야 한다). 접힌 상태에서도
+ * 개수는 계속 갱신되고, 탭 한 번으로 펼쳐 바로 정리할 수 있다.
  */
 export function OrganizeSuggestionCard({
   suggestion,
   busy,
+  collapsed,
   onAccept,
-  onDismiss,
+  onToggle,
 }: {
   suggestion: OrganizeSuggestion;
   busy: boolean;
+  collapsed: boolean;
   onAccept: () => void;
-  onDismiss: () => void;
+  onToggle: () => void;
 }) {
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        className="pressable"
+        onClick={onToggle}
+        aria-expanded={false}
+        aria-label={`${suggestion.label}에 모인 조각 ${suggestion.count}개 — 정리 제안 펼치기`}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "5px 10px",
+          borderRadius: "var(--radius-pill)",
+          border: "none",
+          backgroundColor: "var(--fill-2)",
+          color: "var(--fg-muted)",
+          fontFamily: "var(--font-sans)",
+          fontSize: "var(--text-sm)",
+          cursor: "pointer",
+        }}
+      >
+        <Sparkles size={13} aria-hidden />
+        {suggestion.label} {suggestion.count}개
+      </button>
+    );
+  }
+
   return (
     <div
       style={{
@@ -37,7 +72,6 @@ export function OrganizeSuggestionCard({
         alignItems: "center",
         gap: "var(--space-3)",
         padding: "var(--space-3)",
-        marginBottom: "var(--space-2)",
         borderRadius: "var(--radius-md)",
         backgroundColor: "var(--fill-2)",
       }}
@@ -58,24 +92,7 @@ export function OrganizeSuggestionCard({
       >
         {suggestion.label}에 {suggestion.count}개 모였어. 일기로 정리해줄까?
       </p>
-      <div style={{ display: "flex", gap: "var(--space-2)", flexShrink: 0 }}>
-        <button
-          type="button"
-          className="pressable"
-          onClick={onDismiss}
-          disabled={busy}
-          style={{
-            padding: "6px 10px",
-            borderRadius: "var(--radius-pill)",
-            border: "none",
-            backgroundColor: "transparent",
-            color: "var(--fg-muted)",
-            fontSize: "var(--text-sm)",
-            cursor: busy ? "not-allowed" : "pointer",
-          }}
-        >
-          나중에
-        </button>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexShrink: 0 }}>
         <button
           type="button"
           className="pressable"
@@ -87,6 +104,7 @@ export function OrganizeSuggestionCard({
             border: "none",
             backgroundColor: "var(--fg)",
             color: "var(--bg)",
+            fontFamily: "var(--font-sans)",
             fontSize: "var(--text-sm)",
             fontWeight: 500,
             cursor: busy ? "not-allowed" : "pointer",
@@ -94,6 +112,30 @@ export function OrganizeSuggestionCard({
           }}
         >
           {busy ? "정리하는 중" : "정리해줘"}
+        </button>
+        {/* 접기 — "나중에"라는 말 대신 동작을 그대로 보여준다. 지우는 게 아니라 접는 것이다. */}
+        <button
+          type="button"
+          className="pressable"
+          onClick={onToggle}
+          disabled={busy}
+          aria-expanded
+          aria-label="정리 제안 접기"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 28,
+            height: 28,
+            padding: 0,
+            borderRadius: "var(--radius-pill)",
+            border: "none",
+            backgroundColor: "transparent",
+            color: "var(--fg-muted)",
+            cursor: busy ? "not-allowed" : "pointer",
+          }}
+        >
+          <ChevronDown size={16} aria-hidden />
         </button>
       </div>
     </div>

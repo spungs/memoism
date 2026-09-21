@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp, ImagePlus, X } from "lucide-react";
 import { CaptureCorrectionSheet } from "./capture-correction-sheet";
@@ -126,6 +126,8 @@ export function CharacterChat({
   // 지난 날의 미반영 조각 제안. 파생 상태라 진입할 때마다 서버에 새로 묻는다.
   const [suggestion, setSuggestion] = useState<OrganizeSuggestion | null>(null);
   const [organizing, setOrganizing] = useState(false);
+  /** 제안을 접어뒀는가. 지우는 게 아니라 접는 것이라 재조회는 계속 돌고 개수도 갱신된다. */
+  const [suggestionCollapsed, setSuggestionCollapsed] = useState(false);
   // 저장 칩을 탭해서 연 교정 대상(메시지 id + 그 메시지가 기록한 날들).
   const [correcting, setCorrecting] = useState<{
     messageId: string;
@@ -166,21 +168,27 @@ export function CharacterChat({
       });
   }, [messages]);
 
-  // 제안 조회. 저장하지 않는 파생 상태라 마운트마다 묻는다.
-  useEffect(() => {
-    let alive = true;
-    void fetch("/api/diaries/unfolded")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (alive && d?.suggestion) setSuggestion(d.suggestion);
-      })
-      .catch(() => {
-        // 제안은 부가 기능이다 — 실패해도 대화를 막지 않는다.
-      });
-    return () => {
-      alive = false;
-    };
+  // 제안 조회. 저장하지 않는 파생 상태라 마운트할 때와 메이 답변이 올 때마다 다시 묻는다.
+  //
+  // 전송 후에도 부르는 이유: 캡처는 날짜 라우팅을 한다("어제 저녁에 ~"는 어제 일기로
+  // 간다). 그래서 채팅 한 통이 *지난 날*의 미반영 조각 수를 바꿀 수 있는데, 마운트
+  // 때만 물으면 새로고침 전까지 옛 숫자가 그대로 남는다.
+  //
+  // 접혀 있어도 계속 갱신한다 — 접힌 칩에 현재 개수가 그대로 보여야 한다.
+  const refreshSuggestion = useCallback(async () => {
+    try {
+      const res = await fetch("/api/diaries/unfolded");
+      if (!res.ok) return;
+      const data = await res.json();
+      setSuggestion(data?.suggestion ?? null);
+    } catch {
+      // 제안은 부가 기능이다 — 실패해도 대화를 막지 않는다.
+    }
   }, []);
+
+  useEffect(() => {
+    void refreshSuggestion();
+  }, [refreshSuggestion]);
 
   async function handleOrganize() {
     if (!suggestion || organizing) return;
@@ -216,6 +224,9 @@ export function CharacterChat({
       };
       setMessages((prev) => [...prev, msg]);
       setSuggestion(null);
+      // 접어둔 채로 정리했더라도 다음 제안은 펼친 상태로 보여준다 — 접기는
+      // "이 제안 지금은 됐다"였지 "앞으로 계속 접어둬라"가 아니다.
+      setSuggestionCollapsed(false);
       // 정리는 비싼 경로라 캡을 하나 쓴다 — 카운터를 다시 읽게 한다.
       setUsageSignal((n) => n + 1);
       // 일기 목록·상세가 바뀌었다.
@@ -419,6 +430,9 @@ export function CharacterChat({
     } finally {
       setSending(false);
       setUsageSignal((n) => n + 1);
+      // 이 메시지가 지난 날 일기에 조각으로 들어갔을 수 있다(날짜 라우팅).
+      // 답변이 온 시점에 제안 숫자를 다시 맞춘다.
+      void refreshSuggestion();
       textareaRef.current?.focus();
     }
   }
@@ -488,6 +502,22 @@ export function CharacterChat({
           <SettingsLink />
         </div>
       </header>
+
+      {/* 제안 — 헤더 바로 아래 고정. 목록 *안*에 두면 스크롤과 함께 사라지고,
+          입력창 위에 두면 마지막 대화를 밀어올린다(둘 다 겪었다). 여기가 둘 다 피한다. */}
+      {suggestion && (
+        <div style={{ padding: "var(--space-2) var(--space-4) 0", flexShrink: 0 }}>
+          <OrganizeSuggestionCard
+            suggestion={suggestion}
+            busy={organizing}
+            collapsed={suggestionCollapsed}
+            onAccept={() => void handleOrganize()}
+            // 접기/펼치기만 한다. 서버에 스누즈를 기록하지 않으므로 새로고침하면
+            // 다시 펼친 상태로 돌아온다(스펙 §3.2).
+            onToggle={() => setSuggestionCollapsed((v) => !v)}
+          />
+        </div>
+      )}
 
       {/* 메시지 목록 */}
       <div
@@ -685,17 +715,6 @@ export function CharacterChat({
             variant="low-only"
           />
         </div>
-        {/* 제안은 입력창 바로 위 — 목록 안에 두면 스크롤과 함께 사라진다. */}
-        {suggestion && (
-          <OrganizeSuggestionCard
-            suggestion={suggestion}
-            busy={organizing}
-            onAccept={() => void handleOrganize()}
-            // 클라이언트 상태만 지운다. 서버에 스누즈를 기록하지 않으므로
-            // 다음 진입 때 다시 뜬다(스펙 §3.2).
-            onDismiss={() => setSuggestion(null)}
-          />
-        )}
         {picked.length > 0 && (
           <div
             style={{
