@@ -134,6 +134,8 @@ export function CharacterChat({
   } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  /** 직전 입력창 높이 — 높이가 바뀔 때만 대화 목록을 따라 내리기 위해. */
+  const prevInputH = useRef(INPUT_MIN_H);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // 대화에 보이는 사진의 signed URL (id → url). captureRef엔 id만 있어 서버에서 해석한다.
@@ -247,13 +249,26 @@ export function CharacterChat({
     if (!ta) return;
     ta.style.height = "1px";
     const contentH = ta.scrollHeight;
-    ta.style.height =
-      Math.min(Math.max(contentH, INPUT_MIN_H), INPUT_MAX_H) + "px";
+    const nextH = Math.min(Math.max(contentH, INPUT_MIN_H), INPUT_MAX_H);
+    ta.style.height = nextH + "px";
     // 최대 높이에 닿으면 스크롤을 열어준다. overflow가 계속 hidden이면 넘친 줄이
     // 잘려서 사라진다 — 브라우저는 커서만 보이게 내부 스크롤을 하므로 윗줄이
     // 글자 중간에서 끊긴다. 자라는 동안엔 hidden이라야 리사이즈 중 스크롤바가
     // 깜빡이지 않는다(그게 hidden을 넣은 원래 이유다).
     ta.style.overflowY = contentH > INPUT_MAX_H ? "auto" : "hidden";
+    // 여러 줄이 되면 pill(999px)을 버린다. 높이 120px 박스에 999px를 주면 모서리가
+    // 60px 곡선이라 첫 줄·마지막 줄의 앞글자를 깎아먹는다("록"이 "룩"으로 보인다).
+    ta.style.borderRadius =
+      nextH > INPUT_MIN_H ? "var(--radius-xl)" : "var(--radius-pill)";
+
+    // 입력창이 자라면 대화 목록이 그만큼 줄어든다. 따라 내려주지 않으면 방금 온
+    // 답변이 위로 밀려 가려진다. 높이가 *바뀔 때만* 내린다 — 매 타건마다 내리면
+    // 사용자가 위로 올려 읽는 중에 끌어내리게 된다.
+    if (prevInputH.current !== nextH) {
+      prevInputH.current = nextH;
+      const el = listRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    }
   }, [draft]);
 
   async function answerConsent(allow: boolean) {
