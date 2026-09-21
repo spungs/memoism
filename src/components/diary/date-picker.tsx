@@ -17,14 +17,30 @@ interface DatePickerProps {
   onChange: (value: string) => void;
 }
 
+/** 달력 팝오버의 대략 높이(px). 열 때 위/아래 방향을 고르는 기준. */
+const CALENDAR_HEIGHT = 340;
+
 export function DiaryDatePicker({ value, max, onChange }: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const [viewYear, setViewYear] = useState(() => Number(value.slice(0, 4)));
   const [viewMonth, setViewMonth] = useState(() => Number(value.slice(5, 7)) - 1);
   const containerRef = useRef<HTMLDivElement>(null);
+  // 아래 공간이 모자라면 달력을 위로 편다. 바텀 시트(교정 시트) 안에서는 버튼이
+  // 화면 맨 아래에 있어서, 아래로 펴면 달력이 화면 밖으로 내려가고 그 아래 버튼
+  // ("날짜 바꾸기")까지 덮어버린다.
+  const [dropUp, setDropUp] = useState(false);
 
   const maxYear = Number(max.slice(0, 4));
   const maxMonth = Number(max.slice(5, 7)) - 1;
+
+  // 열리는 순간 한 번만 방향을 정한다. 열려 있는 동안 바꾸면 달력이 튄다.
+  useEffect(() => {
+    if (!open) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setDropUp(window.innerHeight - rect.bottom < CALENDAR_HEIGHT + 16);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -111,7 +127,9 @@ export function DiaryDatePicker({ value, max, onChange }: DatePickerProps) {
         <div
           style={{
             position: "absolute",
-            top: "calc(100% + 8px)",
+            ...(dropUp
+              ? { bottom: "calc(100% + 8px)" }
+              : { top: "calc(100% + 8px)" }),
             left: 0,
             zIndex: 100,
             width: 288,
