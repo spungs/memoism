@@ -16,9 +16,10 @@ export type OrganizeSuggestion = {
  * 일어난 사건이 아니다. 저장하면 정리한 뒤에도 대화에 남아, 누르면 "정리할 조각이
  * 없어요"가 뜬다. 결과 칩은 반대로 저장한다(사건이므로).
  *
- * 위치는 **헤더 바로 아래 고정**. 대화 목록 *안*에 두면 스크롤과 함께 밀려 사라지고,
- * 입력창 위에 두면 마지막 대화를 밀어올린다 — 둘 다 실제로 겪었다. 여기가 둘 다 피하면서
- * 발견도 보장한다(메이를 진입점으로 고른 이유).
+ * 위치는 **대화 위에 떠 있다**(카톡 공지 방식). 세 번 옮긴 끝의 자리다 —
+ * 목록 *안*에 두면 스크롤과 함께 사라지고, 입력창 위에 두면 마지막 대화를 밀어올리고,
+ * 헤더 아래에 끼워 넣으면 대화가 딱 잘린 것처럼 보였다. 띄우면 레이아웃 높이를
+ * 아예 먹지 않아 뒤 대화가 전부 보이고, 발견도 그대로 보장된다.
  *
  * "나중에"는 **지우지 않고 접는다.** 조각은 그대로 남아 있는데 제안만 사라지면
  * 다시 정리할 길이 채팅에 없어진다(일기 상세까지 들어가야 한다). 접힌 상태에서도
@@ -41,7 +42,7 @@ export function OrganizeSuggestionCard({
     return (
       <button
         type="button"
-        className="pressable"
+        className="pressable glass"
         onClick={onToggle}
         aria-expanded={false}
         aria-label={`${suggestion.label}에 모인 조각 ${suggestion.count}개 — 정리 제안 펼치기`}
@@ -51,8 +52,9 @@ export function OrganizeSuggestionCard({
           gap: 6,
           padding: "5px 10px",
           borderRadius: "var(--radius-pill)",
-          border: "none",
-          backgroundColor: "var(--fill-2)",
+          border: "1px solid var(--separator)",
+          backgroundColor: "var(--material-bar-strong)",
+          boxShadow: "var(--shadow-lg)",
           color: "var(--fg-muted)",
           fontFamily: "var(--font-sans)",
           fontSize: "var(--text-sm)",
@@ -67,13 +69,16 @@ export function OrganizeSuggestionCard({
 
   return (
     <div
+      className="glass"
       style={{
         display: "flex",
         alignItems: "center",
         gap: "var(--space-3)",
         padding: "var(--space-3)",
         borderRadius: "var(--radius-md)",
-        backgroundColor: "var(--fill-2)",
+        border: "1px solid var(--separator)",
+        backgroundColor: "var(--material-bar-strong)",
+        boxShadow: "var(--shadow-lg)",
       }}
     >
       <Sparkles

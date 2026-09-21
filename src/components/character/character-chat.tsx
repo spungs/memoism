@@ -250,14 +250,13 @@ export function CharacterChat({
 
   // 새 메시지 추가 / 새 대화 시작 시 스크롤 최하단으로 (리셋 땐 messages는 그대로라 boundaryAt도 의존)
   //
-  // suggestion도 의존한다: 제안 카드는 마운트 후 fetch로 **나중에** 도착해 입력 바
-  // 위에 끼어든다. 그만큼 대화 목록이 줄어드는데 따라 내리지 않으면 마지막 메시지가
-  // 잘린 채로 남는다(새로고침·탭 이동 후 돌아올 때마다 재현). 카드를 닫을 때도
-  // 같은 이유로 다시 맞춘다.
+  // suggestion은 의존하지 않는다: 제안 카드는 대화 위에 **떠 있어서**(absolute)
+  // 레이아웃 높이를 먹지 않는다. 예전엔 입력 바 위에 끼워 넣어 카드가 도착할 때마다
+  // 목록이 줄었고, 그래서 여기서 따라 내려야 했다. 지금은 그럴 필요가 없다.
   useEffect(() => {
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, boundaryAt, suggestion]);
+  }, [messages, boundaryAt]);
 
   // 입력창 높이 자동 조정 — 내용 없을 때 minHeight로 리셋, 입력하면 최대 maxHeight까지 확장
   useEffect(() => {
@@ -503,10 +502,27 @@ export function CharacterChat({
         </div>
       </header>
 
-      {/* 제안 — 헤더 바로 아래 고정. 목록 *안*에 두면 스크롤과 함께 사라지고,
-          입력창 위에 두면 마지막 대화를 밀어올린다(둘 다 겪었다). 여기가 둘 다 피한다. */}
+      {/* 목록 영역 — 스크롤하지 않는 래퍼. 제안 카드가 이 안에서 떠 있어야
+          스크롤을 따라 움직이지 않고, 헤더를 덮지도 않는다. */}
+      <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex" }}>
+      {/* 제안 — 카톡 공지처럼 대화 위에 **떠 있다**(absolute).
+          목록 *안*에 두면 스크롤과 함께 사라지고, 레이아웃에 끼우면 대화를 밀어
+          올린다 — 둘 다 겪었다. 띄우면 뒤 대화가 전부 보이면서 버튼만 남는다. */}
       {suggestion && (
-        <div style={{ padding: "var(--space-2) var(--space-4) 0", flexShrink: 0 }}>
+        <div
+          style={{
+            position: "absolute",
+            top: "var(--space-2)",
+            left: "var(--space-4)",
+            right: "var(--space-4)",
+            zIndex: 20,
+            display: "flex",
+            justifyContent: suggestionCollapsed ? "flex-start" : "stretch",
+            // 래퍼는 클릭을 통과시키고(뒤 대화 스크롤 가능), 카드 본체만 받는다.
+            pointerEvents: "none",
+          }}
+        >
+          <div style={{ pointerEvents: "auto", width: "100%" }}>
           <OrganizeSuggestionCard
             suggestion={suggestion}
             busy={organizing}
@@ -516,6 +532,7 @@ export function CharacterChat({
             // 다시 펼친 상태로 돌아온다(스펙 §3.2).
             onToggle={() => setSuggestionCollapsed((v) => !v)}
           />
+          </div>
         </div>
       )}
 
@@ -674,6 +691,7 @@ export function CharacterChat({
             <TypingIndicator />
           </div>
         )}
+      </div>
       </div>
 
       {/* 에러 배너 — 한도 소진은 여기 오지 않는다(대화 말풍선으로 알린다) */}
