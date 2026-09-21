@@ -1,6 +1,7 @@
 import "server-only";
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
+import { screenUserText, SafetyBlockedError } from "./safety";
 
 const MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
 
@@ -342,6 +343,23 @@ export async function generateDiary(
   // 있다. 조각을 텍스트로 안 세면 그 날이 "모드 B는 텍스트가 필요합니다"로 막힌다.
   const hasTextInput =
     !!input.text?.trim() || (input.fragments?.length ?? 0) > 0;
+
+  // 안전 펜스 체크포인트 ② — 일기 4경로(auto-generate·regenerate·preview·organize)가
+  // 전부 이 함수를 지난다. 라우트마다 호출하는 방식은 새 경로를 만들 때 빠뜨린다
+  // (실제로 organize가 그렇게 다섯 번째 우회 구멍이 됐다).
+  //
+  // 사용자 유래 텍스트를 전부 모아 한 번에 본다: 본문 + 조각 + 재정리 지시.
+  const screened = [
+    input.text ?? "",
+    ...(input.fragments ?? []).map((f) => f.text),
+    input.instruction ?? "",
+  ]
+    .filter((t) => t.trim().length > 0)
+    .join("\n");
+  if (screened) {
+    const verdict = await screenUserText(screened);
+    if (verdict.blocked) throw new SafetyBlockedError(verdict.reply);
+  }
 
   if (input.mode === "A" && (!input.photos || input.photos.length === 0)) {
     throw new GeminiError("모드 A는 사진이 1장 이상 필요합니다");
