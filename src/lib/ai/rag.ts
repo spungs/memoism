@@ -5,6 +5,23 @@ import { kstDayRangeUtc } from "@/lib/diary/kst";
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
+/**
+ * 벡터 후보의 최소 유사도. 이 아래는 "덜 무관할 뿐" 관련이 없다.
+ *
+ * 운영 데이터(41건) 실측으로 정했다 (2026-09-22):
+ *   무관한 말   "고마워 잘 자" 0.615 · "지금껏 말했는데 왜 메뉴를 모르니" 0.608
+ *              "아니 그게 아니라" 0.607 · "응 그래" 0.604 · "너 누구야?" 0.583
+ *   진짜 회상   "운동한 날 기억나?" 0.704 · "최근에 뭐 먹었지?" 0.689
+ *
+ * 임계값이 없던 동안은 무관한 잡담에도 상위 5건이 근거 후보로 올라갔고, 메이가
+ * 쓰지도 않은 일기를 [[refs]]에 달았다("에그베네딕트" 사례).
+ *
+ * **키워드·날짜 경로엔 이 임계값을 걸지 않는다.** 한국어 임베딩은 "여행 갔던 거
+ * 언제야?"조차 0.591로 낮게 잡는다(실측). 그런 질의는 키워드가 담당한다 —
+ * 벡터는 "확실히 가까울 때만" 말하게 두는 게 이 구조의 역할 분담이다.
+ */
+export const MIN_VECTOR_SIMILARITY = 0.65;
+
 export type RagSearchHit = {
   id: string;
   title: string;
@@ -52,6 +69,8 @@ export async function searchDiaries(
     FROM app.diary_embeddings e
     JOIN app.diaries d ON d.id = e.diary_id
     WHERE d.user_id = ${userId}
+      AND 1 - (e.vector OPERATOR(public.<=>) ${literal}::public.vector)
+          >= ${MIN_VECTOR_SIMILARITY}
     ORDER BY e.vector OPERATOR(public.<=>) ${literal}::public.vector ASC
     LIMIT ${topK}
   `;
