@@ -1,0 +1,350 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ImagePlus } from "lucide-react";
+import {
+  groupPhotosByExifDate,
+  MAX_BACKFILL_DAYS,
+  MAX_BACKFILL_PHOTOS,
+  type PhotoGroup,
+} from "@/lib/diary/backfill-group";
+import { extractExif, exifToWire } from "@/lib/diary/exif";
+import { compressImages } from "@/lib/diary/image-compress";
+import { dateKeyLabel, kstTodayKey } from "@/lib/diary/kst";
+
+type Wire = { takenAt: string | null; lat: number | null; lng: number | null };
+type DayResult = { dateKey: string; ok: boolean; note: string };
+
+const rowStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "var(--space-3)",
+  padding: "var(--space-3)",
+  borderRadius: "var(--radius-md)",
+  backgroundColor: "var(--fill-2)",
+} as const;
+
+/**
+ * 밀린 날 채우기 — 사진 선택 → 날짜별 묶음 미리보기 → 선택한 날만 정리.
+ *
+ * 흐름이 2단계인 이유(스펙 §3 D-1): 10일치를 즉시 생성하면 AI 캡을 한 번에 태우고,
+ * 결과가 마음에 안 들면 되돌리기가 10번이다. 어느 사진이 어느 날로 갈지 **업로드
+ * 전에** 보여주고 사용자가 고르게 한다.
+ */
+export function BackfillClient() {
+  const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [wires, setWires] = useState<Wire[]>([]);
+  const [groups, setGroups] = useState<PhotoGroup[]>([]);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState<string | null>(null);
+  const [results, setResults] = useState<DayResult[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handlePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const chosen = Array.from(e.target.files ?? []).slice(0, MAX_BACKFILL_PHOTOS);
+    if (chosen.length === 0) return;
+    setError(null);
+    setResults(null);
+    setBusy("사진을 읽는 중…");
+    try {
+      // EXIF는 **압축 전에** 뽑는다 — 압축이 메타데이터를 날린다.
+      const metas = await Promise.all(chosen.map(extractExif));
+      const w = metas.map(exifToWire);
+      const compressed = await compressImages(chosen);
+      const g = groupPhotosByExifDate(w, kstTodayKey());
+      setFiles(compressed);
+      setWires(w);
+      setGroups(g);
+      // 날짜가 있는 묶음만 기본 선택. null 묶음은 해제 상태(스펙 §4.1).
+      setPicked(new Set(g.filter((x) => x.dateKey).map((x) => x.dateKey!)));
+    } catch {
+      setError("사진을 읽지 못했어요. 다시 골라주세요.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const dayGroups = groups.filter((g) => g.dateKey !== null);
+  const unknown = groups.find((g) => g.dateKey === null);
+  const tooManyDays = dayGroups.length > MAX_BACKFILL_DAYS;
+  const canRun = !busy && picked.size > 0 && !tooManyDays;
+
+  async function run() {
+    setError(null);
+    const targets = dayGroups.filter((g) => picked.has(g.dateKey!));
+    const keep = targets.flatMap((g) => g.photoIndexes);
+    if (keep.length === 0) {
+      setError("정리할 날짜를 하나 이상 골라주세요.");
+      return;
+    }
+
+    // ① 사진 저장 — 선택된 날짜의 사진만. null 묶음은 올리지 않는다.
+    setBusy("사진을 저장하는 중…");
+    const fd = new FormData();
+    const dateKeys: string[] = [];
+    for (const g of targets) {
+      for (const i of g.photoIndexes) {
+        fd.append("photo", files[i]);
+        dateKeys.push(g.dateKey!);
+      }
+    }
+    fd.append("exifs", JSON.stringify(keep.map((i) => wires[i])));
+    fd.append("dateKeys", JSON.stringify(dateKeys));
+
+    let saveData: { error?: string };
+    try {
+      const saveRes = await fetch("/api/diaries/backfill/photos", {
+        method: "POST",
+        body: fd,
+      });
+      saveData = await saveRes.json();
+      if (!saveRes.ok) {
+        setBusy(null);
+        setError(saveData.error ?? "사진을 저장하지 못했어요.");
+        return;
+      }
+    } catch {
+      setBusy(null);
+      setError("사진을 올리다가 연결이 끊겼어요.");
+      return;
+    }
+
+    // ② 날짜를 하나씩 정리 — 진행률이 여기서 나온다(스펙 §9).
+    const out: DayResult[] = [];
+    for (let i = 0; i < targets.length; i++) {
+      const dk = targets[i].dateKey!;
+      setBusy(`${i + 1}/${targets.length}일차 정리 중…`);
+      try {
+        const res = await fetch("/api/diaries/backfill/organize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dateKey: dk }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          out.push({ dateKey: dk, ok: true, note: data.title });
+        } else if (data.reason === "cap") {
+          // 캡이 끝났다. 남은 날은 사진만 저장된 채로 둔다 — 내일 이어서 하면 된다.
+          out.push({ dateKey: dk, ok: false, note: "오늘 AI 횟수를 다 썼어요" });
+          for (const rest of targets.slice(i + 1)) {
+            out.push({
+              dateKey: rest.dateKey!,
+              ok: false,
+              note: "사진만 저장했어요",
+            });
+          }
+          break;
+        } else {
+          out.push({ dateKey: dk, ok: false, note: "사진만 저장했어요" });
+        }
+      } catch {
+        out.push({ dateKey: dk, ok: false, note: "사진만 저장했어요" });
+      }
+    }
+    setBusy(null);
+    setResults(out);
+    router.refresh();
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+      <p
+        style={{
+          margin: 0,
+          fontFamily: "var(--font-sans)",
+          fontSize: "var(--text-sm)",
+          color: "var(--fg-muted)",
+          lineHeight: 1.6,
+        }}
+      >
+        사진을 고르면 찍은 날짜별로 일기를 만들어요. 한 번에 사진{" "}
+        {MAX_BACKFILL_PHOTOS}장 · {MAX_BACKFILL_DAYS}일까지 가능해요.
+      </p>
+
+      <button
+        type="button"
+        className="pressable"
+        onClick={() => fileRef.current?.click()}
+        disabled={!!busy}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          height: 44,
+          borderRadius: "var(--radius-md)",
+          border: "none",
+          backgroundColor: "var(--tint-soft)",
+          color: "var(--tint)",
+          fontFamily: "var(--font-sans)",
+          fontSize: "var(--text-base)",
+          fontWeight: 600,
+          cursor: busy ? "default" : "pointer",
+        }}
+      >
+        <ImagePlus size={16} aria-hidden />
+        사진 고르기
+      </button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={handlePick}
+        style={{ display: "none" }}
+      />
+
+      {busy && (
+        <p
+          style={{
+            margin: 0,
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-sm)",
+            color: "var(--fg-muted)",
+          }}
+        >
+          {busy}
+        </p>
+      )}
+
+      {error && (
+        <p
+          role="alert"
+          style={{
+            margin: 0,
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-sm)",
+            color: "var(--danger)",
+          }}
+        >
+          {error}
+        </p>
+      )}
+
+      {!results && dayGroups.length > 0 && (
+        <>
+          {tooManyDays && (
+            <p
+              role="alert"
+              style={{
+                margin: 0,
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                color: "var(--danger)",
+              }}
+            >
+              {dayGroups.length}일치가 선택됐어요. {MAX_BACKFILL_DAYS}일 이하로
+              나눠서 해주세요.
+            </p>
+          )}
+
+          {dayGroups.map((g) => (
+            <label key={g.dateKey} style={{ ...rowStyle, cursor: "pointer" }}>
+              <span
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-base)",
+                  color: "var(--fg)",
+                }}
+              >
+                {dateKeyLabel(g.dateKey!)}
+                <span
+                  style={{
+                    color: "var(--fg-muted)",
+                    fontSize: "var(--text-sm)",
+                  }}
+                >
+                  {"  "}
+                  사진 {g.photoIndexes.length}장
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={picked.has(g.dateKey!)}
+                onChange={(e) => {
+                  const next = new Set(picked);
+                  if (e.target.checked) next.add(g.dateKey!);
+                  else next.delete(g.dateKey!);
+                  setPicked(next);
+                }}
+              />
+            </label>
+          ))}
+
+          {unknown && (
+            <p
+              style={{
+                margin: 0,
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                color: "var(--fg-muted)",
+              }}
+            >
+              찍은 날짜를 알 수 없는 사진 {unknown.photoIndexes.length}장은
+              빼뒀어요.
+            </p>
+          )}
+
+          <button
+            type="button"
+            className="pressable"
+            onClick={() => void run()}
+            disabled={!canRun}
+            style={{
+              height: 44,
+              borderRadius: "var(--radius-md)",
+              border: "none",
+              backgroundColor: "var(--fg)",
+              color: "var(--bg)",
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-base)",
+              fontWeight: 600,
+              cursor: canRun ? "pointer" : "default",
+              opacity: canRun ? 1 : 0.5,
+            }}
+          >
+            {picked.size}일치 정리하기
+          </button>
+        </>
+      )}
+
+      {results && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-2)",
+          }}
+        >
+          {results.map((r) => (
+            <div key={r.dateKey} style={rowStyle}>
+              <span
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-base)",
+                  color: "var(--fg)",
+                }}
+              >
+                {dateKeyLabel(r.dateKey)}
+              </span>
+              <span
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-sm)",
+                  color: "var(--fg-muted)",
+                  textAlign: "right",
+                }}
+              >
+                {r.ok ? `정리됨 · ${r.note}` : r.note}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
