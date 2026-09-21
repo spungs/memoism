@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { deleteImage, getObjectSize, saveImage } from "@/lib/storage";
 import { assertStorageQuota, STORAGE_FULL_MSG } from "@/lib/storage/quota";
 import { upsertDiaryEmbedding } from "./embedding";
+import { reembedDiaryWithFragments } from "./fragment-embed";
 import { diaryCreatedAtForDateKey } from "./kst";
 import { MAX_IMAGES_PER_REQUEST } from "./limits";
 import {
@@ -409,8 +410,9 @@ export async function updateDiaryAction(
     }
   }
 
-  // 임베딩 재갱신 (content 변경 가능성)
-  await upsertDiaryEmbedding(id, parsed.data.title, parsed.data.content);
+  // 임베딩 재갱신 (content 변경 가능성). 본문만 넣으면 조각이 있는 일기를 손으로
+  // 저장할 때마다 조각이 임베딩에서 빠져 회상에서 사라진다.
+  await reembedDiaryWithFragments(id);
 
   revalidatePath("/diary");
   revalidatePath(`/diary/${id}`);
@@ -466,8 +468,9 @@ export async function revertDiaryAction(id: string): Promise<
     },
   });
 
-  // 스왑 후 content가 바뀌었으므로 재임베딩
-  await upsertDiaryEmbedding(id, updated.title, updated.content);
+  // 스왑 후 content가 바뀌었으므로 재임베딩. 조각은 되돌리기와 무관하게 보존되므로
+  // 임베딩 입력에 계속 있어야 한다 (본문만 넣으면 되돌릴 때마다 조각이 빠진다).
+  await reembedDiaryWithFragments(id);
 
   revalidatePath("/diary");
   revalidatePath(`/diary/${id}`);
