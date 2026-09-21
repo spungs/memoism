@@ -246,7 +246,14 @@ export function CharacterChat({
     const ta = textareaRef.current;
     if (!ta) return;
     ta.style.height = "1px";
-    ta.style.height = Math.min(Math.max(ta.scrollHeight, INPUT_MIN_H), INPUT_MAX_H) + "px";
+    const contentH = ta.scrollHeight;
+    ta.style.height =
+      Math.min(Math.max(contentH, INPUT_MIN_H), INPUT_MAX_H) + "px";
+    // 최대 높이에 닿으면 스크롤을 열어준다. overflow가 계속 hidden이면 넘친 줄이
+    // 잘려서 사라진다 — 브라우저는 커서만 보이게 내부 스크롤을 하므로 윗줄이
+    // 글자 중간에서 끊긴다. 자라는 동안엔 hidden이라야 리사이즈 중 스크롤바가
+    // 깜빡이지 않는다(그게 hidden을 넣은 원래 이유다).
+    ta.style.overflowY = contentH > INPUT_MAX_H ? "auto" : "hidden";
   }, [draft]);
 
   async function answerConsent(allow: boolean) {
