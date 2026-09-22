@@ -112,6 +112,29 @@ export async function checkAndIncrement(
 }
 
 /**
+ * 차감한 1회를 되돌린다. **AI가 결과를 못 준 경우에만** 부른다.
+ *
+ * `checkAndIncrement`는 호출 *전에* 차감한다(동시성 안전을 위해 그래야 한다).
+ * 그래서 모델이 타임아웃·과부하로 죽으면 사용자는 아무것도 못 받고 횟수만 잃는다.
+ * FREE는 하루 3회다 — 한 번의 서버 장애가 그날 몫의 3분의 1이다.
+ * (2026-09-22 사진 9장 일기 502 때 실제로 1회가 이렇게 날아갔다.)
+ *
+ * 안전 펜스 차단은 되돌리지 않는다. 모델이 정상 응답한 결과라 비용이 실제로 났고,
+ * 되돌리면 같은 글로 무한히 재시도할 수 있게 된다.
+ *
+ * 카운터가 0이면 아무것도 하지 않는다(음수 방지). 자정을 넘겨 실패하면 어제 행이
+ * 아니라 오늘 행을 보게 되지만, 그 경우 `gt: 0` 조건에 막혀 조용히 지나간다 —
+ * 남의 날 카운터를 깎는 것보다 낫다.
+ */
+export async function releaseIncrement(userId: string): Promise<void> {
+  const date = todayKST();
+  await prisma.usageLog.updateMany({
+    where: { userId, date, aiCallCount: { gt: 0 } },
+    data: { aiCallCount: { decrement: 1 } },
+  });
+}
+
+/**
  * 현재 사용량 조회 (cap UI 표시용). **insight 경로 사용량**만 센다 —
  * capture 경로는 카운터를 증가시키지 않으므로 여기 잡히지 않는다.
  * - FREE: 항상 표시 ("오늘 X/3")

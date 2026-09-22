@@ -9,6 +9,15 @@ import {
 } from "@/lib/diary/schemas";
 import { MAX_AI_INSTRUCTION_LENGTH } from "@/lib/diary/ai-instruction";
 
+/**
+ * AI 재시도까지 끝낼 시간을 함수에 준다.
+ *
+ * 최악: 일기 타임아웃 35s + backoff 0.6s + 재시도 35s ≒ 71s (+ 사진 다운로드).
+ * 이 값을 안 적으면 플랫폼 기본값에 매달리게 되고, 모델을 기다리다 함수가 먼저
+ * 죽으면 재시도가 아무 의미가 없어진다.
+ */
+export const maxDuration = 90;
+
 // body는 선택이다. 없으면 DB 본문 기준으로 재정리한다(구 동작).
 // content가 오면 그게 "화면에서 편집 중인 현재 본문"이라 그대로 AI 입력이 된다.
 // title이 오고 DB 제목과 다르면 사용자가 고친 것이므로 AI 제목으로 덮어쓰지 않는다.
@@ -60,7 +69,10 @@ export async function POST(
   const result = await regenerateDiary(id, session.userId, options);
 
   if (!result.ok) {
-    const status = result.capExhausted ? 429 : result.invalidInput ? 400 : 502;
+    // 502가 아니라 503이다. 502는 "게이트웨이가 죽었다"는 뜻이라 Vercel 대시보드에서
+    // 플랫폼 장애로 읽힌다 — 실제로는 업스트림(Gemini) 지연·거부다.
+    // (2026-09-22에 이 오분류로 함수 크래시를 의심하며 한참 헤맸다.)
+    const status = result.capExhausted ? 429 : result.invalidInput ? 400 : 503;
     return NextResponse.json(
       {
         error: result.error,

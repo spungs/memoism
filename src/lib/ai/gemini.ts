@@ -15,6 +15,16 @@ const MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
 export const CAPTURE_MODEL =
   process.env.GEMINI_CAPTURE_MODEL ?? "gemini-3.1-flash-lite";
 const TIMEOUT_MS = 20_000;
+/**
+ * 일기 생성 전용 상한. 채팅·임베딩(20초)과 따로 두는 이유는 실측 때문이다.
+ *
+ * 2026-09-22 측정(사진 9장 일기, `diary-latency.manual.test.ts`):
+ *   운영 경로 5.8s / 7.0s / 8.3s, 같은 입력 raw 호출은 7.1s ~ 14.0s.
+ * 정상이 6~14초인데 상한이 20초면 여유가 1.4배뿐이라 꼬리가 그대로 실패가 된다.
+ * 사진 장수는 범인이 아니다 — 사진 1장은 해상도와 무관하게 258토큰 고정이고,
+ * 9장을 다 합쳐도 입력이 2,375토큰이다. 6장이 1장보다 빨랐던 회차도 있다.
+ */
+const DIARY_TIMEOUT_MS = 35_000;
 // 한국어는 토큰당 글자 수가 영어의 1/2 정도라 영어 기준 300토큰 ≒ 한국어 600토큰.
 // "1~3문장" 응답 + 자연스러운 종결 보장을 위해 여유 있게 1000.
 const DEFAULT_MAX_OUTPUT_TOKENS = 1000;
@@ -30,12 +40,22 @@ function getClient(): GoogleGenAI {
   return _client;
 }
 
+/**
+ * 응답 시간 초과. `GeminiError`의 하위라 사용자에게 보이는 메시지는 그대로다.
+ *
+ * 타입을 따로 둔 이유: 문자열로는 재시도 여부를 가릴 수 없었다. 2026-09-22에
+ * 사진 9장 일기가 20초를 넘겨 502로 죽었는데, **가장 일시적인 장애인 타임아웃만
+ * 유일하게 재시도되지 않고 있었다**(isTransient의 정규식이 이 문구를 모른다).
+ * 5분 뒤 사용자가 손으로 누른 재시도는 성공했다 — 사람이 대신 재시도한 셈이다.
+ */
+export class GeminiTimeoutError extends GeminiError {}
+
 async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     p,
     new Promise<T>((_, reject) =>
       setTimeout(
-        () => reject(new GeminiError("Gemini 응답 시간이 초과되었습니다")),
+        () => reject(new GeminiTimeoutError("Gemini 응답 시간이 초과되었습니다")),
         ms,
       ),
     ),
@@ -51,7 +71,10 @@ function isBillingDepleted(raw: string): boolean {
 
 // 일시적 장애(503 과부하 / 429 한도 / 5xx)는 재시도 가치가 있다.
 // 단, 결제 크레딧 소진은 재시도해도 소용없으니 제외한다(괜한 backoff 지연만 발생).
-function isTransient(e: unknown): boolean {
+export function isTransient(e: unknown): boolean {
+  // 타임아웃은 정의상 일시적이다. 실측(2026-09-22, 사진 9장 일기)으로 같은 입력이
+  // 7.1s~14.0s로 흔들렸다 — 상한을 넘기는 건 입력이 아니라 그때의 모델 서버 상태다.
+  if (e instanceof GeminiTimeoutError) return true;
   const raw = e instanceof Error ? e.message : String(e);
   if (isBillingDepleted(raw)) return false;
   return /\b(503|500|502|504|429)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand|overloaded|deadline/i.test(
@@ -86,13 +109,21 @@ function friendlyGeminiError(e: unknown): GeminiError {
   return new GeminiError("AI 처리 중 문제가 생겼어요. 잠시 후 다시 시도해주세요.");
 }
 
-async function callWithRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
+export async function callWithRetry<T>(
+  fn: () => Promise<T>,
+  retries = 2,
+): Promise<T> {
   let lastErr: unknown;
+  let timeouts = 0;
   for (let i = 0; i <= retries; i++) {
     try {
       return await fn();
     } catch (e) {
       lastErr = e;
+      // 타임아웃만은 한 번까지만 더 시도한다. 다른 실패는 즉시 돌아오지만 타임아웃은
+      // 상한(일기 35초)을 꽉 채우고 나서야 실패라, 기본 3회를 그대로 두면 사용자가
+      // 100초 넘게 화면 앞에 붙잡힌다.
+      if (e instanceof GeminiTimeoutError && ++timeouts > 1) break;
       // 일시적 장애가 아니거나 마지막 시도면 중단.
       if (!isTransient(e) || i === retries) break;
       // 지수 backoff (0.6s, 1.2s) — 과부하가 가라앉을 시간을 준다.
@@ -448,7 +479,7 @@ export async function generateDiary(
           thinkingConfig: { thinkingBudget: 0 },
         },
       }),
-      TIMEOUT_MS,
+      DIARY_TIMEOUT_MS,
     ),
   );
 
