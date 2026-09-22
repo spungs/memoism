@@ -116,9 +116,21 @@ export function groupPhotosByExifDate(
   });
 
   // 최근 날짜 먼저. null 묶음은 맨 뒤 — 기본 선택 해제라 눈에 덜 띄어야 한다.
+  //
+  // 묶음 **안**은 촬영시각 순으로 세운다. 파일 선택 순서는 시간순이 아니고
+  // (파일명 규칙·여러 앨범에서 고르면 뒤섞인다), 이 순서가 그대로 orderIndex가 되어
+  // AI 입력 순서가 된다 — 아침 사진이 저녁 뒤로 가면 일기의 하루 흐름이 뒤집힌다.
+  // 수동 작성(diary-form.tsx)은 이미 같은 정렬을 한다. 두 경로가 달라질 이유가 없다.
   const groups: PhotoGroup[] = [...byDate.entries()]
     .sort((a, b) => (a[0] < b[0] ? 1 : -1))
-    .map(([dateKey, photoIndexes]) => ({ dateKey, photoIndexes }));
+    .map(([dateKey, photoIndexes]) => ({
+      dateKey,
+      photoIndexes: [...photoIndexes].sort(
+        (i, j) =>
+          new Date(exifs[i].takenAt!).getTime() -
+          new Date(exifs[j].takenAt!).getTime(),
+      ),
+    }));
 
   if (unknown.length > 0) groups.push({ dateKey: null, photoIndexes: unknown });
   return groups;

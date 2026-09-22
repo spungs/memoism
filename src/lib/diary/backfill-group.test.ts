@@ -42,6 +42,25 @@ describe("groupPhotosByExifDate", () => {
     expect(r[1].photoIndexes).toEqual([0]);
   });
 
+  it("묶음 안에서 촬영시각 순으로 정렬한다", () => {
+    // 파일 선택 순서는 시간순이 아니다(파일명 규칙·여러 앨범). 이 순서가 그대로
+    // orderIndex가 되고 AI 입력 순서가 되므로, 섞이면 일기의 하루 흐름이 뒤집힌다.
+    const r = groupPhotosByExifDate(
+      [
+        at("2026-09-20T09:00:00Z"), // 저녁
+        at("2026-09-20T01:00:00Z"), // 아침
+        at("2026-09-20T05:00:00Z"), // 낮
+      ],
+      TODAY,
+    );
+    expect(r[0].photoIndexes).toEqual([1, 2, 0]);
+  });
+
+  it("날짜 미상 묶음은 고른 순서를 유지한다 — 정렬할 시각이 없다", () => {
+    const r = groupPhotosByExifDate([at(null), at("어제쯤?"), at(null)], TODAY);
+    expect(r[0].photoIndexes).toEqual([0, 1, 2]);
+  });
+
   it("미래 날짜는 EXIF 손상으로 보고 null 묶음에 넣는다", () => {
     const r = groupPhotosByExifDate([at("2027-01-01T00:00:00Z")], TODAY);
     expect(r).toEqual([{ dateKey: null, photoIndexes: [0] }]);
