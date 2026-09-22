@@ -71,7 +71,8 @@ export async function POST(req: NextRequest) {
   });
 
   if (!result.ok) {
-    const status = result.capExhausted ? 429 : result.invalidInput ? 400 : 502;
+    // regenerate와 같은 이유로 503이다 — 502는 플랫폼 장애로 읽힌다.
+    const status = result.capExhausted ? 429 : result.invalidInput ? 400 : 503;
     return NextResponse.json(
       {
         ok: false,
