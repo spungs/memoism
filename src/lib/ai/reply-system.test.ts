@@ -65,6 +65,24 @@ describe("일기 범위 질문 규칙", () => {
     expect(s).toContain("네가 확인하지 못한 기록의 내용을 되묻지 마");
   });
 
+  it("집계로 안 날짜의 본문을 지어내지 못하게 막는다", () => {
+    const s = read("src/app/api/chat/route.ts");
+    // 제목까지만 주고 본문은 모른다고 명시 — 날짜만 줬더니 본문을 지어냈다
+    expect(s).toContain("**날짜·개수·제목**만이야");
+    expect(s).toContain("**본문 내용은 모른다**");
+    expect(s).toContain("**집계로 안 날짜·제목의 본문을 지어내지 마.**");
+    // 집계 답변에는 근거 칩이 붙으면 안 된다
+    expect(s).toContain("집계만 근거로 답했으면 마지막 줄은 [[refs: none]]");
+  });
+
+  it("최초·최근 일기의 제목을 집계에 싣는다", () => {
+    const s = read("src/app/api/chat/route.ts");
+    expect(s).toContain("oldestTitle");
+    expect(s).toContain("newestTitle");
+    // 최근 것은 recentDiaries[0]과 같은 행이라 다시 묻지 않는다
+    expect(s).toContain("recentDiaries[0]?.title");
+  });
+
   it("기존 내용 환각 금지 규칙은 그대로 유지된다", () => {
     const s = read("src/app/api/chat/route.ts");
     expect(s).toContain("## 가장 중요한 규칙 — 일기에 있는 내용만 말하기");

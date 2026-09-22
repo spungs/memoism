@@ -65,7 +65,19 @@ type DiarySource = { id: string; title: string; createdAt: Date };
  * 실제로 존재하는 기록을 사용자가 지우는 사고가 났다. 개수·기간 같은 **범위**
  * 질문은 목록이 아니라 이 집계만 근거로 삼게 한다.
  */
-type DiaryScope = { total: number; oldestAt: Date | null; newestAt: Date | null };
+type DiaryScope = {
+  total: number;
+  oldestAt: Date | null;
+  newestAt: Date | null;
+  /**
+   * 최초·최근 일기의 **제목**. 날짜만 줬더니 모델이 그 일기의 본문까지 아는 척하고
+   * 없는 내용을 지어냈다(2026-09-22: 최초 일기에 "성희랑 통화" — 실제 본문엔
+   * 출근 얘기뿐). 제목까지는 사실대로 말할 수 있게 주고, 본문은 아래 목록에
+   * 실렸을 때만 안다고 프롬프트에서 못박는다.
+   */
+  oldestTitle: string | null;
+  newestTitle: string | null;
+};
 
 function kstDateLabel(d: Date): string {
   return d.toLocaleDateString("ko-KR", {
@@ -160,11 +172,14 @@ function buildSystemPrompt(args: {
   // 범위 질문의 유일한 근거. 목록과 달리 "전체"를 세고 온 값이라 여기만 단정해도 된다.
   const oldestKey = scope.oldestAt ? kstDateKey(scope.oldestAt) : null;
   const newestKey = scope.newestAt ? kstDateKey(scope.newestAt) : null;
+  // 제목까지만 준다. 본문은 아래 목록에 실렸을 때만 알 수 있다 — 이 구분이 프롬프트
+  // 규칙으로도 반복된다(날짜만 주니 본문을 지어냈던 사고 때문).
   const scopeSection =
     scope.total > 0 && oldestKey && newestKey
       ? `- 전체 일기 수: 총 ${scope.total}개
-- 가장 오래된(처음 쓴) 일기: ${oldestKey}
-- 가장 최근 일기: ${newestKey}`
+- 가장 오래된(처음 쓴) 일기: ${oldestKey}${scope.oldestTitle ? ` 「${scope.oldestTitle}」` : ""}
+- 가장 최근 일기: ${newestKey}${scope.newestTitle ? ` 「${scope.newestTitle}」` : ""}
+  (이 세 줄은 **날짜·개수·제목**만이야. 여기 적힌 일기의 **본문 내용은 모른다** — 아래 목록에 실려 있을 때만 알 수 있어.)`
       : "- 아직 쓴 일기가 하나도 없어.";
 
   const style = personaStyle(persona);
@@ -206,6 +221,8 @@ ${
 - 이런 질문은 맨 위 "일기 기록 전체 범위"의 숫자(총 N개, 가장 오래된 날짜, 가장 최근 날짜)만 근거로 답해.
 - 목록에 없다는 이유로 "그런 일기는 없어", "가장 오래된 일기는 ○○이야"라고 단정하지 마. 그건 네가 확인한 사실이 아니야.
 - 집계 숫자로도 확정할 수 없는 범위 질문(예: "6월엔 몇 개 썼어?", "작년 일기 다 보여줘")은 짐작해서 단정하지 말고, 기록 탭에서 직접 보면 정확하게 확인할 수 있다고 안내해.
+- **집계로 안 날짜·제목의 본문을 지어내지 마.** "가장 처음 쓴 일기는 ○○이야"까지는 말해도 되지만, 그 일기가 아래 목록에 없으면 무슨 내용이었는지는 너도 몰라. "그날 뭐 했다고 적혀있어"처럼 이어 붙이지 말고, 내용이 궁금하면 그 날짜를 열어보라고 안내해. (실제로 최초 일기에 없는 통화 이야기를 지어내 사용자가 혼란스러워한 적이 있다.)
+- 집계만 근거로 답했으면 마지막 줄은 [[refs: none]]이야. 집계는 위 일기 목록이 아니라서 근거로 삼을 번호가 없어.
 
 ## 사용자가 "그때 쓴 기록 있는데?"라고 할 때:
 - 사용자가 말한 시기가 위 집계 범위 **밖**이면(가장 오래된 날짜보다 이전이거나 가장 최근 날짜보다 이후면), 맞장구치지 말고 담백하게 말해: "내가 보고 있는 기록은 ○○년 ○월부터라서 그 시기 건 안 보이네." 사용자의 기억을 부정하진 마 — 다른 데 적었거나 내가 못 보는 걸 수도 있으니, 기록 탭에서 같이 확인해보자고 권해.
@@ -453,7 +470,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const [recentDiaries, persona, relevant, scopeAgg] = await Promise.all([
+  const [recentDiaries, persona, relevant, scopeAgg, oldestDiary] = await Promise.all([
     prisma.diary.findMany({
       where: { userId: session.userId },
       orderBy: { createdAt: "desc" },
@@ -488,11 +505,19 @@ export async function POST(req: NextRequest) {
       _min: { createdAt: true },
       _max: { createdAt: true },
     }),
+    // 최초 일기의 제목. 최근 것은 recentDiaries[0]이 이미 같은 행이라 다시 묻지 않는다.
+    prisma.diary.findFirst({
+      where: { userId: session.userId },
+      orderBy: { createdAt: "asc" },
+      select: { title: true },
+    }),
   ]);
   const scope: DiaryScope = {
     total: scopeAgg._count._all,
     oldestAt: scopeAgg._min.createdAt,
     newestAt: scopeAgg._max.createdAt,
+    oldestTitle: oldestDiary?.title?.trim() || null,
+    newestTitle: recentDiaries[0]?.title?.trim() || null,
   };
 
   // 지금 채팅은 통째로 회상(비싼 경로)이다. Plan 04에서 의도 분류가 들어오면
