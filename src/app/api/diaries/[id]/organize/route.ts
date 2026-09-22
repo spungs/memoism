@@ -5,6 +5,15 @@ import { prisma } from "@/lib/db";
 import { organizeDiaryFromFragments } from "@/lib/diary/organize";
 import { MAX_AI_INSTRUCTION_LENGTH } from "@/lib/diary/ai-instruction";
 
+/**
+ * AI 재시도까지 끝낼 시간을 함수에 준다.
+ *
+ * 최악: 일기 타임아웃 35s + backoff 0.6s + 재시도 35s ≒ 71s (+ 사진 다운로드).
+ * 이 값을 안 적으면 플랫폼 기본값에 매달리게 되고, 모델을 기다리다 함수가 먼저
+ * 죽으면 재시도가 아무 의미가 없어진다.
+ */
+export const maxDuration = 90;
+
 const bodySchema = z.object({
   instruction: z.string().max(MAX_AI_INSTRUCTION_LENGTH).optional(),
 });
@@ -42,7 +51,9 @@ export async function POST(
   const result = await organizeDiaryFromFragments(id, session.userId, options);
 
   if (!result.ok) {
-    const status = result.capExhausted ? 429 : result.nothingToFold ? 400 : 500;
+    // 남은 실패는 대부분 업스트림(Gemini) 지연·거부다. 500은 "이 서버가 깨졌다"는
+    // 뜻이라 regenerate와 같은 오분류를 만든다 — 503으로 보낸다.
+    const status = result.capExhausted ? 429 : result.nothingToFold ? 400 : 503;
     return NextResponse.json(
       {
         error: result.error,
@@ -63,6 +74,14 @@ export async function POST(
     createdAt: string;
     relatedDiaries: Array<{ id: string; title: string; createdAt: string }>;
   } | null = null;
+  // 답변만 덩그러니 남으면 사용자가 뭘 시켜서 나온 말인지 알 수 없다 —
+  // 앞에 사용자의 요청 말풍선을 같이 남긴다.
+  let userChatMessage: {
+    id: string;
+    role: "user";
+    content: string;
+    createdAt: string;
+  } | null = null;
 
   try {
     const character = await prisma.character.findUnique({
@@ -70,24 +89,48 @@ export async function POST(
       select: { id: true },
     });
     if (character) {
-      const created = await prisma.chatMessage.create({
-        data: {
-          userId: session.userId,
-          characterId: character.id,
-          role: "ASSISTANT",
-          content: `${result.label} 일기로 정리했어.`,
-          relatedDiaries: [
-            {
-              id: result.diary.id,
-              title: result.diary.title,
-              // 정리한 시각이 아니라 *일기의 날짜*다. 8월 3일 일기를 오늘 정리하면
-              // 칩에 오늘 날짜가 찍혀서 눌렀을 때 나오는 일기와 어긋난다.
-              createdAt: result.diaryCreatedAt,
-            },
-          ],
-        },
-        select: { id: true, content: true, createdAt: true },
-      });
+      const userContent = `${result.dateKey} 조각 정리해줘`;
+      // createdAt을 명시한다. @default(now())는 Postgres now()로 컴파일되고 now()는
+      // **트랜잭션 시작 시각**을 돌려주므로, 한 트랜잭션 안의 두 행이 밀리초까지 같아진다.
+      // 그러면 createdAt 정렬이 순서를 보장하지 못해 답변이 요청보다 먼저 보인다.
+      const sentAt = new Date();
+      const [userCreated, created] = await prisma.$transaction([
+        prisma.chatMessage.create({
+          data: {
+            userId: session.userId,
+            characterId: character.id,
+            role: "USER",
+            content: userContent,
+            createdAt: sentAt,
+          },
+          select: { id: true, content: true, createdAt: true },
+        }),
+        prisma.chatMessage.create({
+          data: {
+            userId: session.userId,
+            characterId: character.id,
+            role: "ASSISTANT",
+            content: `${result.label} 일기로 정리했어.`,
+            relatedDiaries: [
+              {
+                id: result.diary.id,
+                title: result.diary.title,
+                // 정리한 시각이 아니라 *일기의 날짜*다. 8월 3일 일기를 오늘 정리하면
+                // 칩에 오늘 날짜가 찍혀서 눌렀을 때 나오는 일기와 어긋난다.
+                createdAt: result.diaryCreatedAt,
+              },
+            ],
+            createdAt: new Date(sentAt.getTime() + 1),
+          },
+          select: { id: true, content: true, createdAt: true },
+        }),
+      ]);
+      userChatMessage = {
+        id: userCreated.id,
+        role: "user",
+        content: userCreated.content,
+        createdAt: userCreated.createdAt.toISOString(),
+      };
       chatMessage = {
         id: created.id,
         role: "assistant",
@@ -114,6 +157,7 @@ export async function POST(
     dateKey: result.dateKey,
     label: result.label,
     diaryCreatedAt: result.diaryCreatedAt,
+    userChatMessage,
     chatMessage,
   });
 }

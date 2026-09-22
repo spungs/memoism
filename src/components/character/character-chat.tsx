@@ -208,6 +208,12 @@ export function CharacterChat({
       }
       // 서버가 ChatMessage로 저장했으면 그 행을 그대로 붙인다(새로고침 후에도 남는다).
       // 저장에 실패했으면 낙관적 메시지로 대체 — 이번 화면에만 보인다.
+      const userMsg: Message = data.userChatMessage ?? {
+        id: `organize-user-${data.diary.id}-${Date.now()}`,
+        role: "user",
+        content: `${data.dateKey} 조각 정리해줘`,
+        createdAt: new Date().toISOString(),
+      };
       const msg: Message = data.chatMessage ?? {
         id: `organize-${data.diary.id}-${Date.now()}`,
         role: "assistant",
@@ -222,7 +228,7 @@ export function CharacterChat({
           },
         ],
       };
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) => [...prev, userMsg, msg]);
       setSuggestion(null);
       // 접어둔 채로 정리했더라도 다음 제안은 펼친 상태로 보여준다 — 접기는
       // "이 제안 지금은 됐다"였지 "앞으로 계속 접어둬라"가 아니다.
