@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { MonthPickerSheet } from "./month-picker-sheet";
 import { DiarySearchView } from "./diary-search-view";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 import { MoodBadge } from "./mood-badge";
@@ -264,6 +265,8 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
   const [committing, setCommitting] = useState<null | "prev" | "next" | "snap">(
     null,
   );
+  /** 연·월 점프 시트. 열려 있을 때만 렌더한다(시트의 draftYear 초기화 이유). */
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const canGoNext = ym(year, month) < todayYm;
 
@@ -334,7 +337,11 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
   }, [year, month]);
 
   // 커밋 후 트랙을 -100%로 즉시 리베이스 — 같은 내용이 같은 자리에 오므로 점프 없음.
-  function rebaseTo(y: number, m: number) {
+  //
+  // `resetScroll`은 **멀리 점프할 때만** 켠다(오늘 버튼·월 선택). 옆 달로 한 칸
+  // 넘기는 건 목록을 훑는 동작이라, 볼 때마다 맨 위로 되돌리면 읽던 자리를 잃고
+  // 같은 거리를 다시 스크롤해야 한다.
+  function rebaseTo(y: number, m: number, resetScroll = false) {
     setCommitting(null);
     setDx(0);
     dxRef.current = 0;
@@ -342,8 +349,10 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
     setMonth(m);
     setSelectedKey(y === ty && m === tm ? todayKey : cellKey(y, m, 1));
     setError(null);
-    window.scrollTo({ top: 0 });
-    setScrolled(false);
+    if (resetScroll) {
+      window.scrollTo({ top: 0 });
+      setScrolled(false);
+    }
   }
 
   function onTrackTransitionEnd(e: React.TransitionEvent) {
@@ -366,9 +375,15 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
     if (committing || !canGoNext) return;
     setCommitting("next");
   }
+  function pickMonth(y: number, m: number) {
+    setPickerOpen(false);
+    if (y === year && m === month) return;
+    rebaseTo(y, m, true); // 멀리 점프 — 오늘 버튼과 같은 취급
+  }
+
   function goToday() {
     if (committing || (ty === year && tm === month)) return;
-    rebaseTo(ty, tm); // 멀리 점프 — 애니메이션 없이 즉시
+    rebaseTo(ty, tm, true); // 멀리 점프 — 애니메이션 없이 즉시, 맨 위부터
   }
 
   function onTouchStart(e: React.TouchEvent) {
@@ -507,17 +522,38 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
                 일기
               </span>
             )}
-            <span
+            {/* 탭하면 연·월 점프 시트. 먼 달로 가려고 ‹ 를 열 번 누르던 걸 없앤다. */}
+            <button
+              type="button"
+              className="pressable"
+              onClick={() => setPickerOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={pickerOpen}
+              aria-label={`${year}년 ${month}월, 다른 달 고르기`}
               style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "2px 6px",
+                margin: "-2px -6px",
+                border: "none",
+                background: "transparent",
                 fontFamily: "var(--font-sans)",
                 fontSize: "var(--text-lg)",
                 fontWeight: 600,
                 color: "var(--fg)",
                 letterSpacing: "var(--tracking-tight)",
+                cursor: "pointer",
               }}
             >
               {year}년 {month}월
-            </span>
+              <span
+                aria-hidden
+                style={{ fontSize: 10, color: "var(--fg-placeholder)", lineHeight: 1 }}
+              >
+                ▾
+              </span>
+            </button>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-1)" }}>
             <button
@@ -737,6 +773,17 @@ function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
         description="이 날짜로 새 일기를 쓸까요?"
         confirmLabel="쓰기"
       />
+
+      {pickerOpen && (
+        <MonthPickerSheet
+          year={year}
+          month={month}
+          todayYear={ty}
+          todayMonth={tm}
+          onPick={pickMonth}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
     </div>
   );
 }
