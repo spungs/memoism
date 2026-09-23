@@ -594,9 +594,19 @@ export async function POST(req: NextRequest) {
             title: s.title,
             createdAt: s.createdAt.toISOString(),
           }))
-      : // 마커 누락(모델 실패) 시 fallback: 날짜·키워드로 '직접' 찾은 일기만 (의미-only 제외 → 날짜갭 방지).
+      : // 마커 누락 시 fallback — **날짜로 지목된 일기만** 남긴다.
+        //
+        // 키워드 매칭은 뺐다(2026-09-23). 이게 답변과 무관한 칩의 원인이었다:
+        // "가장 처음 쓴 일기는?"이 집계로 답한 문장인데도, 키워드 "처음"에 걸린
+        // 삼척 일기와 "일기"에 걸린 영어학원 일기가 칩으로 떴다. 키워드·벡터는
+        // "질문과 비슷해 보이는 것"이지 "답변이 근거로 쓴 것"이 아니다 — 근거는
+        // 모델만 알고, 그걸 말하는 수단이 refs 마커다. 마커가 없으면 근거도 없다.
+        //
+        // 날짜는 다르다. "6월 3일 뭐 했어?"의 6월 3일은 질문이 **명시적으로 지목한**
+        // 날이라 답변이 그 일기를 다룰 수밖에 없다. 여기까지 지우면 날짜 질문에서
+        // 칩이 통째로 사라진다.
         relevant
-          .filter((d) => d.matchedByDate !== null || d.matchedByKeyword !== null)
+          .filter((d) => d.matchedByDate !== null)
           .slice(0, RELATED_CHIP_MAX)
           .map((d) => ({
             id: d.id,

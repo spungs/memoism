@@ -75,6 +75,13 @@ describe("일기 범위 질문 규칙", () => {
     expect(s).toContain("집계만 근거로 답했으면 마지막 줄은 [[refs: none]]");
   });
 
+  it("마커가 없으면 날짜로 지목된 일기만 칩으로 남는다", () => {
+    const s = read("src/app/api/chat/route.ts");
+    // 키워드 fallback은 답변과 무관한 칩의 원인이었다 — 되살아나면 안 된다.
+    expect(s).not.toContain("d.matchedByDate !== null || d.matchedByKeyword !== null");
+    expect(s).toContain(".filter((d) => d.matchedByDate !== null)");
+  });
+
   it("최초·최근 일기의 제목을 집계에 싣는다", () => {
     const s = read("src/app/api/chat/route.ts");
     expect(s).toContain("oldestTitle");
