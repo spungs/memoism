@@ -43,6 +43,31 @@ export async function deleteSession(): Promise<void> {
   cookieStore.delete(SESSION_COOKIE);
 }
 
+/**
+ * tokenVersion 검증 결과의 짧은 캐시 (함수 인스턴스 로컬).
+ *
+ * 이 검증 하나 때문에 **모든 페이지·API가 요청마다 users를 한 번 조회**했다. DB가
+ * 싱가포르에 있어 그 왕복이 그대로 첫 화면 지연이 된다(실측 2026-09-23: 응답이
+ * 0KB인 API도 859ms).
+ *
+ * tokenVersion이 올라가는 건 **비밀번호 변경뿐이다**(`auth/actions.ts`). 몇 달에 한 번
+ * 있을까 한 일을 위해 매 요청 왕복을 치르는 건 값이 맞지 않는다. 대신 그 창을 30초로
+ * 줄여 두고, 비밀번호를 바꾼 인스턴스에서는 즉시 버린다
+ * (`invalidateTokenVersionCache`).
+ *
+ * 남는 위험: 다른 인스턴스가 캐시를 들고 있으면 최대 30초 동안 옛 세션이 통과한다.
+ * 비밀번호 변경 직후 30초를 노린 탈취를 막지는 못하지만, 그 시나리오는 공격자가 이미
+ * 유효한 쿠키를 들고 있다는 뜻이라 이 검증의 주 목적(기기 정리)과는 층이 다르다.
+ * 즉시성이 필요해지면 TTL을 0으로 두면 옛 동작 그대로다.
+ */
+const TOKEN_VERSION_TTL_MS = 30_000;
+const tokenVersionCache = new Map<string, { version: number; expiresAt: number }>();
+
+/** 비밀번호 변경처럼 tokenVersion을 올린 직후 호출한다. */
+export function invalidateTokenVersionCache(userId: string): void {
+  tokenVersionCache.delete(userId);
+}
+
 // Reads the session forwarded by middleware (x-user-* headers) and then
 // validates it against the DB: a session whose tokenVersion no longer matches
 // the user's current tokenVersion is treated as invalidated (e.g. after a
@@ -56,14 +81,29 @@ export const getSession = cache(
     const headerTokenVersion = headerStore.get("x-user-token-version");
     if (!userId || !email) return null;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { tokenVersion: true },
-    });
-    if (!user) return null;
-    if (user.tokenVersion !== Number(headerTokenVersion)) return null;
+    const now = Date.now();
+    const cached = tokenVersionCache.get(userId);
+    let currentVersion: number;
 
-    return { userId, email, tokenVersion: user.tokenVersion };
+    if (cached && cached.expiresAt > now) {
+      currentVersion = cached.version;
+    } else {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { tokenVersion: true },
+      });
+      // 없는 사용자는 캐싱하지 않는다 — 탈퇴·삭제 직후 상태를 붙들 이유가 없다.
+      if (!user) return null;
+      currentVersion = user.tokenVersion;
+      tokenVersionCache.set(userId, {
+        version: currentVersion,
+        expiresAt: now + TOKEN_VERSION_TTL_MS,
+      });
+    }
+
+    if (currentVersion !== Number(headerTokenVersion)) return null;
+
+    return { userId, email, tokenVersion: currentVersion };
   },
 );
 

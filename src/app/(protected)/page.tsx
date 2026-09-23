@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { CharacterChat } from "@/components/character/character-chat";
 import { CHARACTER_NAME } from "@/lib/character/utils";
-import { todayUsage } from "@/lib/ai/usage";
+import { todayAiCallCount, usageFromCount } from "@/lib/ai/usage";
 
 export const metadata = { title: "메이" };
 
@@ -23,7 +23,7 @@ export default async function HomePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [character, recentChat] = await Promise.all([
+  const [character, recentChat, aiCallCount] = await Promise.all([
     prisma.character.findUnique({
       where: { userId: session.userId },
       select: {
@@ -53,13 +53,19 @@ export default async function HomePage() {
         captureRef: true,
       },
     }),
+    // 등급과 무관한 쿼리라 character를 기다릴 이유가 없다 — 나란히 보낸다.
+    todayAiCallCount(session.userId),
   ]);
 
   if (!character) redirect("/login");
 
   // 오늘 한도 소진 여부를 로드 시점에 함께 내려준다 → 새로고침해도 입력창이 "열린 척"
-  // 하지 않고 즉시 비활성. (등급→한도 계산이 character 결과에 의존해 순차 조회)
-  const usage = await todayUsage(session.userId, character.subscriptionStatus, character.plan);
+  // 하지 않고 즉시 비활성. 조회는 위에서 병렬로 끝났고 여기선 등급을 얹어 계산만 한다.
+  const usage = usageFromCount(
+    aiCallCount,
+    character.subscriptionStatus,
+    character.plan,
+  );
   const initialCapExhausted = usage.remaining <= 0;
 
   const initialMessages = recentChat

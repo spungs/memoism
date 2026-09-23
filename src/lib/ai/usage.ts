@@ -146,14 +146,36 @@ export async function todayUsage(
   subscriptionStatus: SubscriptionStatus,
   plan: SubscriptionPlan,
 ): Promise<{ used: number; limit: number; remaining: number; tier: Tier }> {
-  const tier = effectiveTier(subscriptionStatus, plan);
-  const limit = TIER_LIMITS[tier];
-  const date = todayKST();
+  return usageFromCount(
+    await todayAiCallCount(userId),
+    subscriptionStatus,
+    plan,
+  );
+}
 
+/**
+ * 오늘 쓴 횟수만 읽는다 — **등급과 무관하다**(userId + 날짜로만 찾는다).
+ *
+ * 등급이 필요한 건 한도 계산뿐인데, 한 함수로 묶여 있던 탓에 호출부가 character
+ * 조회를 기다렸다가 이 쿼리를 쐈다. DB가 멀면 그 순차 한 단계가 그대로 지연이다
+ * (홈이 getSession → character → usage로 3단계였다). 쪼개 두면 character와
+ * 나란히 보낼 수 있다.
+ */
+export async function todayAiCallCount(userId: string): Promise<number> {
   const row = await prisma.usageLog.findUnique({
-    where: { userId_date: { userId, date } },
+    where: { userId_date: { userId, date: todayKST() } },
     select: { aiCallCount: true },
   });
-  const used = row?.aiCallCount ?? 0;
+  return row?.aiCallCount ?? 0;
+}
+
+/** 순수: 읽어온 횟수 + 등급 → 한도·잔여. */
+export function usageFromCount(
+  used: number,
+  subscriptionStatus: SubscriptionStatus,
+  plan: SubscriptionPlan,
+): { used: number; limit: number; remaining: number; tier: Tier } {
+  const tier = effectiveTier(subscriptionStatus, plan);
+  const limit = TIER_LIMITS[tier];
   return { used, limit, remaining: Math.max(0, limit - used), tier };
 }

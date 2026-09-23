@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkAndIncrement, limitFor } from "./usage";
+import { checkAndIncrement, limitFor, usageFromCount } from "./usage";
 
 describe("limitFor", () => {
   it("capture 경로는 티어와 무관하게 무제한(null)", () => {
@@ -42,5 +42,34 @@ describe("checkAndIncrement — capture 경로", () => {
     expect(r.remaining).toBeNull();
     // 만료라 실효 티어는 FREE로 강등되지만, capture는 어차피 무제한이다.
     expect(r.tier).toBe("FREE");
+  });
+});
+
+describe("usageFromCount — 순수 계산", () => {
+  // todayUsage에서 쪼개낸 부분. 쿼리(todayAiCallCount)와 분리돼 있어야
+  // 호출부가 character 조회를 기다리지 않고 usageLog를 병렬로 읽을 수 있다.
+  it("등급별 한도에서 잔여를 뺀다", () => {
+    expect(usageFromCount(2, "ACTIVE", "FREE")).toEqual({
+      used: 2,
+      limit: 3,
+      remaining: 1,
+      tier: "FREE",
+    });
+    expect(usageFromCount(25, "ACTIVE", "PRO")).toEqual({
+      used: 25,
+      limit: 100,
+      remaining: 75,
+      tier: "PRO",
+    });
+  });
+
+  it("한도를 넘겨도 잔여는 음수가 되지 않는다", () => {
+    expect(usageFromCount(7, "ACTIVE", "FREE").remaining).toBe(0);
+  });
+
+  it("구독이 끊기면 FREE 한도로 내려간다", () => {
+    const r = usageFromCount(1, "EXPIRED", "PRO");
+    expect(r.tier).toBe("FREE");
+    expect(r.limit).toBe(3);
   });
 });

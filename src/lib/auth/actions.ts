@@ -6,7 +6,12 @@ import { prisma } from "@/lib/db";
 import { captureServer } from "@/lib/analytics/server";
 import { hashPassword, verifyPassword } from "./password";
 import { signupSchema, loginSchema } from "./schemas";
-import { createSession, deleteSession, getSession } from "./session";
+import {
+  createSession,
+  deleteSession,
+  getSession,
+  invalidateTokenVersionCache,
+} from "./session";
 
 export type AuthFormState = {
   error?: string;
@@ -174,6 +179,9 @@ export async function changePasswordAction(
     data: { passwordHash: newHash, tokenVersion: { increment: 1 } },
     select: { tokenVersion: true },
   });
+  // 이 인스턴스가 들고 있던 옛 tokenVersion을 즉시 버린다 — 안 버리면 방금 올린 값이
+  // TTL 만큼 반영되지 않는다(session.ts의 캐시 주석 참고).
+  invalidateTokenVersionCache(session.userId);
   await createSession(session.userId, session.email, updated.tokenVersion);
 
   return { ok: true };
