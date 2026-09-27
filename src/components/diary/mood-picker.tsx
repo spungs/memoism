@@ -12,9 +12,12 @@ export {
 } from './mood-data'
 import { MOODS, type MoodKey } from './mood-data'
 
+/** 감정을 고르지 않은 채 저장되지 않게 하는 기본값. 호출자가 초기값으로 쓴다. */
+export const DEFAULT_MOOD: MoodKey = 'calm'
+
 interface MoodPickerProps {
-  value: MoodKey | null
-  onChange: (mood: MoodKey | null) => void
+  value: MoodKey
+  onChange: (mood: MoodKey) => void
 }
 
 export function MoodPicker({ value, onChange }: MoodPickerProps) {
@@ -34,22 +37,15 @@ export function MoodPicker({ value, onChange }: MoodPickerProps) {
       >
         오늘의 감정
       </p>
-      {/* 가로 스크롤 줄은 박스 밖을 잘라낸다. 선택된 칩이 scale(1.08)로 커지면
-          (최대 ~3.3px) 첫 칩의 왼쪽 모서리와 위쪽이 잘렸다. 커질 여유만큼 padding을
-          주고 같은 만큼 음수 margin으로 되돌려 칩 위치·레이아웃은 그대로 둔다.
-          (아래 6px = 여유 4px + 원래 있던 paddingBottom 2px)
-          오른쪽은 margin을 되돌리지 않는다 — 넓히면 화면 밖 다음 칩이 3px 비쳐
-          그게 또 잘린 모서리처럼 보인다. padding만 둬서 끝까지 스크롤한 마지막 칩의
-          여유만 확보한다. */}
+      {/* 6칸 한 줄 — 가로 칩은 390px에서 4개만 보이고 화남·피곤이 스크롤 뒤에
+          숨었다. 이모지를 위, 글자를 아래로 세워 한 줄에 다 넣는다(320px에서도
+          칸당 ~39px). 스크롤 컨테이너가 아니라 선택 시 scale로 커져도 잘리지 않는다. */}
       <div
         style={{
-          display: 'flex',
-          gap: 'var(--space-2)',
-          overflowX: 'auto',
-          padding: '4px 4px 6px',
-          margin: '-4px 0 -4px -4px',
+          display: 'grid',
+          gridTemplateColumns: `repeat(${MOODS.length}, 1fr)`,
+          gap: 6,
         }}
-        className="hide-scrollbar"
       >
         {MOODS.map((mood) => {
           const isSelected = value === mood.key
@@ -57,18 +53,21 @@ export function MoodPicker({ value, onChange }: MoodPickerProps) {
             <button
               key={mood.key}
               type="button"
-              onClick={() => onChange(isSelected ? null : mood.key)}
+              // 다시 눌러도 해제하지 않는다 — 감정 미설정으로 저장되는 길을 막는다.
+              onClick={() => onChange(mood.key)}
               aria-pressed={isSelected}
               aria-label={mood.label}
               className="pressable"
               style={{
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
-                gap: 6,
-                flexShrink: 0,
-                minHeight: 36,
-                padding: '0 12px',
-                borderRadius: 'var(--radius-pill)',
+                justifyContent: 'center',
+                gap: 4,
+                minWidth: 0,
+                minHeight: 56,
+                padding: '8px 0',
+                borderRadius: 'var(--radius-md)',
                 border: 'none',
                 backgroundColor: isSelected
                   ? mood.color
@@ -79,11 +78,11 @@ export function MoodPicker({ value, onChange }: MoodPickerProps) {
                 transform: isSelected ? 'scale(1.08)' : 'scale(1)',
               }}
             >
-              <span style={{ fontSize: 16, lineHeight: 1 }}>{mood.emoji}</span>
+              <span style={{ fontSize: 20, lineHeight: 1 }}>{mood.emoji}</span>
               <span
                 style={{
                   fontFamily: 'var(--font-sans)',
-                  fontSize: 'var(--text-sm)',
+                  fontSize: 'var(--text-xs)',
                   fontWeight: 600,
                   color: isSelected ? '#fff' : 'var(--fg-muted)',
                   letterSpacing: 0,

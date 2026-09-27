@@ -22,7 +22,7 @@ import {
   isOverAiLimit,
 } from "./content-length-hint";
 import { DiaryDatePicker } from "./date-picker";
-import { MoodPicker, type MoodKey } from "./mood-picker";
+import { DEFAULT_MOOD, MoodPicker, type MoodKey } from "./mood-picker";
 import { AiBusyOverlay, Spinner } from "@/components/ui/ai-busy-overlay";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 
@@ -257,7 +257,11 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
 
   const [title, setTitle] = useState(initial?.title ?? "");
   const [content, setContent] = useState(initial?.content ?? "");
-  const [mood, setMood] = useState<MoodKey | null>(initial?.mood ?? null);
+  // 미설정으로 저장되지 않게 평온에서 시작한다. 감정이 없던 옛 일기를 고치면 평온이 들어간다.
+  const [mood, setMood] = useState<MoodKey>(initial?.mood ?? DEFAULT_MOOD);
+  // 사용자가 직접 골랐는지. 기본값 평온과 "일부러 고른 평온"을 구분해야 AI 정리 때
+  // 사용자 선택을 AI 추천보다 앞세울 수 있다(검토 화면이 이 값을 먼저 쓴다).
+  const [moodTouched, setMoodTouched] = useState(false);
   const [date, setDate] = useState(initial?.date ?? todayStr());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -375,7 +379,11 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
       const draft: NewDraft = JSON.parse(raw);
       if (draft.title) setTitle(draft.title);
       if (draft.content) setContent(draft.content);
-      if (draft.mood) setMood(draft.mood);
+      if (draft.mood) {
+        setMood(draft.mood);
+        // 초안에는 손대지 않은 기본값도 저장된다 — 평온이 아닐 때만 직접 고른 것으로 본다.
+        setMoodTouched(draft.mood !== DEFAULT_MOOD);
+      }
       if (draft.date) setDate(draft.date);
     } catch {
       // 무시
@@ -483,7 +491,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
         fd.set("title", trimmedTitle);
         fd.set("content", trimmedContent);
         fd.set("source", "manual");
-        fd.set("mood", mood ?? "");
+        fd.set("mood", mood);
         fd.set("date", date);
         for (const f of compressed) fd.append("image", f);
         fd.set("exifs", JSON.stringify(exifs.map(exifToWire)));
@@ -577,6 +585,8 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
           mode: data.mode,
           // 사용자 원본 텍스트 — 검토 화면의 "다시 생성"이 B/C 모드 재생성에 사용.
           text: content.trim() || undefined,
+          // 사용자가 고른 감정이 있으면 검토 화면이 AI 추천보다 먼저 쓴다.
+          userMood: moodTouched ? mood : undefined,
           date: draftDate,
           createdAt: Date.now(),
         }),
@@ -782,7 +792,13 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
 
         <DiaryDatePicker value={date} max={today} onChange={setDate} />
 
-        <MoodPicker value={mood} onChange={setMood} />
+        <MoodPicker
+          value={mood}
+          onChange={(m) => {
+            setMood(m);
+            setMoodTouched(true);
+          }}
+        />
 
         {/* 글쓰기 표면 — 흰 카드로 분리해 "지금 기록하고 있다"는 물성 부여 */}
         <div

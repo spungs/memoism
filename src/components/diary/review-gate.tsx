@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createDiaryAction } from "@/lib/diary/actions";
 import { getDiaryImageSignedUrls } from "@/lib/storage/actions";
 import { DiaryDatePicker } from "./date-picker";
+import { DEFAULT_MOOD, KNOWN_MOOD_KEYS, MoodPicker, type MoodKey } from "./mood-picker";
 import { AiInstructionInput } from "./ai-instruction-input";
 import { ContentLengthHint, isOverAiLimit } from "./content-length-hint";
 import { buildInstruction } from "@/lib/diary/ai-instruction";
@@ -31,9 +32,16 @@ type PendingDraft = {
   mode: "A" | "B" | "C";
   /** 사용자 원본 텍스트 — "다시 생성"이 B/C 모드 재생성에 사용. */
   text?: string;
+  /** 사용자가 직접 고른 감정(작성 화면 또는 이 화면). 있으면 AI 추천보다 먼저 쓴다. */
+  userMood?: string;
   date: string;
   createdAt: number;
 };
+
+/** 저장된 문자열이 아는 감정 키면 그대로, 아니면 null. AI 추천은 스키마 밖 값일 수 있다. */
+function toMoodKey(v: string | null | undefined): MoodKey | null {
+  return v && KNOWN_MOOD_KEYS.has(v) ? (v as MoodKey) : null;
+}
 
 function formatExifTime(iso: string | null): string | null {
   if (!iso) return null;
@@ -91,6 +99,7 @@ export function ReviewGate() {
   const [loading, setLoading] = useState(true);
   const [editedTitle, setEditedTitle] = useState("");
   const [editedContent, setEditedContent] = useState("");
+  const [mood, setMood] = useState<MoodKey>(DEFAULT_MOOD);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [signedUrls, setSignedUrls] = useState<(string | null)[]>([]);
   const [regenerating, setRegenerating] = useState(false);
@@ -132,6 +141,12 @@ export function ReviewGate() {
       setDraftState(parsed);
       setEditedTitle(parsed.draft.title);
       setEditedContent(parsed.draft.content);
+      // 내가 고른 감정 > AI 추천 > 평온. 미설정으로는 저장하지 않는다.
+      setMood(
+        toMoodKey(parsed.userMood) ??
+          toMoodKey(parsed.draft.suggestedMood) ??
+          DEFAULT_MOOD,
+      );
     } catch {
       sessionStorage.removeItem(PENDING_DRAFT_KEY);
       router.replace("/diary/new");
@@ -162,6 +177,23 @@ export function ReviewGate() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [draftState]);
+
+  // 감정 변경 — 날짜와 같은 이유로 sessionStorage에도 남긴다. userMood로 적어 두면
+  // "다시 생성"의 새 추천이 사용자가 고른 감정을 덮지 않는다.
+  const handleMoodChange = (next: MoodKey) => {
+    setMood(next);
+    setDraftState((prev) => (prev ? { ...prev, userMood: next } : prev));
+    try {
+      const raw = sessionStorage.getItem(PENDING_DRAFT_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as PendingDraft;
+        parsed.userMood = next;
+        sessionStorage.setItem(PENDING_DRAFT_KEY, JSON.stringify(parsed));
+      }
+    } catch {
+      /* sessionStorage 실패 시에도 state로는 반영됨 */
+    }
+  };
 
   // 일기 날짜 변경 — state와 sessionStorage 양쪽을 갱신해 새로고침에도 유지.
   const handleDateChange = (next: string) => {
@@ -201,7 +233,7 @@ export function ReviewGate() {
       fd.set("source", `auto_${draftState.mode.toLowerCase()}`);
       fd.set("storagePaths", JSON.stringify(draftState.storagePaths));
       fd.set("exifs", JSON.stringify(draftState.exifs));
-      fd.set("mood", draftState.draft.suggestedMood ?? "");
+      fd.set("mood", mood);
       fd.set("date", draftState.date);
 
       const result = await createDiaryAction(fd);
@@ -265,6 +297,11 @@ export function ReviewGate() {
       // 지시가 반영된 결과가 나왔으니 비운다. 남겨두면 다음 재생성에 또 적용된다.
       setInstructionChips([]);
       setInstructionText("");
+      // 사용자가 감정을 고른 적 없으면 새 추천을 따른다.
+      if (!draftState.userMood) {
+        const suggested = toMoodKey(data.data.suggestedMood);
+        if (suggested) setMood(suggested);
+      }
       setDraftState((prev) =>
         prev
           ? {
@@ -666,18 +703,9 @@ export function ReviewGate() {
           />
           <ContentLengthHint value={editedContent} />
 
-          {draftState.draft.suggestedMood && (
-            <p
-              style={{
-                fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-sm)",
-                color: "var(--fg-muted)",
-                margin: 0,
-              }}
-            >
-              추천 기분 · {draftState.draft.suggestedMood}
-            </p>
-          )}
+          {/* 예전엔 "추천 기분 · calm"을 키 그대로 보여주기만 하고 바꿀 수 없었다.
+              AI 추천을 미리 골라둔 채로 사용자가 저장 전에 바꾼다. */}
+          <MoodPicker value={mood} onChange={handleMoodChange} />
 
           <AiInstructionInput
             chips={instructionChips}
