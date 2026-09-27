@@ -136,6 +136,44 @@ export function groupPhotosByExifDate(
   return groups;
 }
 
+/**
+ * 사용자가 사진을 다른 날짜로 옮긴 결과(`overrides`: 사진 인덱스 → dateKey)를
+ * EXIF 묶음(`base`)에 반영한다. 뺀 사진(`removed`)은 어디에도 두지 않는다.
+ *
+ * 옮긴 사진은 그 날 묶음 **끝**에 옮긴 순서대로 붙는다 — 날짜 모르는 사진은
+ * 촬영시각이 없고, 다른 날에서 온 사진의 시각은 이 날과 무관해 정렬 기준이 없다.
+ * 묶음 순서는 `groupPhotosByExifDate`와 같다(최근 날짜 먼저, 날짜 모름 맨 뒤).
+ * 사진이 다 빠진 날짜는 사라진다.
+ */
+export function applyDateOverrides(
+  base: PhotoGroup[],
+  overrides: ReadonlyMap<number, string>,
+  removed: ReadonlySet<number>,
+): PhotoGroup[] {
+  const byDate = new Map<string | null, number[]>();
+  const add = (dateKey: string | null, i: number) => {
+    const arr = byDate.get(dateKey);
+    if (arr) arr.push(i);
+    else byDate.set(dateKey, [i]);
+  };
+
+  for (const g of base) {
+    for (const i of g.photoIndexes) {
+      if (!removed.has(i) && !overrides.has(i)) add(g.dateKey, i);
+    }
+  }
+  for (const [i, dateKey] of overrides) {
+    if (!removed.has(i)) add(dateKey, i);
+  }
+
+  const dated: PhotoGroup[] = [...byDate.entries()]
+    .filter((e): e is [string, number[]] => e[0] !== null)
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([dateKey, photoIndexes]) => ({ dateKey, photoIndexes }));
+  const unknown = byDate.get(null);
+  return unknown ? [...dated, { dateKey: null, photoIndexes: unknown }] : dated;
+}
+
 export type CapSelection = {
   /** 이번에 담을 묶음. 최신 날짜부터, **날짜 단위로** 통째. */
   kept: PhotoGroup[];

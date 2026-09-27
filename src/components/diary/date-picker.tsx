@@ -15,13 +15,16 @@ interface DatePickerProps {
   value: string; // YYYY-MM-DD
   max: string;   // YYYY-MM-DD (today)
   onChange: (value: string) => void;
+  /** 처음부터 달력을 편 채로 보여준다. "다른 날짜 고르기"를 누른 뒤 날짜 버튼을
+   *  한 번 더 누르게 하지 않으려고 쓴다. */
+  defaultOpen?: boolean;
 }
 
 /** 달력 팝오버의 대략 높이(px). 열 때 위/아래 방향을 고르는 기준. */
 const CALENDAR_HEIGHT = 340;
 
-export function DiaryDatePicker({ value, max, onChange }: DatePickerProps) {
-  const [open, setOpen] = useState(false);
+export function DiaryDatePicker({ value, max, onChange, defaultOpen = false }: DatePickerProps) {
+  const [open, setOpen] = useState(defaultOpen);
   const [viewYear, setViewYear] = useState(() => Number(value.slice(0, 4)));
   const [viewMonth, setViewMonth] = useState(() => Number(value.slice(5, 7)) - 1);
   const containerRef = useRef<HTMLDivElement>(null);

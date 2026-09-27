@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyDateOverrides,
   backfillLimitsFor,
   chunkBySize,
   groupPhotosByExifDate,
@@ -213,5 +214,75 @@ describe("selectGroupsWithinCap", () => {
     const r = selectGroupsWithinCap([], L);
     expect(r.kept).toEqual([]);
     expect(r.droppedPhotos).toBe(0);
+  });
+});
+
+describe("applyDateOverrides", () => {
+  // EXIF로 묶인 기본 상태: 9/20에 0·1, 9/18에 2, 날짜 모름 3·4
+  const base = [
+    { dateKey: "2026-09-20", photoIndexes: [0, 1] },
+    { dateKey: "2026-09-18", photoIndexes: [2] },
+    { dateKey: null, photoIndexes: [3, 4] },
+  ];
+  const none = new Set<number>();
+
+  it("옮긴 게 없으면 그대로다", () => {
+    expect(applyDateOverrides(base, new Map(), none)).toEqual(base);
+  });
+
+  it("날짜 모르는 사진을 있는 날짜에 넣으면 그 날 끝에 붙는다", () => {
+    const r = applyDateOverrides(base, new Map([[3, "2026-09-20"]]), none);
+    expect(r).toEqual([
+      { dateKey: "2026-09-20", photoIndexes: [0, 1, 3] },
+      { dateKey: "2026-09-18", photoIndexes: [2] },
+      { dateKey: null, photoIndexes: [4] },
+    ]);
+  });
+
+  it("목록에 없던 날짜로 넣으면 새 묶음이 날짜 순서 자리에 생긴다", () => {
+    const r = applyDateOverrides(base, new Map([[3, "2026-09-19"]]), none);
+    expect(r.map((g) => g.dateKey)).toEqual([
+      "2026-09-20",
+      "2026-09-19",
+      "2026-09-18",
+      null,
+    ]);
+    expect(r[1].photoIndexes).toEqual([3]);
+  });
+
+  it("날짜 있는 사진도 옮기고, 비게 된 원래 날짜는 사라진다", () => {
+    const r = applyDateOverrides(base, new Map([[2, "2026-09-20"]]), none);
+    expect(r).toEqual([
+      { dateKey: "2026-09-20", photoIndexes: [0, 1, 2] },
+      { dateKey: null, photoIndexes: [3, 4] },
+    ]);
+  });
+
+  it("날짜 모르는 사진을 다 넣으면 날짜 모름 묶음이 없어진다", () => {
+    const r = applyDateOverrides(
+      base,
+      new Map([
+        [3, "2026-09-18"],
+        [4, "2026-09-18"],
+      ]),
+      none,
+    );
+    expect(r.find((g) => g.dateKey === null)).toBeUndefined();
+    expect(r.find((g) => g.dateKey === "2026-09-18")!.photoIndexes).toEqual([
+      2, 3, 4,
+    ]);
+  });
+
+  it("뺀 사진은 어디에도 없다", () => {
+    const r = applyDateOverrides(
+      base,
+      new Map([[3, "2026-09-20"]]),
+      new Set([1, 3]),
+    );
+    expect(r).toEqual([
+      { dateKey: "2026-09-20", photoIndexes: [0] },
+      { dateKey: "2026-09-18", photoIndexes: [2] },
+      { dateKey: null, photoIndexes: [4] },
+    ]);
   });
 });

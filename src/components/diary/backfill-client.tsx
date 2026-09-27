@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight, ImagePlus } from "lucide-react";
 import {
+  applyDateOverrides,
   chunkBySize,
   groupPhotosByExifDate,
   selectGroupsWithinCap,
@@ -17,6 +18,8 @@ import { compressImages, makeThumbnails } from "@/lib/diary/image-compress";
 import { formatFragmentAt } from "@/lib/diary/fragment-fold";
 import { dateKeyLabel, kstTodayKey } from "@/lib/diary/kst";
 import { MAX_AI_INPUT_CONTENT_LENGTH } from "@/lib/diary/schemas";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { DiaryDatePicker } from "./date-picker";
 
 type Wire = { takenAt: string | null; lat: number | null; lng: number | null };
 /** `diaryId`가 있으면 결과 행을 누를 때 그날 일기 상세로 간다. */
@@ -93,10 +96,13 @@ function photoTime(w: Wire | undefined): string | null {
 function BackfillThumb({
   src,
   time,
+  onOpen,
   onRemove,
 }: {
   src: string;
   time: string | null;
+  /** 사진을 눌렀을 때 — 다른 날짜로 옮기는 시트를 연다. */
+  onOpen: () => void;
   onRemove: () => void;
 }) {
   return (
@@ -113,12 +119,29 @@ function BackfillThumb({
     >
       {/* next/image 를 쓰지 않는다 — blob: URL 은 최적화 대상이 아니고, 여기 소스는
           이미 240px 썸네일이라 더 줄일 것도 없다. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt=""
-        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-      />
+      {/* × 는 이 버튼 안에 넣지 않는다(버튼 중첩 금지). 위에 겹쳐 놓아 × 를 누르면
+          빼기만, 나머지를 누르면 날짜 옮기기가 된다. */}
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label="이 사진 다른 날짜로 옮기기"
+        style={{
+          display: "block",
+          width: "100%",
+          height: "100%",
+          padding: 0,
+          border: "none",
+          background: "none",
+          cursor: "pointer",
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt=""
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
+      </button>
       <button
         type="button"
         onClick={onRemove}
@@ -173,6 +196,151 @@ const thumbRowStyle = {
   paddingBottom: 2,
 } as const;
 
+const SHEET_BUTTON: React.CSSProperties = {
+  width: "100%",
+  minHeight: 50,
+  padding: "var(--space-3) var(--space-4)",
+  borderRadius: "var(--radius-md)",
+  border: "none",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-md)",
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+/**
+ * 사진 한 장을 다른 날짜로 옮기는 시트. 지금 목록에 있는 날짜를 먼저 보여주고,
+ * 없는 날짜는 달력으로 고른다. 드래그 대신 누르기인 이유: iOS 웹에서 터치 드래그는
+ * 스크롤과 부딪히고, 목록에 없는 날짜로는 끌어다 놓을 곳이 없다.
+ */
+function MoveDateSheet({
+  photoIndex,
+  currentDate,
+  dayGroups,
+  onMove,
+  onClose,
+}: {
+  photoIndex: number | null;
+  /** 이 사진이 지금 들어가 있는 날짜. 날짜 모름이면 null. */
+  currentDate: string | null;
+  dayGroups: PhotoGroup[];
+  onMove: (photoIndex: number, dateKey: string) => void;
+  onClose: () => void;
+}) {
+  const [picking, setPicking] = useState(false);
+  const close = () => {
+    setPicking(false);
+    onClose();
+  };
+  const move = (dateKey: string) => {
+    if (photoIndex === null) return;
+    setPicking(false);
+    onMove(photoIndex, dateKey);
+  };
+  const others = dayGroups.filter((g) => g.dateKey !== currentDate);
+
+  return (
+    <BottomSheet isOpen={photoIndex !== null} onClose={close}>
+      <div style={{ padding: "var(--space-4) var(--space-5) 0" }}>
+        <p
+          style={{
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-md)",
+            fontWeight: 600,
+            color: "var(--fg)",
+            textAlign: "center",
+            margin: "var(--space-2) 0 var(--space-1)",
+          }}
+        >
+          이 사진을 어느 날에 넣을까요?
+        </p>
+        <p
+          style={{
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-sm)",
+            color: "var(--fg-muted)",
+            textAlign: "center",
+            margin: "0 0 var(--space-5)",
+          }}
+        >
+          지금: {currentDate ? dateKeyLabel(currentDate) : "날짜 모름"}
+        </p>
+
+        {picking ? (
+          <div style={{ paddingBottom: "var(--space-4)" }}>
+            <DiaryDatePicker
+              // 날짜 모르는 사진은 목록의 가장 최근 날짜 달에서 연다 — 이번 달에서 열면
+              // 밀린 날까지 ‹ 를 여러 번 눌러야 한다.
+              value={currentDate ?? dayGroups[0]?.dateKey ?? kstTodayKey()}
+              max={kstTodayKey()}
+              onChange={move}
+              defaultOpen
+            />
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--space-2)",
+              paddingBottom: "var(--space-4)",
+            }}
+          >
+            {others.map((g) => (
+              <button
+                key={g.dateKey}
+                type="button"
+                className="pressable"
+                onClick={() => move(g.dateKey!)}
+                style={{
+                  ...SHEET_BUTTON,
+                  backgroundColor: "var(--fill-2)",
+                  color: "var(--fg)",
+                }}
+              >
+                {dateKeyLabel(g.dateKey!)}
+                <span
+                  style={{
+                    color: "var(--fg-muted)",
+                    fontSize: "var(--text-sm)",
+                    fontWeight: 400,
+                  }}
+                >
+                  {"  "}사진 {g.photoIndexes.length}장
+                </span>
+              </button>
+            ))}
+            <button
+              type="button"
+              className="pressable"
+              onClick={() => setPicking(true)}
+              style={{
+                ...SHEET_BUTTON,
+                backgroundColor: "var(--tint-soft)",
+                color: "var(--tint)",
+              }}
+            >
+              다른 날짜 고르기
+            </button>
+            <button
+              type="button"
+              className="pressable"
+              onClick={close}
+              style={{
+                ...SHEET_BUTTON,
+                backgroundColor: "transparent",
+                color: "var(--fg-muted)",
+              }}
+            >
+              닫기
+            </button>
+          </div>
+        )}
+      </div>
+    </BottomSheet>
+  );
+}
+
 /**
  * 밀린 날 채우기 — 사진 선택 → 날짜별 묶음 미리보기 → 선택한 날만 정리.
  *
@@ -193,6 +361,11 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
   // 뺀 사진은 배열에서 지우지 않고 인덱스만 기억한다. 지우면 files·wires·groups
   // 세 배열의 인덱스를 전부 다시 맞춰야 하고, 그게 어긋나면 사진이 엉뚱한 날로 간다.
   const [removed, setRemoved] = useState<Set<number>>(new Set());
+  // 사용자가 옮긴 날짜(사진 인덱스 → dateKey). 뺀 사진처럼 배열은 두고 덮어쓴다.
+  // EXIF 날짜로 되돌리면 항목을 지운다 — 여기 있는 사진은 "EXIF와 다른 날"이다.
+  const [overrides, setOverrides] = useState<Map<number, string>>(new Map());
+  // 날짜 옮기기 시트를 연 사진.
+  const [moving, setMoving] = useState<number | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
   const [results, setResults] = useState<DayResult[] | null>(null);
@@ -265,6 +438,7 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
       setGroups(groupsForView);
       setThumbs(thumbFiles.map((f) => URL.createObjectURL(f)));
       setRemoved(new Set());
+      setOverrides(new Map());
       // 날짜가 있는 묶음만 기본 선택. null 묶음은 해제 상태(스펙 §4.1).
       setPicked(new Set(sel.kept.map((g) => g.dateKey!)));
       setNotice(capNotice(sel, limits));
@@ -275,19 +449,33 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
     }
   }
 
-  // 뺀 사진을 걷어낸 뒤의 묶음. 한 날의 사진을 전부 빼면 그 날짜도 사라진다.
-  const visibleGroups = groups
-    .map((g) => ({
-      ...g,
-      photoIndexes: g.photoIndexes.filter((i) => !removed.has(i)),
-    }))
-    .filter((g) => g.photoIndexes.length > 0);
+  // 옮긴 날짜를 반영하고 뺀 사진을 걷어낸 묶음. 사진이 다 빠진 날짜는 사라진다.
+  const visibleGroups = applyDateOverrides(groups, overrides, removed);
   const dayGroups = visibleGroups.filter((g) => g.dateKey !== null);
   const unknown = visibleGroups.find((g) => g.dateKey === null);
   // `picked` 는 사라진 날짜를 그대로 들고 있을 수 있다. 세는 건 항상 화면에 남은
   // 날짜 기준이어야 버튼 숫자와 실제 실행 대상이 어긋나지 않는다.
   const pickedDays = dayGroups.filter((g) => picked.has(g.dateKey!));
-  const canRun = !busy && pickedDays.length > 0;
+  // 날짜 모르는 사진은 처음 한도 계산에 안 들어갔다. 날짜를 붙이면 한도를 넘을
+  // 수 있어 여기서 다시 센다 — 서버는 요청(묶음) 단위로만 보므로 전체는 여기서 막는다.
+  const pickedPhotoCount = pickedDays.reduce((n, g) => n + g.photoIndexes.length, 0);
+  const overCap =
+    pickedPhotoCount > limits.maxPhotos || pickedDays.length > limits.maxDays;
+  const canRun = !busy && pickedDays.length > 0 && !overCap;
+
+  /** EXIF가 정한 원래 날짜(날짜 모름이면 null). */
+  const exifDateOf = (i: number) =>
+    groups.find((g) => g.photoIndexes.includes(i))?.dateKey ?? null;
+
+  function moveTo(i: number, dateKey: string) {
+    const next = new Map(overrides);
+    if (dateKey === exifDateOf(i)) next.delete(i);
+    else next.set(i, dateKey);
+    setOverrides(next);
+    // 옮겨 넣은 날은 정리 대상으로 켠다 — 넣어놓고 체크가 꺼져 빠지는 일이 없게.
+    setPicked(new Set(picked).add(dateKey));
+    setMoving(null);
+  }
 
   async function run() {
     setError(null);
@@ -331,7 +519,16 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
       setBusy(`사진 저장 중… ${sent}/${keep.length}장`);
       const fd = new FormData();
       for (const i of chunk) fd.append("photo", files[i]);
-      fd.append("exifs", JSON.stringify(chunk.map((i) => wires[i])));
+      // 옮긴 사진의 촬영시각은 이 날짜와 맞지 않으니 보내지 않는다 — 정리할 때
+      // AI가 다른 날 시각을 그날 일로 읽는다. 위치는 그대로 쓴다.
+      fd.append(
+        "exifs",
+        JSON.stringify(
+          chunk.map((i) =>
+            overrides.has(i) ? { ...wires[i], takenAt: null } : wires[i],
+          ),
+        ),
+      );
       fd.append(
         "dateKeys",
         JSON.stringify(chunk.map((i) => dateKeyByIndex.get(i)!)),
@@ -581,7 +778,9 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
                   <BackfillThumb
                     key={i}
                     src={thumbs[i]}
-                    time={photoTime(wires[i])}
+                    // 옮겨 온 사진의 촬영시각은 이 날과 무관해 배지를 달지 않는다.
+                    time={overrides.has(i) ? null : photoTime(wires[i])}
+                    onOpen={() => !busy && setMoving(i)}
                     onRemove={() => setRemoved(new Set(removed).add(i))}
                   />
                 ))}
@@ -641,7 +840,7 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
                 }}
               >
                 찍은 날짜를 알 수 없는 사진 {unknown.photoIndexes.length}장은
-                빼뒀어요.
+                빼뒀어요. 누르면 날짜를 정할 수 있어요.
               </p>
               {/* 어떤 사진이 빠졌는지 보여준다 — 목록에 없는 날이 왜 없는지
                   사용자가 알 수 있는 유일한 단서다. */}
@@ -651,11 +850,28 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
                     key={i}
                     src={thumbs[i]}
                     time={null}
+                    onOpen={() => !busy && setMoving(i)}
                     onRemove={() => setRemoved(new Set(removed).add(i))}
                   />
                 ))}
               </div>
             </div>
+          )}
+
+          {overCap && (
+            <p
+              style={{
+                margin: 0,
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                color: "var(--fg-muted)",
+                lineHeight: 1.6,
+              }}
+            >
+              한 번에 사진 {limits.maxPhotos}장 · {limits.maxDays}일까지예요. 지금 사진{" "}
+              {pickedPhotoCount}장 · {pickedDays.length}일이라 몇 장을 빼거나 날짜 체크를
+              풀어주세요.
+            </p>
           )}
 
           <button
@@ -758,6 +974,19 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
           )}
         </div>
       )}
+
+      <MoveDateSheet
+        photoIndex={moving}
+        currentDate={
+          moving === null
+            ? null
+            : (visibleGroups.find((g) => g.photoIndexes.includes(moving))?.dateKey ??
+              null)
+        }
+        dayGroups={dayGroups}
+        onMove={moveTo}
+        onClose={() => setMoving(null)}
+      />
     </div>
   );
 }
