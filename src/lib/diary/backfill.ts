@@ -1,6 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { savePhotosByDate } from "./capture-photos";
+import { createFragment } from "./fragments";
+import { getOrCreateDiaryForDate } from "./queries";
 import { organizeDiaryFromFragments } from "./organize";
 import { regenerateDiary } from "./regenerate";
 import { kstDayRangeFromKey } from "./kst";
@@ -37,7 +39,10 @@ export async function saveBackfillPhotos(
   photos: File[],
   exifs: ClientExif[],
   dateKeys: string[],
-): Promise<{ ok: true; savedDates: string[] } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; savedDates: string[]; diaryIds: Record<string, string> }
+  | { ok: false; error: string }
+> {
   if (photos.length === 0) return { ok: false, error: "사진이 없어요" };
   if (exifs.length !== photos.length || dateKeys.length !== photos.length) {
     return { ok: false, error: "사진과 메타데이터 개수가 맞지 않아요" };
@@ -56,7 +61,51 @@ export async function saveBackfillPhotos(
   return {
     ok: true,
     savedDates: [...new Set(saved.entries.map((e) => e.dateKey))],
+    // 결과 화면이 날짜를 그날 일기로 잇는 데 쓴다. 정리가 한도에 걸려 organize를
+    // 부르지 못한 날도 사진은 여기서 이미 일기에 들어가 있다.
+    diaryIds: Object.fromEntries(saved.entries.map((e) => [e.dateKey, e.diaryId])),
   };
+}
+
+/**
+ * ①-0 날짜별 메모를 그날 일기의 텍스트 조각으로 저장한다. 사진보다 **먼저** 한다.
+ *
+ * 본문에 바로 쓰지 않고 조각으로 두는 이유: 메이에게 남긴 말과 같은 재료라 ②의
+ * organize가 사진과 함께 엮는다. 정리가 실패하거나 한도에 걸려도 메모는 조각
+ * 타임라인에 그대로 남는다 — 사진을 정리와 분리해 먼저 저장하는 것과 같은 원칙이다.
+ *
+ * 같은 내용의 조각이 이미 있으면 건너뛴다. 사진 업로드가 중간에 끊기면 사용자는
+ * 처음부터 다시 누르는데, 그때 메모가 두 번 쌓이면 정리 결과에도 두 번 들어간다.
+ */
+export async function saveBackfillNotes(
+  userId: string,
+  notes: { dateKey: string; text: string }[],
+): Promise<
+  { ok: true; diaryIds: Record<string, string> } | { ok: false; error: string }
+> {
+  const { maxDays } = await getBackfillLimits(userId);
+  if (new Set(notes.map((n) => n.dateKey)).size > maxDays) {
+    return { ok: false, error: `한 번에 ${maxDays}일까지 채울 수 있어요` };
+  }
+
+  const diaryIds: Record<string, string> = {};
+  for (const n of notes) {
+    const { id: diaryId } = await getOrCreateDiaryForDate(userId, n.dateKey);
+    const dup = await prisma.diaryFragment.findFirst({
+      where: { diaryId, kind: "text", content: n.text },
+      select: { id: true },
+    });
+    if (!dup) {
+      await createFragment({
+        userId,
+        dateKey: n.dateKey,
+        kind: "text",
+        content: n.text,
+      });
+    }
+    diaryIds[n.dateKey] = diaryId;
+  }
+  return { ok: true, diaryIds };
 }
 
 /**

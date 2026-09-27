@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ImagePlus } from "lucide-react";
+import { ChevronRight, ImagePlus } from "lucide-react";
 import {
   chunkBySize,
   groupPhotosByExifDate,
@@ -15,9 +16,16 @@ import { extractExif, exifToWire } from "@/lib/diary/exif";
 import { compressImages, makeThumbnails } from "@/lib/diary/image-compress";
 import { formatFragmentAt } from "@/lib/diary/fragment-fold";
 import { dateKeyLabel, kstTodayKey } from "@/lib/diary/kst";
+import { MAX_AI_INPUT_CONTENT_LENGTH } from "@/lib/diary/schemas";
 
 type Wire = { takenAt: string | null; lat: number | null; lng: number | null };
-type DayResult = { dateKey: string; ok: boolean; note: string };
+/** `diaryId`가 있으면 결과 행을 누를 때 그날 일기 상세로 간다. */
+type DayResult = {
+  dateKey: string;
+  ok: boolean;
+  note: string;
+  diaryId: string | null;
+};
 
 const rowStyle = {
   display: "flex",
@@ -37,7 +45,7 @@ const rowStyle = {
  * HTML 이라 파싱이 터지고, 그러면 진짜 원인이 "연결이 끊겼어요"로 뭉개진다.
  * (2026-09-22 운영에서 실제로 413 이 이렇게 가려졌다.)
  */
-async function readError(res: Response): Promise<string> {
+async function readError(res: Response, what = "사진을"): Promise<string> {
   try {
     const data = await res.json();
     if (typeof data?.error === "string") return data.error;
@@ -47,7 +55,7 @@ async function readError(res: Response): Promise<string> {
   if (res.status === 413) {
     return "사진 용량이 한 번에 보내기엔 커요. 장수를 줄여서 다시 해주세요.";
   }
-  return `사진을 저장하지 못했어요 (오류 ${res.status})`;
+  return `${what} 저장하지 못했어요 (오류 ${res.status})`;
 }
 
 
@@ -191,6 +199,10 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
   const [error, setError] = useState<string | null>(null);
   // 한도에 걸려 미뤄진 사진 안내. 오류가 아니라 사실 통지라 톤을 낮춘다.
   const [notice, setNotice] = useState<string | null>(null);
+  // 날짜별 메모. 키는 dateKey — 사진을 빼서 날짜가 사라져도 인덱스가 어긋나지 않는다.
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  // 메모가 안전 펜스에 걸리면 서버가 돌려주는 상담 안내. 결과 아래에 한 번만 보여준다.
+  const [safetyReply, setSafetyReply] = useState<string | null>(null);
 
   // 새로 고르거나 화면을 떠날 때 이전 blob: URL 을 놓아준다.
   useEffect(() => {
@@ -205,6 +217,8 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
     setError(null);
     setNotice(null);
     setResults(null);
+    setSafetyReply(null);
+    setNotes({});
     setBusy("사진을 읽는 중…");
     try {
       // 순서가 중요하다. EXIF(가벼움) → 날짜 묶기 → 한도 적용 → 압축(비쌈).
@@ -277,11 +291,46 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
 
   async function run() {
     setError(null);
+    setSafetyReply(null);
     const targets = pickedDays;
     const keep = targets.flatMap((g) => g.photoIndexes);
     if (keep.length === 0) {
       setError("정리할 날짜를 하나 이상 골라주세요.");
       return;
+    }
+
+    // 결과 행을 그날 일기로 잇는 데 쓴다. 메모·사진 저장 응답에서 모은다 — 한도에
+    // 걸려 정리를 못 부른 날도 일기는 이미 있다.
+    const diaryIdByDate = new Map<string, string>();
+    const collectIds = (ids: Record<string, string> | undefined) => {
+      for (const [d, id] of Object.entries(ids ?? {})) diaryIdByDate.set(d, id);
+    };
+
+    // ⓪ 메모 먼저. 작은 JSON 한 번이라 여기서 실패하면 아직 아무것도 안 올라간
+    // 상태로 다시 누르면 된다. 사진 뒤에 두면 메모 실패 후 재시도가 사진을 두 번 올린다.
+    const noteList = targets
+      .map((g) => ({ dateKey: g.dateKey!, text: (notes[g.dateKey!] ?? "").trim() }))
+      .filter((n) => n.text.length > 0);
+    const notedDates = new Set(noteList.map((n) => n.dateKey));
+    if (noteList.length > 0) {
+      setBusy("메모 저장 중…");
+      try {
+        const res = await fetch("/api/diaries/backfill/notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ notes: noteList }),
+        });
+        if (!res.ok) {
+          setBusy(null);
+          setError(await readError(res, "메모를"));
+          return;
+        }
+        collectIds((await res.json()).diaryIds);
+      } catch {
+        setBusy(null);
+        setError("메모를 저장하다가 연결이 끊겼어요.");
+        return;
+      }
     }
 
     // ① 사진 저장 — 선택된 날짜의 사진만. null 묶음은 올리지 않는다.
@@ -318,6 +367,7 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
           setError(await readError(saveRes));
           return;
         }
+        collectIds((await saveRes.json()).diaryIds);
       } catch {
         setBusy(null);
         // 앞 묶음이 이미 저장됐으면 그렇게 말한다 — 전부 날아간 줄 알고 처음부터
@@ -333,9 +383,12 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
     }
 
     // ② 날짜를 하나씩 정리 — 진행률이 여기서 나온다(스펙 §9).
+    const savedOnly = (dk: string) =>
+      notedDates.has(dk) ? "사진·메모만 저장했어요" : "사진만 저장했어요";
     const out: DayResult[] = [];
     for (let i = 0; i < targets.length; i++) {
       const dk = targets[i].dateKey!;
+      const savedId = diaryIdByDate.get(dk) ?? null;
       setBusy(`${i + 1}/${targets.length}일차 정리 중…`);
       try {
         const res = await fetch("/api/diaries/backfill/organize", {
@@ -345,23 +398,39 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
         });
         const data = await res.json();
         if (res.ok) {
-          out.push({ dateKey: dk, ok: true, note: data.title });
+          out.push({
+            dateKey: dk,
+            ok: true,
+            note: data.title,
+            diaryId: data.diaryId ?? savedId,
+          });
         } else if (data.reason === "cap") {
           // 캡이 끝났다. 남은 날은 사진만 저장된 채로 둔다 — 내일 이어서 하면 된다.
-          out.push({ dateKey: dk, ok: false, note: "오늘 사용 횟수를 다 썼어요" });
+          out.push({
+            dateKey: dk,
+            ok: false,
+            note: "오늘 사용 횟수를 다 썼어요",
+            diaryId: savedId,
+          });
           for (const rest of targets.slice(i + 1)) {
             out.push({
               dateKey: rest.dateKey!,
               ok: false,
-              note: "사진만 저장했어요",
+              note: savedOnly(rest.dateKey!),
+              diaryId: diaryIdByDate.get(rest.dateKey!) ?? null,
             });
           }
           break;
         } else {
-          out.push({ dateKey: dk, ok: false, note: "사진만 저장했어요" });
+          // 펜스에 걸리면 서버가 상담 안내를 돌려준다. 메모가 생기면서 이 경로에
+          // 사용자가 쓴 글이 들어가므로 삼키지 않고 보여준다.
+          if (data.reason === "safety" && typeof data.error === "string") {
+            setSafetyReply(data.error);
+          }
+          out.push({ dateKey: dk, ok: false, note: savedOnly(dk), diaryId: savedId });
         }
       } catch {
-        out.push({ dateKey: dk, ok: false, note: "사진만 저장했어요" });
+        out.push({ dateKey: dk, ok: false, note: savedOnly(dk), diaryId: savedId });
       }
     }
     setBusy(null);
@@ -523,6 +592,38 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
                   />
                 ))}
               </div>
+
+              {/* 체크를 풀면 그 날은 보내지 않으므로 입력도 막는다 — 쓴 메모가
+                  저장된 줄 알고 넘어가지 않게. */}
+              <textarea
+                value={notes[g.dateKey!] ?? ""}
+                onChange={(e) => {
+                  setNotes({ ...notes, [g.dateKey!]: e.target.value });
+                  e.target.style.height = "auto";
+                  e.target.style.height = `${e.target.scrollHeight}px`;
+                }}
+                disabled={!!busy || !picked.has(g.dateKey!)}
+                placeholder="이날 있었던 일 (선택)"
+                aria-label={`${dateKeyLabel(g.dateKey!)} 메모`}
+                rows={2}
+                maxLength={MAX_AI_INPUT_CONTENT_LENGTH}
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  resize: "none",
+                  padding: "var(--space-2) var(--space-3)",
+                  borderRadius: "var(--radius-md)",
+                  // 다크 모드에서 카드(fill-2)와 surface가 거의 같은 색이라 테두리로 구분한다.
+                  border: "1px solid var(--separator)",
+                  backgroundColor: "var(--surface)",
+                  color: "var(--fg)",
+                  fontFamily: "var(--font-sans)",
+                  // 16px 미만이면 iOS Safari가 포커스 때 화면을 확대한다.
+                  fontSize: 16,
+                  lineHeight: 1.5,
+                  opacity: picked.has(g.dateKey!) ? 1 : 0.5,
+                }}
+              />
             </div>
           ))}
 
@@ -594,29 +695,73 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
             gap: "var(--space-2)",
           }}
         >
-          {results.map((r) => (
-            <div key={r.dateKey} style={rowStyle}>
-              <span
-                style={{
-                  fontFamily: "var(--font-sans)",
-                  fontSize: "var(--text-base)",
-                  color: "var(--fg)",
-                }}
+          {results.map((r) => {
+            const body = (
+              <>
+                <span
+                  style={{
+                    fontFamily: "var(--font-sans)",
+                    fontSize: "var(--text-base)",
+                    color: "var(--fg)",
+                    flexShrink: 0,
+                  }}
+                >
+                  {dateKeyLabel(r.dateKey)}
+                </span>
+                <span
+                  style={{
+                    fontFamily: "var(--font-sans)",
+                    fontSize: "var(--text-sm)",
+                    color: "var(--fg-muted)",
+                    textAlign: "right",
+                    marginLeft: "auto",
+                  }}
+                >
+                  {r.ok ? `정리됨 · ${r.note}` : r.note}
+                </span>
+              </>
+            );
+            // 정리에 실패한 날도 사진은 그날 일기에 들어가 있다 — 들어가서 직접
+            // 쓰거나 나중에 정리할 수 있게 똑같이 잇는다.
+            return r.diaryId ? (
+              <Link
+                key={r.dateKey}
+                href={`/diary/${r.diaryId}`}
+                className="pressable"
+                style={{ ...rowStyle, textDecoration: "none" }}
               >
-                {dateKeyLabel(r.dateKey)}
-              </span>
-              <span
-                style={{
-                  fontFamily: "var(--font-sans)",
-                  fontSize: "var(--text-sm)",
-                  color: "var(--fg-muted)",
-                  textAlign: "right",
-                }}
-              >
-                {r.ok ? `정리됨 · ${r.note}` : r.note}
-              </span>
-            </div>
-          ))}
+                {body}
+                <ChevronRight
+                  size={16}
+                  color="var(--fg-muted)"
+                  aria-hidden
+                  style={{ flexShrink: 0 }}
+                />
+              </Link>
+            ) : (
+              <div key={r.dateKey} style={rowStyle}>
+                {body}
+              </div>
+            );
+          })}
+
+          {safetyReply && (
+            <p
+              style={{
+                margin: 0,
+                padding: "var(--space-3)",
+                borderRadius: "var(--radius-md)",
+                backgroundColor: "var(--fill-2)",
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                color: "var(--fg)",
+                lineHeight: 1.6,
+                whiteSpace: "pre-line",
+              }}
+            >
+              {safetyReply}
+            </p>
+          )}
         </div>
       )}
     </div>

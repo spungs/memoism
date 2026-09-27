@@ -53,5 +53,5 @@ export async function POST(req: NextRequest) {
 
   const r = await saveBackfillPhotos(session.userId, photos, exifs, dateKeys);
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
-  return NextResponse.json({ savedDates: r.savedDates });
+  return NextResponse.json({ savedDates: r.savedDates, diaryIds: r.diaryIds });
 }
