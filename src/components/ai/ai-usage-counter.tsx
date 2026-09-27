@@ -67,7 +67,7 @@ export function AiUsageCounter({
           remaining === 0
           ? "오늘 질문은 다 썼어요 · 기록은 계속할 수 있어요"
           : `오늘 질문 ${remaining}번 남았어요`
-        : `오늘 AI 정리·회상 ${usage.used}/${usage.limit}`}
+        : `오늘 정리·회상 ${usage.used}/${usage.limit}`}
     </span>
   );
 }

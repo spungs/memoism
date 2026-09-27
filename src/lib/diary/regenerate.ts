@@ -103,7 +103,7 @@ export async function regenerateDiary(
   if (!cap.allowed) {
     return {
       ok: false,
-      error: "오늘 AI 사용 횟수를 모두 사용했어요. 내일 다시 만나요.",
+      error: "오늘 사용 횟수를 모두 사용했어요. 내일 다시 만나요.",
       capExhausted: true,
     };
   }
@@ -179,7 +179,7 @@ export async function regenerateDiary(
     await releaseIncrement(userId);
     return {
       ok: false,
-      error: e instanceof Error ? e.message : "AI 생성 실패",
+      error: e instanceof Error ? e.message : "정리 실패",
     };
   }
 

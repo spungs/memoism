@@ -320,7 +320,7 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
             </div>
             <div style={DIVIDER_STYLE} />
             <div style={ROW_STYLE}>
-              <span style={ROW_LABEL_STYLE}>오늘 AI 사용</span>
+              <span style={ROW_LABEL_STYLE}>오늘 정리·회상</span>
               <span style={ROW_VALUE_STYLE}>
                 {usage.used} / {usage.limit}
               </span>

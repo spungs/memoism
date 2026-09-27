@@ -48,7 +48,6 @@ export default async function DiaryDetailPage({ params }: PageProps) {
   const unfoldedCount = diary.fragments.filter(
     (f) => f.kind === "text" && f.foldedAt === null,
   ).length;
-  const isAiSource = diary.source?.startsWith("auto_") ?? false;
 
   // DiaryImage signed URL 일괄 발급 (1h TTL). 실패한 항목은 null.
   const imagePaths = diary.images.map((img) => img.storagePath);
@@ -190,27 +189,6 @@ export default async function DiaryDetailPage({ params }: PageProps) {
               ) : null,
             )}
           </div>
-        )}
-
-        {/* ✨ AI 칩 — fill-2 배경 + secondary 글자, 무채색으로 후퇴 */}
-        {isAiSource && (
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              fontFamily: "var(--font-sans)",
-              fontSize: 11,
-              fontWeight: 600,
-              color: "var(--fg-muted)",
-              backgroundColor: "var(--fill-2)",
-              padding: "3px 8px",
-              borderRadius: "var(--radius-pill)",
-              marginBottom: "var(--space-3)",
-            }}
-          >
-            ✨ AI
-          </span>
         )}
 
         <DiaryContent>{diary.content}</DiaryContent>

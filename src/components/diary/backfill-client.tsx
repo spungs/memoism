@@ -348,7 +348,7 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
           out.push({ dateKey: dk, ok: true, note: data.title });
         } else if (data.reason === "cap") {
           // 캡이 끝났다. 남은 날은 사진만 저장된 채로 둔다 — 내일 이어서 하면 된다.
-          out.push({ dateKey: dk, ok: false, note: "오늘 AI 횟수를 다 썼어요" });
+          out.push({ dateKey: dk, ok: false, note: "오늘 사용 횟수를 다 썼어요" });
           for (const rest of targets.slice(i + 1)) {
             out.push({
               dateKey: rest.dateKey!,

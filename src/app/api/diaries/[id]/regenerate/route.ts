@@ -56,7 +56,7 @@ export async function POST(
       return NextResponse.json(
         {
           error: tooLong
-            ? `일기가 너무 길어요. ${MAX_AI_INPUT_CONTENT_LENGTH}자 이내만 AI가 정리할 수 있어요.`
+            ? `${MAX_AI_INPUT_CONTENT_LENGTH.toLocaleString("ko-KR")}자가 넘어 일기로 정리할 수 없어요. 줄이면 다시 쓸 수 있어요.`
             : "잘못된 요청 형식이에요",
         },
         { status: 400 },

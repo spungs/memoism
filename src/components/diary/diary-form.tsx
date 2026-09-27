@@ -15,6 +15,7 @@ import {
 } from "@/lib/diary/exif";
 import { compressImage } from "@/lib/diary/image-compress";
 import { MAX_IMAGES_PER_REQUEST } from "@/lib/diary/limits";
+import { MAX_AI_INPUT_CONTENT_LENGTH } from "@/lib/diary/schemas";
 import { DiaryAiActions } from "./diary-ai-actions";
 import {
   ContentLengthHint,
@@ -557,7 +558,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
       const data = await res.json();
 
       if (!res.ok) {
-        setAiError(data?.error ?? "AI 생성에 실패했어요");
+        setAiError(data?.error ?? "정리에 실패했어요");
         return;
       }
 
@@ -585,7 +586,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     } catch (e) {
       // 사용자가 취소한 경우는 에러로 표시하지 않는다.
       if (e instanceof DOMException && e.name === "AbortError") return;
-      setAiError(e instanceof Error ? e.message : "AI 생성 실패");
+      setAiError(e instanceof Error ? e.message : "정리 실패");
     } finally {
       setAiPending(false);
       setUsageSignal((n) => n + 1);
@@ -849,7 +850,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
             }}
             placeholder={
               mode === "create"
-                ? "오늘 하루를 기록해요. (사진만 첨부해서 AI로 정리할 수도 있어요)"
+                ? "오늘 하루를 기록해요. (사진만 첨부해서 일기로 정리할 수도 있어요)"
                 : "오늘 하루를 기록해요..."
             }
             autoFocus={mode === "create"}
@@ -1021,15 +1022,15 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
                   }}
                 >
                   <Spinner size={16} />
-                  AI가 정리 중...
+                  정리 중...
                 </span>
               ) : (
-                "✨ AI로 정리하기"
+                "✨ 일기로 정리하기"
               )}
             </button>
             <p style={{ ...MUTED_LABEL, textTransform: "none", letterSpacing: "normal" }}>
               {overAiLimit
-                ? "내용이 길어 AI 정리는 어려워요. 저장은 그대로 됩니다."
+                ? `${MAX_AI_INPUT_CONTENT_LENGTH.toLocaleString("ko-KR")}자가 넘어 '일기로 정리하기'를 쓸 수 없어요. 줄이면 다시 쓸 수 있고, 저장은 그대로 돼요.`
                 : "사진만 있어도, 텍스트만 있어도, 둘 다 있어도 OK."}
             </p>
             <AiUsageCounter refreshSignal={usageSignal} />

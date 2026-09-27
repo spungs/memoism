@@ -134,7 +134,7 @@ export async function organizeDiaryFromFragments(
   if (!cap.allowed) {
     return {
       ok: false,
-      error: "오늘 AI 사용 횟수를 모두 사용했어요. 내일 다시 만나요.",
+      error: "오늘 사용 횟수를 모두 사용했어요. 내일 다시 만나요.",
       capExhausted: true,
     };
   }
@@ -200,7 +200,7 @@ export async function organizeDiaryFromFragments(
     // 결과를 못 줬으니 차감한 횟수를 돌려준다(펜스 차단은 제외 — usage.ts 참고).
     await releaseIncrement(userId);
     // 실패 시 foldedAt은 찍히지 않는다 — 다음에 다시 시도할 수 있다.
-    return { ok: false, error: e instanceof Error ? e.message : "AI 생성 실패" };
+    return { ok: false, error: e instanceof Error ? e.message : "정리 실패" };
   }
 
   const foldedAt = new Date();

@@ -5,6 +5,7 @@ import { Sparkles, Undo2 } from "lucide-react";
 import { revertDiaryAction } from "@/lib/diary/actions";
 import { AiInstructionInput } from "./ai-instruction-input";
 import { isOverAiLimit } from "./content-length-hint";
+import { MAX_AI_INPUT_CONTENT_LENGTH } from "@/lib/diary/schemas";
 import { buildInstruction } from "@/lib/diary/ai-instruction";
 import { AiBusyOverlay, Spinner } from "@/components/ui/ai-busy-overlay";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
@@ -63,6 +64,12 @@ export function DiaryAiActions({
   // 조각이 입력의 주인공이라 화면 본문을 덮어쓸 근거가 없고, 사용자가 저장 안 한
   // 편집은 어차피 저장 버튼이 담당한다.
   const hasUnfolded = unfoldedCount > 0;
+  // 버튼 문구. 상한 초과 안내가 막힌 버튼을 이름으로 가리켜야 해서 따로 둔다.
+  const actionLabel = hasUnfolded
+    ? `조각 ${unfoldedCount}개로 정리하기`
+    : aiGenerationVersion === 0
+      ? "일기로 정리하기"
+      : "다시 정리하기";
 
   const handleRegenerate = async () => {
     setAiPending(true);
@@ -179,13 +186,7 @@ export function DiaryAiActions({
           }}
         >
           {aiPending ? <Spinner size={14} /> : <Sparkles size={14} aria-hidden />}
-          {aiPending
-            ? "AI가 정리 중..."
-            : hasUnfolded
-              ? `조각 ${unfoldedCount}개로 정리하기`
-              : aiGenerationVersion === 0
-                ? "AI로 정리하기"
-                : "AI로 다시 정리하기"}
+          {aiPending ? "정리 중..." : actionLabel}
         </button>
 
         {hasPreviousContent && (
@@ -224,12 +225,12 @@ export function DiaryAiActions({
         }}
       >
         {overAiLimit
-          ? "내용이 길어 AI 정리는 어려워요. 수정·저장은 그대로 됩니다."
+          ? `${MAX_AI_INPUT_CONTENT_LENGTH.toLocaleString("ko-KR")}자가 넘어 '${actionLabel}'를 쓸 수 없어요. 줄이면 다시 쓸 수 있고, 수정·저장은 그대로 돼요.`
           : hasUnfolded
             ? "메이에게 남긴 조각을 일기로 엮어요."
             : aiGenerationVersion > 0
-              ? "사진과 메모를 기반으로 AI가 다시 정리해줘요."
-              : "사진과 본문을 기반으로 AI가 1인칭 일기로 정리해줘요."}
+              ? "사진과 메모를 기반으로 다시 정리해줘요."
+              : "사진과 본문을 기반으로 1인칭 일기로 정리해줘요."}
       </p>
 
       <AiUsageCounter refreshSignal={usageSignal} />

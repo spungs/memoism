@@ -252,7 +252,7 @@ export function ReviewGate() {
 
       if (!res.ok || !data?.ok) {
         if (data?.capExhausted) {
-          setRegenError("오늘 AI 생성 한도를 모두 사용했어요.");
+          setRegenError("오늘 사용 횟수를 모두 사용했어요.");
         } else {
           setRegenError(data?.error ?? "다시 생성에 실패했어요");
         }
@@ -413,7 +413,7 @@ export function ReviewGate() {
             letterSpacing: "var(--tracking-normal)",
           }}
         >
-          AI 검토
+          일기 검토
         </span>
         <button
           type="button"

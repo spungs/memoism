@@ -92,21 +92,21 @@ function friendlyGeminiError(e: unknown): GeminiError {
   console.error("[gemini] request failed:", raw);
   if (/\b(503|500|502|504)\b|UNAVAILABLE|high demand|overloaded/i.test(raw)) {
     return new GeminiError(
-      "AI 서버가 잠시 혼잡해요. 잠시 후 다시 시도해주세요.",
+      "서버가 잠시 혼잡해요. 잠시 후 다시 시도해주세요.",
     );
   }
   // 결제 크레딧 소진 — 분당 한도가 아니라 잔액 0. 운영자 충전 전까지 풀리지 않는다.
   if (isBillingDepleted(raw)) {
     return new GeminiError(
-      "지금은 AI 기능을 사용할 수 없어요. 잠시 후 다시 시도해주세요.",
+      "지금은 이 기능을 사용할 수 없어요. 잠시 후 다시 시도해주세요.",
     );
   }
   if (/\b429\b|RESOURCE_EXHAUSTED|quota/i.test(raw)) {
     return new GeminiError(
-      "지금 AI 사용량이 많아요. 잠시 후 다시 시도해주세요.",
+      "지금 사용량이 많아요. 잠시 후 다시 시도해주세요.",
     );
   }
-  return new GeminiError("AI 처리 중 문제가 생겼어요. 잠시 후 다시 시도해주세요.");
+  return new GeminiError("처리 중 문제가 생겼어요. 잠시 후 다시 시도해주세요.");
 }
 
 export async function callWithRetry<T>(

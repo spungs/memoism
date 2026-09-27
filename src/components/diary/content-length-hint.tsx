@@ -53,7 +53,14 @@ export function ContentLengthHint({ value }: Props) {
     >
       {length.toLocaleString("ko-KR")} /{" "}
       {MAX_AI_INPUT_CONTENT_LENGTH.toLocaleString("ko-KR")}자
-      {over && " · 여기까지는 저장돼요. AI 정리만 어려워요"}
+      {/* 한 줄로 두면 390px에서 "있어요"만 다음 줄로 떨어진다. 문장 경계에서 끊는다. */}
+      {over && (
+        <>
+          {" · 저장은 돼요."}
+          <br />
+          글자 수 제한은 정리 기능에만 있어요
+        </>
+      )}
     </p>
   );
 }
