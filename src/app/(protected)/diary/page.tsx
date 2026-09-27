@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, ImagePlus } from "lucide-react";
+import { ImagePlus } from "lucide-react";
 import { DiaryMonthView } from "@/components/diary/diary-month-view";
 import { DiarySummaryStats } from "@/components/diary/diary-summary-stats";
 import { PageHeader } from "@/components/layout/page-header";
@@ -30,37 +30,41 @@ export default async function DiaryListPage() {
         padding: "0 var(--space-4) var(--space-12)",
       }}
     >
-      <PageHeader title="일기" action={<SettingsLink />} />
+      <PageHeader
+        title="일기"
+        action={
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+            {/* 밀린 날 채우기 진입 — 구조 요청이라 글자는 남기되, 한 줄을 통째로
+                차지해 달력을 밀어내지 않도록 헤더 칩으로 둔다. */}
+            <Link
+              href="/diary/backfill"
+              aria-label="사진으로 밀린 날 채우기"
+              className="pressable"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                height: 32,
+                padding: "0 12px",
+                borderRadius: "var(--radius-pill)",
+                backgroundColor: "var(--surface)",
+                color: "var(--fg)",
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                fontWeight: 500,
+                textDecoration: "none",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <ImagePlus size={15} color="var(--tint)" aria-hidden />
+              밀린 날
+            </Link>
+            <SettingsLink />
+          </div>
+        }
+      />
 
       <DiarySummaryStats thisMonth={counts.thisMonth} total={counts.total} />
-
-      {/* 밀린 날 채우기 진입 — 구조 요청이라 눈에 띄되 달력보다 앞서지 않게 둔다. */}
-      <Link
-        href="/diary/backfill"
-        className="pressable"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--space-2)",
-          marginBottom: "var(--space-5)",
-          padding: "var(--space-3) var(--space-4)",
-          borderRadius: "var(--radius-md)",
-          backgroundColor: "var(--surface)",
-          color: "var(--fg)",
-          fontFamily: "var(--font-sans)",
-          fontSize: "var(--text-md)",
-          textDecoration: "none",
-        }}
-      >
-        <ImagePlus size={16} color="var(--tint)" aria-hidden />
-        사진으로 밀린 날 채우기
-        <ChevronRight
-          size={16}
-          color="var(--fg-muted)"
-          aria-hidden
-          style={{ marginLeft: "auto" }}
-        />
-      </Link>
 
       <DiaryMonthView initialYear={ty} initialMonth={tm} initialDays={monthData.days} />
     </div>
