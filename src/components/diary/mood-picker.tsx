@@ -34,12 +34,20 @@ export function MoodPicker({ value, onChange }: MoodPickerProps) {
       >
         오늘의 감정
       </p>
+      {/* 가로 스크롤 줄은 박스 밖을 잘라낸다. 선택된 칩이 scale(1.08)로 커지면
+          (최대 ~3.3px) 첫 칩의 왼쪽 모서리와 위쪽이 잘렸다. 커질 여유만큼 padding을
+          주고 같은 만큼 음수 margin으로 되돌려 칩 위치·레이아웃은 그대로 둔다.
+          (아래 6px = 여유 4px + 원래 있던 paddingBottom 2px)
+          오른쪽은 margin을 되돌리지 않는다 — 넓히면 화면 밖 다음 칩이 3px 비쳐
+          그게 또 잘린 모서리처럼 보인다. padding만 둬서 끝까지 스크롤한 마지막 칩의
+          여유만 확보한다. */}
       <div
         style={{
           display: 'flex',
           gap: 'var(--space-2)',
           overflowX: 'auto',
-          paddingBottom: 2,
+          padding: '4px 4px 6px',
+          margin: '-4px 0 -4px -4px',
         }}
         className="hide-scrollbar"
       >
