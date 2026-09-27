@@ -1,8 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { savePhotosByDate } from "./capture-photos";
-import { createFragment } from "./fragments";
-import { getOrCreateDiaryForDate } from "./queries";
 import { organizeDiaryFromFragments } from "./organize";
 import { regenerateDiary } from "./regenerate";
 import { kstDayRangeFromKey } from "./kst";
@@ -33,12 +31,19 @@ export async function getBackfillLimits(userId: string): Promise<BackfillLimits>
  * 다시 해야 한다. 사진은 그 자체로 기록이므로 저장은 독립적으로 완결시킨다.
  *
  * 쿼터 검증·orderIndex 이어붙이기·보상 삭제는 `savePhotosByDate`가 이미 한다.
+ *
+ * `notes`(날짜별 메모)는 같은 요청에서 그날 일기 **본문**에 쓴다. 일반 작성 화면에서
+ * 글+사진으로 정리하는 것과 같은 모양이 되도록 — ②의 정리가 이 본문과 사진으로
+ * 일기를 만들고, 원래 메모는 previousContent로 남아 되돌릴 수 있다. 사진과 한
+ * 요청에 묶는 이유: 메모를 따로 먼저 보냈더니 그 사이 앱이 재시작되면서 사진 없이
+ * 메모만 남았다(2026-09-28 운영). 정리 전에 끊겨도 사진+메모 일기는 남는다.
  */
 export async function saveBackfillPhotos(
   userId: string,
   photos: File[],
   exifs: ClientExif[],
   dateKeys: string[],
+  notes: Record<string, string> = {},
 ): Promise<
   | { ok: true; savedDates: string[]; diaryIds: Record<string, string> }
   | { ok: false; error: string }
@@ -58,6 +63,10 @@ export async function saveBackfillPhotos(
 
   const saved = await savePhotosByDate(userId, photos, exifs, dateKeys);
   if (!saved.ok) return { ok: false, error: saved.error };
+  for (const e of saved.entries) {
+    const note = notes[e.dateKey]?.trim();
+    if (note) await appendNoteToDiary(e.diaryId, note);
+  }
   return {
     ok: true,
     savedDates: [...new Set(saved.entries.map((e) => e.dateKey))],
@@ -68,44 +77,27 @@ export async function saveBackfillPhotos(
 }
 
 /**
- * ①-0 날짜별 메모를 그날 일기의 텍스트 조각으로 저장한다. 사진보다 **먼저** 한다.
+ * 메모를 일기 본문에 붙인다. 본문이 비어 있으면 메모가 곧 본문이다.
  *
- * 본문에 바로 쓰지 않고 조각으로 두는 이유: 메이에게 남긴 말과 같은 재료라 ②의
- * organize가 사진과 함께 엮는다. 정리가 실패하거나 한도에 걸려도 메모는 조각
- * 타임라인에 그대로 남는다 — 사진을 정리와 분리해 먼저 저장하는 것과 같은 원칙이다.
- *
- * 같은 내용의 조각이 이미 있으면 건너뛴다. 사진 업로드가 중간에 끊기면 사용자는
- * 처음부터 다시 누르는데, 그때 메모가 두 번 쌓이면 정리 결과에도 두 번 들어간다.
+ * 이미 들어 있으면 건너뛴다 — 한 날짜 사진이 여러 요청으로 나뉘면 요청마다 같은
+ * 메모가 오고, 업로드가 끊겨 처음부터 다시 누를 때도 같은 메모가 다시 온다.
+ * 그날 일기에 이미 쓴 글이 있으면 덮지 않고 뒤에 잇는다.
  */
-export async function saveBackfillNotes(
-  userId: string,
-  notes: { dateKey: string; text: string }[],
-): Promise<
-  { ok: true; diaryIds: Record<string, string> } | { ok: false; error: string }
-> {
-  const { maxDays } = await getBackfillLimits(userId);
-  if (new Set(notes.map((n) => n.dateKey)).size > maxDays) {
-    return { ok: false, error: `한 번에 ${maxDays}일까지 채울 수 있어요` };
-  }
-
-  const diaryIds: Record<string, string> = {};
-  for (const n of notes) {
-    const { id: diaryId } = await getOrCreateDiaryForDate(userId, n.dateKey);
-    const dup = await prisma.diaryFragment.findFirst({
-      where: { diaryId, kind: "text", content: n.text },
-      select: { id: true },
-    });
-    if (!dup) {
-      await createFragment({
-        userId,
-        dateKey: n.dateKey,
-        kind: "text",
-        content: n.text,
-      });
-    }
-    diaryIds[n.dateKey] = diaryId;
-  }
-  return { ok: true, diaryIds };
+async function appendNoteToDiary(diaryId: string, note: string): Promise<void> {
+  const diary = await prisma.diary.findUnique({
+    where: { id: diaryId },
+    select: { content: true },
+  });
+  if (!diary) return;
+  const current = diary.content.trim();
+  if (current.includes(note)) return;
+  await prisma.diary.update({
+    where: { id: diaryId },
+    data: {
+      content: current ? `${current}\n\n${note}` : note,
+      contentEditedAt: new Date(),
+    },
+  });
 }
 
 /**

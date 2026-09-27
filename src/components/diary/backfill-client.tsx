@@ -45,7 +45,7 @@ const rowStyle = {
  * HTML 이라 파싱이 터지고, 그러면 진짜 원인이 "연결이 끊겼어요"로 뭉개진다.
  * (2026-09-22 운영에서 실제로 413 이 이렇게 가려졌다.)
  */
-async function readError(res: Response, what = "사진을"): Promise<string> {
+async function readError(res: Response): Promise<string> {
   try {
     const data = await res.json();
     if (typeof data?.error === "string") return data.error;
@@ -55,7 +55,7 @@ async function readError(res: Response, what = "사진을"): Promise<string> {
   if (res.status === 413) {
     return "사진 용량이 한 번에 보내기엔 커요. 장수를 줄여서 다시 해주세요.";
   }
-  return `${what} 저장하지 못했어요 (오류 ${res.status})`;
+  return `사진을 저장하지 못했어요 (오류 ${res.status})`;
 }
 
 
@@ -299,41 +299,21 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
       return;
     }
 
-    // 결과 행을 그날 일기로 잇는 데 쓴다. 메모·사진 저장 응답에서 모은다 — 한도에
+    // 결과 행을 그날 일기로 잇는 데 쓴다. 사진 저장 응답에서 모은다 — 한도에
     // 걸려 정리를 못 부른 날도 일기는 이미 있다.
     const diaryIdByDate = new Map<string, string>();
-    const collectIds = (ids: Record<string, string> | undefined) => {
-      for (const [d, id] of Object.entries(ids ?? {})) diaryIdByDate.set(d, id);
-    };
 
-    // ⓪ 메모 먼저. 작은 JSON 한 번이라 여기서 실패하면 아직 아무것도 안 올라간
-    // 상태로 다시 누르면 된다. 사진 뒤에 두면 메모 실패 후 재시도가 사진을 두 번 올린다.
-    const noteList = targets
-      .map((g) => ({ dateKey: g.dateKey!, text: (notes[g.dateKey!] ?? "").trim() }))
-      .filter((n) => n.text.length > 0);
-    const notedDates = new Set(noteList.map((n) => n.dateKey));
-    if (noteList.length > 0) {
-      setBusy("메모 저장 중…");
-      try {
-        const res = await fetch("/api/diaries/backfill/notes", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ notes: noteList }),
-        });
-        if (!res.ok) {
-          setBusy(null);
-          setError(await readError(res, "메모를"));
-          return;
-        }
-        collectIds((await res.json()).diaryIds);
-      } catch {
-        setBusy(null);
-        setError("메모를 저장하다가 연결이 끊겼어요.");
-        return;
-      }
+    // 날짜별 메모. 사진과 같은 요청으로 보내 그날 일기 본문이 된다.
+    const noteByDate = new Map<string, string>();
+    for (const g of targets) {
+      const text = (notes[g.dateKey!] ?? "").trim();
+      if (text) noteByDate.set(g.dateKey!, text);
     }
 
-    // ① 사진 저장 — 선택된 날짜의 사진만. null 묶음은 올리지 않는다.
+    // ① 사진(+메모) 저장 — 선택된 날짜의 사진만. null 묶음은 올리지 않는다.
+    //
+    // 메모를 따로 먼저 보내지 않는다. 그랬더니 그 사이 앱이 재시작되면서 사진 없이
+    // 메모만 남았다(2026-09-28 운영). 사진과 한 요청이면 끊겨도 둘이 같이 남는다.
     //
     // 요청을 **바이트로 쪼개서** 보낸다. Vercel 이 본문 4.5MB 에서 413 으로 끊기
     // 때문에 60장을 한 번에 담으면 함수가 돌지도 못한다(2026-09-22 운영 장애).
@@ -356,6 +336,15 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
         "dateKeys",
         JSON.stringify(chunk.map((i) => dateKeyByIndex.get(i)!)),
       );
+      // 이 묶음에 사진이 있는 날짜의 메모만 싣는다. 한 날짜가 두 묶음에 걸치면
+      // 두 번 가지만 서버가 이미 들어간 메모는 건너뛴다.
+      const chunkNotes: Record<string, string> = {};
+      for (const i of chunk) {
+        const dk = dateKeyByIndex.get(i)!;
+        const note = noteByDate.get(dk);
+        if (note) chunkNotes[dk] = note;
+      }
+      fd.append("notes", JSON.stringify(chunkNotes));
 
       try {
         const saveRes = await fetch("/api/diaries/backfill/photos", {
@@ -367,7 +356,12 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
           setError(await readError(saveRes));
           return;
         }
-        collectIds((await saveRes.json()).diaryIds);
+        const saved = await saveRes.json();
+        for (const [d, id] of Object.entries(
+          (saved.diaryIds ?? {}) as Record<string, string>,
+        )) {
+          diaryIdByDate.set(d, id);
+        }
       } catch {
         setBusy(null);
         // 앞 묶음이 이미 저장됐으면 그렇게 말한다 — 전부 날아간 줄 알고 처음부터
@@ -384,7 +378,7 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
 
     // ② 날짜를 하나씩 정리 — 진행률이 여기서 나온다(스펙 §9).
     const savedOnly = (dk: string) =>
-      notedDates.has(dk) ? "사진·메모만 저장했어요" : "사진만 저장했어요";
+      noteByDate.has(dk) ? "사진·메모만 저장했어요" : "사진만 저장했어요";
     const out: DayResult[] = [];
     for (let i = 0; i < targets.length; i++) {
       const dk = targets[i].dateKey!;
