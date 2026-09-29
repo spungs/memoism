@@ -12,6 +12,7 @@ import { captureServer } from "@/lib/analytics/server";
 import { CHARACTER_NAME } from "@/lib/character/utils";
 import { MAX_IMAGES_PER_REQUEST } from "@/lib/diary/limits";
 import { kstDateKey } from "@/lib/diary/kst";
+import { getRequestTimeZone } from "@/lib/tz-server";
 import type { ClientExif } from "@/lib/diary/auto-generate";
 
 // JSON·multipart 두 경로가 같은 상한을 쓰게 한 곳에 둔다.
@@ -125,8 +126,10 @@ function buildSystemPrompt(args: {
   }[];
   relevant: RelevantDiary[];
   scope: DiaryScope;
+  /** 사용자 기기 시간대 — 메이에게 알려주는 "오늘"을 현지 날짜로. */
+  timeZone: string;
 }): { prompt: string; sources: Map<number, DiarySource> } {
-  const { characterName, persona, recentDiaries, relevant, scope } = args;
+  const { characterName, persona, recentDiaries, relevant, scope, timeZone } = args;
 
   // 최근 일기 먼저, 그다음 (중복 제외) 관련 일기 순으로 통합 번호([#n])를 매긴다.
   // 메이가 답변 끝에 이 번호로 근거를 표시하면 그 일기들만 칩으로 띄워 "칩 = 답변 근거"를 보장한다.
@@ -183,8 +186,9 @@ function buildSystemPrompt(args: {
       : "- 아직 쓴 일기가 하나도 없어.";
 
   const style = personaStyle(persona);
+  // 오늘은 현지 날짜다(해외여행). 일기 날짜 표기(kstDateLabel)는 저장 좌표라 KST 그대로다.
   const todayLabel = new Date().toLocaleDateString("ko-KR", {
-    timeZone: "Asia/Seoul",
+    timeZone,
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -261,6 +265,7 @@ export async function POST(req: NextRequest) {
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const timeZone = await getRequestTimeZone();
 
   // 사진이 있으면 multipart로 온다. JSON 경로는 그대로 둔다 — 지금 잘 도는
   // 회상 경로에 위험을 옮기지 않기 위해 새 분기는 multipart일 때만 탄다.
@@ -402,6 +407,7 @@ export async function POST(req: NextRequest) {
       session.userId,
       userMessage,
       new Date(),
+      timeZone,
       photos,
       clientExifs,
       // null(아직 안 물어봄)·false(거부) 모두 "보여주지 않는다".
@@ -490,6 +496,7 @@ export async function POST(req: NextRequest) {
     // 하이브리드 검색(의미+날짜+키워드). 실패해도 chat 전체를 막지 않는다 (best-effort).
     findRelevantDiaries(session.userId, userMessage, {
       now: new Date(),
+      timeZone,
       topK: 5,
     }).catch((e) => {
       console.warn(
@@ -548,6 +555,7 @@ export async function POST(req: NextRequest) {
     recentDiaries,
     relevant,
     scope,
+    timeZone,
   });
   let rawAssistant: string;
   try {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { getRequestTimeZone } from "@/lib/tz-server";
 import { findUnfoldedDiary } from "@/lib/diary/queries";
 
 /**
@@ -13,6 +14,6 @@ export async function GET() {
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const suggestion = await findUnfoldedDiary(session.userId);
+  const suggestion = await findUnfoldedDiary(session.userId, await getRequestTimeZone());
   return NextResponse.json({ suggestion });
 }

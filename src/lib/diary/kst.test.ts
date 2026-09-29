@@ -3,6 +3,7 @@ import {
   kstDateKey,
   kstDayRangeFromKey,
   diaryCreatedAtForDateKey,
+  latestPossibleTodayKey,
 } from "./kst";
 
 describe("kstDateKey", () => {
@@ -43,5 +44,18 @@ describe("diaryCreatedAtForDateKey", () => {
   });
   it("형식 오류 → now", () => {
     expect(diaryCreatedAtForDateKey("bad", now)).toBe(now);
+  });
+  it("KST보다 하루 앞선 날짜(동쪽 여행지의 현지 오늘) → 그 날 KST 정오", () => {
+    // 오클랜드(UTC+13)는 KST 20:00 이후 이미 다음 날이다. now를 쓰면 KST 오늘 칸에
+    // 들어가 현지 날짜와 어긋나므로, 그 날 칸의 정오로 둔다(미래 시각이지만 하루 이내).
+    expect(diaryCreatedAtForDateKey("2026-07-24", now).toISOString()).toBe(
+      "2026-07-24T03:00:00.000Z",
+    );
+  });
+});
+
+describe("latestPossibleTodayKey", () => {
+  it("어느 시간대에서든 오늘일 수 있는 가장 늦은 날짜 = KST 오늘 + 1일", () => {
+    expect(latestPossibleTodayKey(new Date("2026-07-23T05:00:00Z"))).toBe("2026-07-24");
   });
 });

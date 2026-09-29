@@ -53,12 +53,29 @@ export function kstDayRangeFromKey(dateKey: string): {
 }
 
 /**
+ * 어느 시간대에서든 "오늘"일 수 있는 가장 늦은 날짜 = KST 오늘 + 1일.
+ * KST(+9)보다 앞선 곳은 최대 +14(키리바시)라 현지 날짜가 KST보다 이틀 앞설 수 없다.
+ * 이보다 늦은 dateKey는 미래로 보고 거부한다(2026-09-29 점검 H2).
+ */
+export function latestPossibleTodayKey(now: Date): string {
+  const [y, m, d] = kstDateKey(now).split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+}
+
+/**
  * 일기 createdAt 앵커 — 날짜키 기준. createdAt은 "날짜 칸" + "작성 시각" 겸용.
- *   - 오늘(KST)/미래 → 실제 작성 시각(now). 과거 → 그 날 KST 정오.
+ * dateKey는 **현지 날짜**(src/lib/tz.ts)여도 되고, 앵커는 KST 좌표에 박는다.
+ *   - KST 오늘 → 실제 작성 시각(now).
+ *   - 과거 → 그 날 KST 정오.
+ *   - KST보다 하루 앞선 날짜(뉴질랜드 등 동쪽 여행지의 현지 오늘) → 그 날 KST 정오.
+ *     now를 쓰면 KST 오늘 칸에 들어가 현지 날짜와 어긋난다. 미래 시각이지만 하루 이내다.
+ *   - 그보다 먼 미래 → now(예전 동작). 호출자가 미리 걸러야 한다.
  */
 export function diaryCreatedAtForDateKey(dateKey: string, now: Date): Date {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return now;
-  if (dateKey >= kstDateKey(now)) return now;
+  const today = kstDateKey(now);
+  if (dateKey === today) return now;
+  if (dateKey > today && dateKey > latestPossibleTodayKey(now)) return now;
   const d = new Date(`${dateKey}T12:00:00+09:00`);
   return isNaN(d.getTime()) ? now : d;
 }

@@ -49,6 +49,7 @@ describe("findRelevantDiaries 경로 분해", () => {
       for (const q of [...QUERIES, ...CONTENT_QUERIES]) {
         const rows = await findRelevantDiaries(USER_ID, q, {
           now: new Date(),
+          timeZone: "Asia/Seoul",
           topK: 5,
         });
         console.log(`\n"${q}" → ${rows.length}건`);

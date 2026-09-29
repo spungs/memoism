@@ -2,8 +2,8 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { embedText } from "@/lib/ai/gemini";
 import { kstDayRangeUtc } from "@/lib/diary/kst";
+import { shiftDateKey, todayKeyInZone, weekdayOfDateKey } from "@/lib/tz";
 
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 /**
  * 벡터 후보의 최소 유사도. 이 아래는 "덜 무관할 뿐" 관련이 없다.
@@ -125,17 +125,20 @@ const diarySelect = {
 
 type DateRange = { startUtc: Date; endUtc: Date; label: string };
 
-function kstYmd(d: Date): { y: number; m: number; day: number } {
-  const k = new Date(d.getTime() + KST_OFFSET_MS);
-  return { y: k.getUTCFullYear(), m: k.getUTCMonth() + 1, day: k.getUTCDate() };
+function ymd(dateKey: string): { y: number; m: number; day: number } {
+  const [y, m, day] = dateKey.split("-").map(Number);
+  return { y, m, day };
 }
 
-function kstShiftDays(now: Date, deltaDays: number): { y: number; m: number; day: number } {
-  return kstYmd(new Date(now.getTime() + deltaDays * 24 * 60 * 60 * 1000));
-}
-
-/** 사용자 메시지에서 날짜 표현을 뽑아 KST 하루 범위로 변환. ('6월 3일','어제','3일 전' 등) */
-export function parseDateRefs(message: string, now: Date): DateRange[] {
+/**
+ * 사용자 메시지에서 날짜 표현을 뽑아 하루 범위로 변환. ('6월 3일','어제','3일 전' 등)
+ *
+ * "오늘·어제·N일 전·이번주 ○요일·연도 없는 날짜의 올해"는 **현지(tz) 날짜**에서 센다 —
+ * 뉴욕 밤에 "어제"라고 하면 뉴욕의 어제다. 범위는 저장 좌표(KST 하루 경계)로 만든다.
+ * 일기는 KST 칸에 앵커되므로(kst.ts) 같은 날짜키면 같은 칸을 가리킨다.
+ */
+export function parseDateRefs(message: string, now: Date, tz: string): DateRange[] {
+  const todayKey = todayKeyInZone(tz, now);
   const ranges: DateRange[] = [];
   const seen = new Set<string>();
   const add = (y: number, m: number, day: number, label: string) => {
@@ -153,29 +156,29 @@ export function parseDateRefs(message: string, now: Date): DateRange[] {
     add(+mt[1], +mt[2], +mt[3], `${mt[1]}년 ${mt[2]}월 ${mt[3]}일`);
     rest = rest.replace(mt[0], " ");
   }
-  // M월 D일 (연도 없음 → KST 올해)
-  const thisYear = kstYmd(now).y;
+  // M월 D일 (연도 없음 → 현지 올해)
+  const thisYear = ymd(todayKey).y;
   for (const mt of rest.matchAll(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/g)) {
     add(thisYear, +mt[1], +mt[2], `${mt[1]}월 ${mt[2]}일`);
     rest = rest.replace(mt[0], " ");
   }
-  // M/D 또는 M.D 슬래시·점 형식 (예: 6/8, 6.8) → KST 올해.
+  // M/D 또는 M.D 슬래시·점 형식 (예: 6/8, 6.8) → 현지 올해.
   // 앞에서 연도 포함·한국어 형식이 이미 처리된 rest 기준으로 파싱해 중복을 방지한다.
   for (const mt of rest.matchAll(/\b(\d{1,2})[\/.](\d{1,2})\b/g)) {
     add(thisYear, +mt[1], +mt[2], `${mt[1]}월 ${mt[2]}일`);
   }
   // 상대 표현
-  if (/오늘/.test(message)) { const t = kstShiftDays(now, 0); add(t.y, t.m, t.day, "오늘"); }
-  if (/어제/.test(message)) { const t = kstShiftDays(now, -1); add(t.y, t.m, t.day, "어제"); }
-  if (/그제|그저께/.test(message)) { const t = kstShiftDays(now, -2); add(t.y, t.m, t.day, "그제"); }
+  const shifted = (delta: number) => ymd(shiftDateKey(todayKey, delta));
+  if (/오늘/.test(message)) { const t = shifted(0); add(t.y, t.m, t.day, "오늘"); }
+  if (/어제/.test(message)) { const t = shifted(-1); add(t.y, t.m, t.day, "어제"); }
+  if (/그제|그저께/.test(message)) { const t = shifted(-2); add(t.y, t.m, t.day, "그제"); }
   const nDaysAgo = message.match(/(\d+)\s*일\s*전/);
-  if (nDaysAgo) { const t = kstShiftDays(now, -Number(nDaysAgo[1])); add(t.y, t.m, t.day, `${nDaysAgo[1]}일 전`); }
+  if (nDaysAgo) { const t = shifted(-Number(nDaysAgo[1])); add(t.y, t.m, t.day, `${nDaysAgo[1]}일 전`); }
 
   // 이번주/지난주/저번주 + 요일 (예: "지난주 월요일", "이번주 금요일")
   // JS getDay(): 0=일, 1=월, 2=화, 3=수, 4=목, 5=금, 6=토
   const DOW_MAP: Record<string, number> = { 월: 1, 화: 2, 수: 3, 목: 4, 금: 5, 토: 6, 일: 0 };
-  const { y: tky, m: tkm, day: tkd } = kstYmd(now);
-  const todayDow = new Date(tky, tkm - 1, tkd).getDay();
+  const todayDow = weekdayOfDateKey(todayKey);
   // 이번 주 월요일까지의 일 수(음수 또는 0). 월=0, 화=-1(이번주 화요일은 어제), ...
   const daysToThisMonday = -((todayDow + 6) % 7);
   for (const [prefix, weekDelta] of [
@@ -187,7 +190,7 @@ export function parseDateRefs(message: string, now: Date): DateRange[] {
       // 이번 주 해당 요일까지의 거리: Mon(1)→0, Tue(2)→1, ..., Sun(0)→6
       const daysInWeek = dow === 0 ? 6 : dow - 1;
       const delta = daysToThisMonday + daysInWeek + weekDelta;
-      const t = kstShiftDays(now, delta);
+      const t = shifted(delta);
       add(t.y, t.m, t.day, `${prefix} ${mt[1]}요일`);
     }
   }
@@ -244,10 +247,10 @@ export function extractKeywords(message: string): string[] {
 export async function findRelevantDiaries(
   userId: string,
   message: string,
-  opts: { now: Date; topK?: number },
+  opts: { now: Date; timeZone: string; topK?: number },
 ): Promise<RelevantDiary[]> {
   const topK = opts.topK ?? 5;
-  const dateRanges = parseDateRefs(message, opts.now);
+  const dateRanges = parseDateRefs(message, opts.now, opts.timeZone);
   const keywords = extractKeywords(message);
 
   const [vectorHits, dateRows, keywordRows] = await Promise.all([

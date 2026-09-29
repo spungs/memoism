@@ -5,7 +5,8 @@ import { enforceVerifiedHotline } from "./hotline-guard";
 import { classifyIntent } from "./intent";
 import { resolveCaptureDate, resolvePhotoDates } from "@/lib/diary/capture-date";
 import { createFragment } from "@/lib/diary/fragments";
-import { dateKeyLabel, kstDateKey } from "@/lib/diary/kst";
+import { dateKeyLabel } from "@/lib/diary/kst";
+import { dateKeyInZone, todayKeyInZone } from "@/lib/tz";
 import {
   savePhotosByDate,
   type CaptureEntry,
@@ -131,6 +132,8 @@ export async function handleCaptureMessage(
   userId: string,
   message: string,
   now: Date,
+  /** 기록한 기기의 시간대. 오늘·새벽 규칙·사진 촬영일을 현지 날짜로 정한다. */
+  timeZone: string,
   photos: File[] = [],
   exifs: ClientExif[] = [],
   /** 사진을 모델에게 보여줘도 되는지(사용자 동의). 기본은 보여주지 않는다. */
@@ -154,8 +157,8 @@ export async function handleCaptureMessage(
   if (photos.length === 0 && !textIsRecord) return { handled: false };
 
   // 텍스트(=메시지)의 날짜. 사진은 각자 EXIF 날짜로 따로 간다.
-  const date = resolveCaptureDate(message, now);
-  const todayKey = kstDateKey(now);
+  const date = resolveCaptureDate(message, now, timeZone);
+  const todayKey = todayKeyInZone(timeZone, now);
 
   // **사진은 되묻기 전에 저장한다.** 사진엔 EXIF라는 확실한 날짜가 있어 애매하지
   // 않다 — 애매한 건 텍스트뿐이다. 여기서 먼저 반환해버리면 사용자가 첨부한
@@ -166,7 +169,10 @@ export async function handleCaptureMessage(
   const entries: CaptureEntry[] = [];
   if (photos.length > 0) {
     const exifKeys = exifs.map((e) =>
-      e.takenAt ? kstDateKey(new Date(e.takenAt)) : null,
+      // 기기가 촬영 시각(EXIF 벽시계)을 자기 시간대로 읽어 보낸 순간이다. 같은 시간대로
+      // 날짜를 잘라야 사진에 찍힌 그 날짜가 나온다(해외에서 찍은 저녁 사진이 다음 날로
+      // 넘어가지 않게).
+      e.takenAt ? dateKeyInZone(new Date(e.takenAt), timeZone) : null,
     );
     const photoDates = resolvePhotoDates(base, fromExplicit, exifKeys, todayKey);
     const saved = await savePhotosByDate(userId, photos, exifs, photoDates);

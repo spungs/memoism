@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { todayKeyInZone } from "@/lib/tz";
 import { getSignedUrl, getSignedUrlsByPath } from "@/lib/storage";
 import { fragmentPreview } from "./fragment-preview";
 import {
@@ -8,7 +9,7 @@ import {
   kstDateKey,
   kstDayRangeFromKey,
   kstMonthRangeUtc,
-  kstTodayKey,
+  latestPossibleTodayKey,
 } from "@/lib/diary/kst";
 
 const DEFAULT_TAKE = 20;
@@ -339,6 +340,13 @@ export async function getOrCreateDiaryForDate(
   userId: string,
   dateKey: string,
 ): Promise<{ id: string }> {
+  // 미래 날짜는 거부한다. 미래 칸을 조회해 못 찾으면 앵커가 now(오늘 칸)로 떨어져, 같은
+  // 말을 할 때마다 오늘 칸에 일기가 하나씩 더 생겼다(2026-09-29 점검 H2). 현지 날짜는
+  // KST보다 최대 하루 앞설 수 있어(동쪽 여행지) 그만큼은 허용한다. 호출자가 현지 오늘
+  // 이하로 거른 뒤 부르므로, 여기 걸리는 건 잘못된 입력뿐이다.
+  if (dateKey > latestPossibleTodayKey(new Date())) {
+    throw new Error(`미래 날짜로는 일기를 만들 수 없어요: ${dateKey}`);
+  }
   const { startUtc, endUtc } = kstDayRangeFromKey(dateKey);
   const existing = await prisma.diary.findFirst({
     where: { userId, createdAt: { gte: startUtc, lt: endUtc } },
@@ -373,13 +381,18 @@ export async function countUnfoldedFragments(diaryId: string): Promise<number> {
  * 오늘을 제외하는 이유(스펙 D-2): 하루가 닫혀야 조각이 완전하다. 오전에 정리하면
  * 미완성 일기가 나오고 그 뒤로 재정리 넛지가 계속 붙는다.
  */
-export async function findUnfoldedDiary(userId: string): Promise<{
+export async function findUnfoldedDiary(
+  userId: string,
+  /** 요청 기기의 시간대 — "오늘"(제안에서 빼는 날)을 현지 날짜로. */
+  timeZone: string,
+): Promise<{
   diaryId: string;
   dateKey: string;
   label: string;
   count: number;
 } | null> {
-  const { startUtc: todayStartUtc } = kstDayRangeFromKey(kstTodayKey());
+  // 현지 오늘을 저장 좌표(KST 칸)의 하루 경계로 바꾼다. 일기는 KST 칸에 앵커된다(kst.ts).
+  const { startUtc: todayStartUtc } = kstDayRangeFromKey(todayKeyInZone(timeZone));
 
   const diary = await prisma.diary.findFirst({
     where: {
