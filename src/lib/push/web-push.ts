@@ -45,6 +45,10 @@ export interface SendResult {
 // 만료된 구독을 의미하는 HTTP 상태코드.
 const EXPIRED_STATUS = new Set([404, 410]);
 
+// 한 구독의 소켓 대기 한도. 응답하지 않는 주소 하나가 allSettled 전체를 붙잡아 함수가
+// 타임아웃되면, 만료 구독 정리까지 실행되지 않았다(점검 M19).
+const SEND_TIMEOUT_MS = 10_000;
+
 /**
  * 주어진 구독들에 동일 payload를 병렬 발송한다.
  * - 404/410(만료) 응답은 해당 PushSubscription 행을 DB에서 prune.
@@ -71,6 +75,7 @@ export async function sendPushToSubscriptions(
           keys: { p256dh: sub.p256dh, auth: sub.auth },
         },
         body,
+        { timeout: SEND_TIMEOUT_MS },
       ),
     ),
   );
