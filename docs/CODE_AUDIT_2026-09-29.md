@@ -373,7 +373,7 @@
   - 위치: `lib/diary/actions.ts:319-338`, `497-517`
   - 두 번 누르면 이중 감산이 일어납니다.
   - 고치는 방향: `DELETE … RETURNING size_bytes`의 합계로 감산합니다.
-- [ ] **L10. regenerate가 DB 본문으로 폴백할 때 입력 길이 상한을 검사하지 않음**
+- [x] **L10. regenerate가 DB 본문으로 폴백할 때 입력 길이 상한을 검사하지 않음** — 수정 `ed5b54e9`
   - 위치: `lib/diary/regenerate.ts:77`
   - 밀린 날 채우기에서 메모를 이어 붙여 2000자를 넘기면 차감 후 불투명한 오류가 납니다.
 - [ ] **L11. 사진 일부를 못 받으면 EXIF 요약 번호가 사진과 어긋남**
@@ -382,11 +382,12 @@
   - 위치: `lib/ai/usage.ts:129-135`
   - 자정을 넘기면 새 날짜 행에서 감산됩니다.
   - 고치는 방향: `checkAndIncrement`가 차감한 date를 반환하고, 반납할 때 그 값을 씁니다.
-- [ ] **L13. 같은 일을 경로마다 다르게 구현함**
+- [x] **L13. 같은 일을 경로마다 다르게 구현함** — 수정 `0db20e04`
   - `auto-generate.ts:75-76`: mode를 직접 도출합니다(`deriveGenerationMode` 미사용).
   - `embedding.ts:80-107`: 백필 임베딩에 조각이 빠집니다.
   - `fragment-actions.ts:36-45`: 조각 수정에 길이 상한이 없습니다.
   - `fragment-fold.ts:58`: 루프가 `break`라서 긴 조각 하나가 예산을 넘으면 그날 정리가 영원히 안 됩니다.
+  - 처리: 네 가지 모두 고쳤습니다(백필은 조각까지 합성하도록 `fragment-embed.ts`로 옮김). 혼자 예산을 넘는 조각은 건너뛰고 나머지를 정리하지만, 그 조각 자체는 계속 미정리로 남습니다.
 - [x] **L14. 서버 전용 표시 누락, 미사용 함수, 로컬 시간 생성자** — 수정 `c26e8767`
   - `lib/push/web-push.ts`에 `import "server-only"`가 없습니다(VAPID 비밀키를 다룸).
   - 미사용 export 7개:
@@ -434,11 +435,12 @@
     - 조각 수정 13px
   - 현재는 `app/layout.tsx:34-35`의 `maximumScale: 1`이 확대를 막는 것으로 추정됩니다. 밀린 날 채우기만 16px를 명시하고 있어서 방어 방식이 제각각입니다.
   - 결정 필요: 16px로 통일할지, 뷰포트 설정에 맡기기로 하고 DESIGN.md에 적을지.
-- [ ] **L20. 접근성 잔여**
+- [x] **L20. 접근성 잔여** — 수정 `14be6f9d`
   - `date-picker.tsx:148-170`: ‹ › 버튼에 aria-label이 없습니다.
   - `diary/[id]/page.tsx:80-82`: 보이는 글자는 "뒤로"인데 라벨은 "목록으로"이고, 이동은 `/diary`로 고정입니다(스와이프 뒤로가기와 목적지가 다름).
   - `diary/[id]/page.tsx:60`: `<main>` 안에 `<main>`이 중첩돼 있습니다.
   - `mood-picker.tsx:76`, `ai-instruction-input.tsx:85`: `outline: none`이라 포커스 링이 없습니다.
+  - 처리: 라벨·중첩 main·포커스 링을 고쳤습니다(뒤로 링크는 라벨을 보이는 글자에 맞춤). "뒤로"가 기록 뒤로가기가 아니라 `/diary`로 가는 동작 차이는 그대로 두었습니다.
 
 ---
 
@@ -451,7 +453,7 @@
   - "Forms use react-hook-form": 사용처가 0곳입니다.
   - docker compose Postgres 포트: 문서·compose는 5432, 로컬 `.env.local`은 5433입니다.
   - 필수 환경변수: `DATABASE_URL`, `JWT_SECRET`만 적혀 있고 `CRON_SECRET`이 빠졌습니다(H7 참고).
-- [ ] **D2. 안 쓰는 의존성**
+- [x] **D2. 안 쓰는 의존성** — 수정 `98e6e559`
   - `react-hook-form`, `@hookform/resolvers`: 사용처 0곳
   - `@tanstack/react-query`: `providers/query-provider.tsx`만 있고 실제 쿼리가 없습니다. devtools도 함께 들어갑니다.
 - [x] **D3. 린트가 빌드 산출물을 검사함** — 수정 `e9c06ffc`
