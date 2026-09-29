@@ -5,6 +5,7 @@ import { generateDiary, type DiaryGenerationOutput } from "@/lib/ai/gemini";
 import { checkAndIncrement, releaseIncrement } from "@/lib/ai/usage";
 import { buildExifSummary } from "./exif-summary";
 import { deriveGenerationMode } from "./generation-mode";
+import { MAX_AI_INPUT_CONTENT_LENGTH } from "./schemas";
 import { pickRegeneratedTitle } from "./regenerate-input";
 import { reembedDiaryWithFragments } from "./fragment-embed";
 import { SafetyBlockedError } from "@/lib/ai/safety";
@@ -77,6 +78,16 @@ export async function regenerateDiary(
 
   // 화면에 보이는 현재 본문이 입력이다. 안 보내면(구 클라이언트) DB 본문으로 폴백.
   const inputContent = (options.content ?? diary.content).trim();
+  // 라우트의 길이 검증은 보낸 content만 본다. DB 본문으로 폴백하면 검사 없이 지나갔고,
+  // 밀린 날 채우기가 메모를 이어 붙여 상한을 넘긴 본문은 차감 뒤 불투명한 오류로 끝났다.
+  // 차감 전에 같은 문구로 막는다(점검 L10).
+  if (inputContent.length > MAX_AI_INPUT_CONTENT_LENGTH) {
+    return {
+      ok: false,
+      error: `${MAX_AI_INPUT_CONTENT_LENGTH.toLocaleString("ko-KR")}자가 넘어 일기로 정리할 수 없어요. 줄이면 다시 쓸 수 있어요.`,
+      invalidInput: true,
+    };
+  }
   // 입력이 아예 없으면 cap 검증 전에 막는다 — 사용 횟수를 차감하지 않기 위해서.
   // (사진이 실제로 내려받아지는지는 아직 모른다. 최종 mode는 다운로드 후 다시 정한다.)
   const hasAnyInput =
