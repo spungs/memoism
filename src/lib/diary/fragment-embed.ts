@@ -63,3 +63,43 @@ export async function reembedDiaryWithFragments(
     );
   }
 }
+
+/**
+ * 본인 일기 중 임베딩 누락분 채우기 (backfill, 개발 전용 라우트에서만 부른다).
+ *
+ * 조각도 합성한다 — 예전엔 본문만 임베딩해서 채팅으로만 기록한 날이 회상에서 빠졌다
+ * (점검 L13). 그래서 embedding.ts가 아니라 여기 둔다(embedding.ts가 이 파일을 부르면
+ * 순환 import가 된다). 내용이 전혀 없는 일기는 건너뛴다.
+ */
+export async function backfillUserEmbeddings(userId: string): Promise<{
+  total: number;
+  succeeded: number;
+  failed: number;
+  errors: Array<{ diaryId: string; error: string }>;
+}> {
+  const missing = await prisma.diary.findMany({
+    where: { userId, embedding: null },
+    select: {
+      id: true,
+      title: true,
+      content: true,
+      fragments: { select: { kind: true, content: true, createdAt: true } },
+    },
+  });
+
+  let succeeded = 0;
+  let failed = 0;
+  const errors: Array<{ diaryId: string; error: string }> = [];
+  for (const d of missing) {
+    const text = composeEmbedTextFromFragments(d.content, d.fragments);
+    if (!text.trim()) continue;
+    const r = await upsertDiaryEmbedding(d.id, d.title, text);
+    if (r.ok) {
+      succeeded++;
+    } else {
+      failed++;
+      errors.push({ diaryId: d.id, error: r.error ?? "unknown" });
+    }
+  }
+  return { total: missing.length, succeeded, failed, errors };
+}

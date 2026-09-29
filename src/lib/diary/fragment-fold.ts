@@ -35,6 +35,8 @@ export function formatFragmentAt(d: Date, tz: string): string {
  *   - 예산 = maxTotalLength - currentContentLength (본문은 항상 보존되므로 먼저 뺀다)
  *   - 넘치면 **가장 오래된 조각부터** 제외한다. 최근 것이 사용자 기억에 가깝고,
  *     제외된 조각은 foldedAt을 안 찍어 다음 정리에 다시 후보가 된다.
+ *   - 혼자 예산을 넘는 조각은 건너뛰고 계속 담는다. 예전엔 거기서 멈춰서, 가장 최근
+ *     조각 하나가 길면 그날 정리가 영원히 빈손이었다(점검 L13).
  *   - 반환은 항상 시간 오름차순 (프롬프트가 하루의 흐름을 읽어야 한다).
  */
 export function selectFragmentsForFold(
@@ -52,7 +54,7 @@ export function selectFragmentsForFold(
   for (let i = sorted.length - 1; i >= 0; i--) {
     const f = sorted[i];
     const cost = FRAGMENT_OVERHEAD + f.content.trim().length;
-    if (cost > budget) break;
+    if (cost > budget) continue;
     budget -= cost;
     keptReversed.push(f);
   }

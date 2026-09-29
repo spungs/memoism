@@ -89,3 +89,17 @@ describe("toPromptFragments", () => {
     expect(r[0].text).toBe("띄어쓰기");
   });
 });
+
+describe("selectFragmentsForFold — 혼자 예산을 넘는 조각 (점검 L13)", () => {
+  it("가장 최근 조각이 너무 길어도 나머지는 정리된다", () => {
+    const list = [
+      frag("old", "아침에 산책", "2026-08-03T00:00:00Z"),
+      frag("mid", "점심은 국수", "2026-08-03T03:00:00Z"),
+      frag("huge", "가".repeat(500), "2026-08-03T09:00:00Z"),
+    ];
+    // 예산 100 — huge(507)는 혼자 넘는다. 예전엔 여기서 멈춰 아무것도 못 골랐다.
+    const r = selectFragmentsForFold(list, 0, 100);
+    expect(r.selected.map((f) => f.id)).toEqual(["old", "mid"]);
+    expect(r.skippedCount).toBe(1);
+  });
+});

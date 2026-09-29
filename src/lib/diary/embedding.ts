@@ -71,37 +71,3 @@ export async function deleteDiaryEmbedding(diaryId: string): Promise<void> {
     );
   }
 }
-
-/**
- * 본인 일기 중 임베딩 누락분 채우기 (backfill).
- *   - dev/staging에서 일회성. V2에선 background queue로 자동.
- *   - 반환: 성공/실패 카운트.
- */
-export async function backfillUserEmbeddings(userId: string): Promise<{
-  total: number;
-  succeeded: number;
-  failed: number;
-  errors: Array<{ diaryId: string; error: string }>;
-}> {
-  const missing = await prisma.diary.findMany({
-    where: {
-      userId,
-      embedding: null,
-    },
-    select: { id: true, title: true, content: true },
-  });
-
-  let succeeded = 0;
-  let failed = 0;
-  const errors: Array<{ diaryId: string; error: string }> = [];
-  for (const d of missing) {
-    const r = await upsertDiaryEmbedding(d.id, d.title, d.content);
-    if (r.ok) {
-      succeeded++;
-    } else {
-      failed++;
-      errors.push({ diaryId: d.id, error: r.error ?? "unknown" });
-    }
-  }
-  return { total: missing.length, succeeded, failed, errors };
-}

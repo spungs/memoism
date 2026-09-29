@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { reembedDiaryWithFragments } from "./fragment-embed";
 import { getOrCreateDiaryForDate } from "./queries";
+import { MAX_AI_INPUT_CONTENT_LENGTH } from "./schemas";
 import { isValidDateKey, todayKeyInZone } from "@/lib/tz";
 import { getRequestTimeZone } from "@/lib/tz-server";
 
@@ -36,6 +37,14 @@ export async function updateFragmentAction(
 
   const text = content.trim();
   if (!text) return { ok: false, error: "내용을 입력해 주세요" };
+  // 조각은 정리 입력이 된다 — 상한이 없으면 수정 한 번으로 그날 정리가 막혔다(점검 L13).
+  // 채팅 메시지 상한과 같은 값이다.
+  if (text.length > MAX_AI_INPUT_CONTENT_LENGTH) {
+    return {
+      ok: false,
+      error: `조각은 ${MAX_AI_INPUT_CONTENT_LENGTH.toLocaleString("ko-KR")}자까지 쓸 수 있어요`,
+    };
+  }
 
   const diaryId = await ownedDiaryId(fragmentId, session.userId);
   if (!diaryId) return { ok: false, error: "조각을 찾을 수 없습니다" };
