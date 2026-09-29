@@ -32,10 +32,11 @@ export async function POST(req: NextRequest) {
   try {
     hits = await searchDiariesByText(session.userId, parsed.data.q);
   } catch (e) {
+    // 원문은 로그에만 — DB 오류 메시지에 접속 정보가 섞여 화면에 나갔다(점검 M20).
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[search] failed:", msg);
     return NextResponse.json(
-      { error: `검색 실행 중 오류가 발생했어요: ${msg}` },
+      { error: "검색하지 못했어요. 잠시 후 다시 시도해주세요." },
       { status: 500 },
     );
   }

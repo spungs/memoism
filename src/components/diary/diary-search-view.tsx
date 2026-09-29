@@ -46,13 +46,17 @@ export function DiarySearchView({ onActiveChange }: Props) {
   // 직전에 실제로 검색한 검색어. 한글 IME 조합 확정(blur 등)으로 같은 값이
   // 다시 들어와도 중복 요청하지 않도록 dedupe 한다.
   const lastSearchedRef = useRef<string | null>(null);
+  // 지금 입력칸의 검색어. 늦게 온 이전 검색어 응답이 새 결과를 덮지 않게 대조한다(점검 M12).
+  const latestQueryRef = useRef("");
 
   // 검색어 변경 시 debounce → API 호출
   useEffect(() => {
     const trimmed = query.trim();
+    latestQueryRef.current = trimmed;
     if (!trimmed) {
       setItems([]);
       setError(null);
+      setLoading(false);
       setTouched(false);
       lastSearchedRef.current = null;
       onActiveChange(false);
@@ -65,6 +69,13 @@ export function DiarySearchView({ onActiveChange }: Props) {
       lastSearchedRef.current = trimmed;
       setLoading(true);
       setError(null);
+      // 그새 검색어가 바뀌었으면 이 응답은 버린다. 버린 검색어로 되돌아오면 다시
+      // 불러야 하니 중복 방지 기록도 푼다.
+      const isStale = () => {
+        if (latestQueryRef.current === trimmed) return false;
+        if (lastSearchedRef.current === trimmed) lastSearchedRef.current = null;
+        return true;
+      };
       try {
         const res = await fetch("/api/diaries/search", {
           method: "POST",
@@ -72,6 +83,7 @@ export function DiarySearchView({ onActiveChange }: Props) {
           body: JSON.stringify({ q: trimmed }),
         });
         const data = await res.json();
+        if (isStale()) return;
         if (!res.ok) {
           setError(data?.error ?? "검색에 실패했어요");
           setItems([]);
@@ -79,10 +91,11 @@ export function DiarySearchView({ onActiveChange }: Props) {
           setItems(data.items ?? []);
         }
       } catch (e) {
+        if (isStale()) return;
         setError(e instanceof Error ? e.message : "검색에 실패했어요");
         setItems([]);
       } finally {
-        setLoading(false);
+        if (latestQueryRef.current === trimmed) setLoading(false);
       }
     }, DEBOUNCE_MS);
     return () => clearTimeout(handle);
