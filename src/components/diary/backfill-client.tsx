@@ -16,7 +16,9 @@ import {
 import { extractExif, exifToWire } from "@/lib/diary/exif";
 import { compressImages, makeThumbnails } from "@/lib/diary/image-compress";
 import { formatFragmentAt } from "@/lib/diary/fragment-fold";
-import { dateKeyLabel, kstTodayKey } from "@/lib/diary/kst";
+import { dateKeyLabel } from "@/lib/diary/kst";
+import { deviceTimeZone, todayKeyInZone } from "@/lib/tz";
+import { useDeviceTimeZone, useDeviceTodayKey } from "@/lib/tz-client";
 import { MAX_AI_INPUT_CONTENT_LENGTH } from "@/lib/diary/schemas";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { DiaryDatePicker } from "./date-picker";
@@ -80,11 +82,11 @@ function capNotice(sel: CapSelection, limits: BackfillLimits): string | null {
   return `${dateKeyLabel(sel.firstDroppedDate!)}부터 ${sel.droppedPhotos}장은 미뤄뒀어요. ${cap}만 돼서요 — 이번 걸 끝내고 다시 골라주세요.`;
 }
 
-/** 썸네일 배지에 쓸 촬영 시각(KST). EXIF 가 없으면 배지를 달지 않는다. */
-function photoTime(w: Wire | undefined): string | null {
+/** 썸네일 배지에 쓸 촬영 시각(기기 시간대). EXIF 가 없으면 배지를 달지 않는다. */
+function photoTime(w: Wire | undefined, timeZone: string): string | null {
   if (!w?.takenAt) return null;
   const d = new Date(w.takenAt);
-  return Number.isNaN(d.getTime()) ? null : formatFragmentAt(d);
+  return Number.isNaN(d.getTime()) ? null : formatFragmentAt(d, timeZone);
 }
 
 /**
@@ -238,6 +240,7 @@ function MoveDateSheet({
     onMove(photoIndex, dateKey);
   };
   const others = dayGroups.filter((g) => g.dateKey !== currentDate);
+  const todayKey = useDeviceTodayKey();
 
   return (
     <BottomSheet isOpen={photoIndex !== null} onClose={close}>
@@ -271,8 +274,8 @@ function MoveDateSheet({
             <DiaryDatePicker
               // 날짜 모르는 사진은 목록의 가장 최근 날짜 달에서 연다 — 이번 달에서 열면
               // 밀린 날까지 ‹ 를 여러 번 눌러야 한다.
-              value={currentDate ?? dayGroups[0]?.dateKey ?? kstTodayKey()}
-              max={kstTodayKey()}
+              value={currentDate ?? dayGroups[0]?.dateKey ?? todayKey}
+              max={todayKey}
               onChange={move}
               defaultOpen
             />
@@ -353,6 +356,7 @@ function MoveDateSheet({
  */
 export function BackfillClient({ limits }: { limits: BackfillLimits }) {
   const router = useRouter();
+  const timeZone = useDeviceTimeZone();
   const fileRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [wires, setWires] = useState<Wire[]>([]);
@@ -399,7 +403,9 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
       // EXIF는 **압축 전에** 뽑아야 한다 — 압축이 메타데이터를 날린다.
       const metas = await Promise.all(chosen.map(extractExif));
       const allWires = metas.map(exifToWire);
-      const allGroups = groupPhotosByExifDate(allWires, kstTodayKey());
+      // 사진 날짜·미래 판정 모두 기기 시간대 — EXIF 벽시계를 기기가 그 시간대로 읽었다.
+      const tz = deviceTimeZone();
+      const allGroups = groupPhotosByExifDate(allWires, todayKeyInZone(tz), tz);
       const unknownGroup = allGroups.find((g) => g.dateKey === null);
       const sel = selectGroupsWithinCap(
         allGroups.filter((g) => g.dateKey !== null),
@@ -779,7 +785,7 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
                     key={i}
                     src={thumbs[i]}
                     // 옮겨 온 사진의 촬영시각은 이 날과 무관해 배지를 달지 않는다.
-                    time={overrides.has(i) ? null : photoTime(wires[i])}
+                    time={overrides.has(i) ? null : photoTime(wires[i], timeZone)}
                     onOpen={() => !busy && setMoving(i)}
                     onRemove={() => setRemoved(new Set(removed).add(i))}
                   />

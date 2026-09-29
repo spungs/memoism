@@ -6,7 +6,9 @@ import { prisma } from "@/lib/db";
 import { getSignedUrlsForOwner } from "@/lib/storage";
 import { reembedDiaryWithFragments } from "./fragment-embed";
 import { getOrCreateDiaryForDate } from "./queries";
-import { dateKeyLabel, kstTodayKey } from "./kst";
+import { dateKeyLabel } from "./kst";
+import { todayKeyInZone } from "@/lib/tz";
+import { getRequestTimeZone } from "@/lib/tz-server";
 
 /**
  * 대화에 보이는 사진 썸네일용 signed URL — `captureRef.entries[].imageIds`로 조회한다.
@@ -72,7 +74,8 @@ export async function recaptureDateAction(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
     return { ok: false, error: "날짜 형식이 올바르지 않습니다" };
   }
-  if (dateKey > kstTodayKey()) {
+  // 현지 오늘까지 허용한다(해외여행 — 동쪽 여행지는 한국보다 하루 앞설 수 있다).
+  if (dateKey > todayKeyInZone(await getRequestTimeZone())) {
     return { ok: false, error: "미래 날짜로는 옮길 수 없어요" };
   }
 

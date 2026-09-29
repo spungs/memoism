@@ -11,14 +11,19 @@ function frag(id: string, content: string, iso: string): FoldCandidate {
 }
 
 describe("formatFragmentAt", () => {
-  it("UTC 시각을 KST 시:분으로 바꾼다", () => {
+  it("UTC 시각을 현지 시:분으로 바꾼다", () => {
     // 2026-08-03T05:30:00Z = KST 14:30
-    expect(formatFragmentAt(new Date("2026-08-03T05:30:00Z"))).toBe("14:30");
+    expect(formatFragmentAt(new Date("2026-08-03T05:30:00Z"), "Asia/Seoul")).toBe("14:30");
   });
 
-  it("자정을 넘긴 KST 시각도 두 자리로 채운다", () => {
+  it("자정을 넘긴 시각도 두 자리로 채운다", () => {
     // 2026-08-02T15:05:00Z = KST 다음날 00:05
-    expect(formatFragmentAt(new Date("2026-08-02T15:05:00Z"))).toBe("00:05");
+    expect(formatFragmentAt(new Date("2026-08-02T15:05:00Z"), "Asia/Seoul")).toBe("00:05");
+  });
+
+  it("해외에서 남긴 조각은 그곳 시각(2026-09-29)", () => {
+    // 2026-08-03T05:30:00Z = 뉴욕 8/3 01:30
+    expect(formatFragmentAt(new Date("2026-08-03T05:30:00Z"), "America/New_York")).toBe("01:30");
   });
 });
 
@@ -73,14 +78,14 @@ describe("selectFragmentsForFold — 예산이 모자랄 때", () => {
 
 describe("toPromptFragments", () => {
   it("시각과 본문만 남긴다 — 날짜는 일기 단위라 중복", () => {
-    const r = toPromptFragments([frag("a", "국수 먹음", "2026-08-03T05:30:00Z")]);
+    const r = toPromptFragments([frag("a", "국수 먹음", "2026-08-03T05:30:00Z")], "Asia/Seoul");
     expect(r).toEqual([{ at: "14:30", text: "국수 먹음" }]);
   });
 
   it("앞뒤 공백을 떼고 넘긴다", () => {
     const r = toPromptFragments([
       frag("a", "  띄어쓰기  ", "2026-08-03T05:30:00Z"),
-    ]);
+    ], "Asia/Seoul");
     expect(r[0].text).toBe("띄어쓰기");
   });
 });

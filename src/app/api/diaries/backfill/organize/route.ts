@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth/session";
+import { getRequestTimeZone } from "@/lib/tz-server";
 import { organizeBackfillDay } from "@/lib/diary/backfill";
 
 /**
@@ -34,7 +35,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "잘못된 요청 형식" }, { status: 400 });
   }
 
-  const r = await organizeBackfillDay(session.userId, parsed.data.dateKey);
+  const r = await organizeBackfillDay(
+    session.userId,
+    parsed.data.dateKey,
+    await getRequestTimeZone(),
+  );
   if (!r.ok) {
     // 캡 소진은 429 — 클라이언트가 이걸 보고 남은 날짜 순회를 멈춘다.
     // 나머지 이유는 그 날만 건너뛰고 계속 간다.

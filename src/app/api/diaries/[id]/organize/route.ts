@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth/session";
+import { getRequestTimeZone } from "@/lib/tz-server";
 import { prisma } from "@/lib/db";
 import { organizeDiaryFromFragments } from "@/lib/diary/organize";
 import { MAX_AI_INSTRUCTION_LENGTH } from "@/lib/diary/ai-instruction";
@@ -48,7 +49,12 @@ export async function POST(
   }
 
   const { id } = await params;
-  const result = await organizeDiaryFromFragments(id, session.userId, options);
+  const result = await organizeDiaryFromFragments(
+    id,
+    session.userId,
+    await getRequestTimeZone(),
+    options,
+  );
 
   if (!result.ok) {
     // 남은 실패는 대부분 업스트림(Gemini) 지연·거부다. 500은 "이 서버가 깨졌다"는

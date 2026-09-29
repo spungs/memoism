@@ -55,7 +55,7 @@ describe.skipIf(!COOKIE || !DIR)("분할 업로드", () => {
       }),
     );
 
-    const groups = groupPhotosByExifDate(wires, kstTodayKey());
+    const groups = groupPhotosByExifDate(wires, kstTodayKey(), "Asia/Seoul");
     const dated = groups.filter((g) => g.dateKey !== null);
     expect(dated.length).toBeGreaterThan(1);
 

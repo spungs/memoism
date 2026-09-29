@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth/session";
+import { todayKeyInZone } from "@/lib/tz";
+import { getRequestTimeZone } from "@/lib/tz-server";
 import { saveBackfillPhotos } from "@/lib/diary/backfill";
 import type { ClientExif } from "@/lib/diary/auto-generate";
 import { MAX_AI_INPUT_CONTENT_LENGTH } from "@/lib/diary/schemas";
@@ -54,6 +56,16 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json(
       { error: "사진 메타데이터 형식이 잘못됐어요" },
+      { status: 400 },
+    );
+  }
+
+  // 현지 오늘보다 늦은 날짜는 받지 않는다. 화면도 미래 촬영일을 "날짜 모름"으로 빼지만
+  // 라우트는 공개 엔드포인트다 — 미래 칸 일기가 생기면 캘린더·회상이 어긋난다(점검 H2).
+  const today = todayKeyInZone(await getRequestTimeZone());
+  if ([...dateKeys, ...Object.keys(notes)].some((k) => k > today)) {
+    return NextResponse.json(
+      { error: "미래 날짜로는 채울 수 없어요" },
       { status: 400 },
     );
   }

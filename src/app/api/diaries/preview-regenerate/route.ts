@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth/session";
+import { getRequestTimeZone } from "@/lib/tz-server";
 import { previewGenerateDiary } from "@/lib/diary/preview-generate";
 import { MAX_AI_INPUT_CONTENT_LENGTH } from "@/lib/diary/schemas";
 import { MAX_AI_INSTRUCTION_LENGTH } from "@/lib/diary/ai-instruction";
@@ -76,6 +77,7 @@ export async function POST(req: NextRequest) {
   const trimmedText = parsed.text?.trim();
   const trimmedInstruction = parsed.instruction?.trim();
   const result = await previewGenerateDiary({
+    timeZone: await getRequestTimeZone(),
     userId: session.userId,
     storagePaths: parsed.storagePaths,
     exifs: parsed.exifs,

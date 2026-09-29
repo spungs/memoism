@@ -9,20 +9,29 @@ import {
 } from "./backfill-group";
 
 const TODAY = "2026-09-22";
+const SEOUL = "Asia/Seoul";
 const at = (iso: string | null) => ({ takenAt: iso });
 
 describe("groupPhotosByExifDate", () => {
+  it("촬영일은 기기 시간대 날짜로 자른다 — 뉴욕 저녁 사진이 다음 날로 넘어가지 않게(2026-09-29)", () => {
+    // 뉴욕 7/23 21:00 == 서울 7/24 10:00
+    const photo = [at("2026-07-24T01:00:00Z")];
+    expect(groupPhotosByExifDate(photo, "2026-07-30", "America/New_York")[0].dateKey).toBe("2026-07-23");
+    expect(groupPhotosByExifDate(photo, "2026-07-30", SEOUL)[0].dateKey).toBe("2026-07-24");
+  });
+
   it("같은 날 사진을 한 묶음으로 모은다", () => {
     const r = groupPhotosByExifDate(
       [at("2026-09-20T01:00:00Z"), at("2026-09-20T09:00:00Z")],
       TODAY,
+      SEOUL,
     );
     expect(r).toEqual([{ dateKey: "2026-09-20", photoIndexes: [0, 1] }]);
   });
 
   it("KST 기준으로 날짜를 정한다", () => {
     // 2026-09-19T16:00:00Z = KST 2026-09-20 01:00
-    const r = groupPhotosByExifDate([at("2026-09-19T16:00:00Z")], TODAY);
+    const r = groupPhotosByExifDate([at("2026-09-19T16:00:00Z")], TODAY, SEOUL);
     expect(r[0].dateKey).toBe("2026-09-20");
   });
 
@@ -30,6 +39,7 @@ describe("groupPhotosByExifDate", () => {
     const r = groupPhotosByExifDate(
       [at("2026-09-18T01:00:00Z"), at("2026-09-20T01:00:00Z")],
       TODAY,
+      SEOUL,
     );
     expect(r.map((g) => g.dateKey)).toEqual(["2026-09-20", "2026-09-18"]);
   });
@@ -38,6 +48,7 @@ describe("groupPhotosByExifDate", () => {
     const r = groupPhotosByExifDate(
       [at(null), at("2026-09-20T01:00:00Z")],
       TODAY,
+      SEOUL,
     );
     expect(r.map((g) => g.dateKey)).toEqual(["2026-09-20", null]);
     expect(r[1].photoIndexes).toEqual([0]);
@@ -53,32 +64,33 @@ describe("groupPhotosByExifDate", () => {
         at("2026-09-20T05:00:00Z"), // 낮
       ],
       TODAY,
+      SEOUL,
     );
     expect(r[0].photoIndexes).toEqual([1, 2, 0]);
   });
 
   it("날짜 미상 묶음은 고른 순서를 유지한다 — 정렬할 시각이 없다", () => {
-    const r = groupPhotosByExifDate([at(null), at("어제쯤?"), at(null)], TODAY);
+    const r = groupPhotosByExifDate([at(null), at("어제쯤?"), at(null)], TODAY, SEOUL);
     expect(r[0].photoIndexes).toEqual([0, 1, 2]);
   });
 
   it("미래 날짜는 EXIF 손상으로 보고 null 묶음에 넣는다", () => {
-    const r = groupPhotosByExifDate([at("2027-01-01T00:00:00Z")], TODAY);
+    const r = groupPhotosByExifDate([at("2027-01-01T00:00:00Z")], TODAY, SEOUL);
     expect(r).toEqual([{ dateKey: null, photoIndexes: [0] }]);
   });
 
   it("오늘 찍은 사진은 오늘 묶음으로 남긴다 — 미래가 아니다", () => {
-    const r = groupPhotosByExifDate([at("2026-09-22T01:00:00Z")], TODAY);
+    const r = groupPhotosByExifDate([at("2026-09-22T01:00:00Z")], TODAY, SEOUL);
     expect(r[0].dateKey).toBe("2026-09-22");
   });
 
   it("파싱 불가능한 문자열도 null 묶음", () => {
-    const r = groupPhotosByExifDate([at("어제쯤?")], TODAY);
+    const r = groupPhotosByExifDate([at("어제쯤?")], TODAY, SEOUL);
     expect(r[0].dateKey).toBeNull();
   });
 
   it("빈 입력은 빈 결과", () => {
-    expect(groupPhotosByExifDate([], TODAY)).toEqual([]);
+    expect(groupPhotosByExifDate([], TODAY, SEOUL)).toEqual([]);
   });
 });
 

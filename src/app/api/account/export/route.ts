@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { todayKeyInZone } from "@/lib/tz";
+import { getRequestTimeZone } from "@/lib/tz-server";
 import { prisma } from "@/lib/db";
 import { getSignedUrlsForOwner } from "@/lib/storage";
 
@@ -112,7 +114,8 @@ export async function GET() {
     chatMessages,
   };
 
-  const filename = `memoism-export-${new Date().toISOString().slice(0, 10)}.json`;
+  // toISOString()은 UTC 날짜라 한국 자정~오전 9시에 내보내면 전날 날짜가 붙었다.
+  const filename = `memoism-export-${todayKeyInZone(await getRequestTimeZone())}.json`;
   return new NextResponse(JSON.stringify(payload, null, 2), {
     status: 200,
     headers: {

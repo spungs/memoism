@@ -64,6 +64,8 @@ export type OrganizeResult =
 export async function organizeDiaryFromFragments(
   diaryId: string,
   userId: string,
+  /** 요청 기기의 시간대 — AI에게 주는 사진·조각 시각을 현지로(해외여행). */
+  timeZone: string,
   options: { instruction?: string } = {},
 ): Promise<OrganizeResult> {
   const diary = await prisma.diary.findFirst({
@@ -171,6 +173,7 @@ export async function organizeDiaryFromFragments(
             lat: img.exifLat,
             lng: img.exifLng,
           })),
+          timeZone,
         )
       : undefined;
 
@@ -180,7 +183,7 @@ export async function organizeDiaryFromFragments(
       mode,
       photos: photos.length > 0 ? photos : undefined,
       text: currentContent || undefined,
-      fragments: toPromptFragments(selected),
+      fragments: toPromptFragments(selected, timeZone),
       persona: persona ?? undefined,
       exifSummary,
       instruction: options.instruction,

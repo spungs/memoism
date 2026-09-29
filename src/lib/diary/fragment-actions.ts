@@ -5,7 +5,8 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { reembedDiaryWithFragments } from "./fragment-embed";
 import { getOrCreateDiaryForDate } from "./queries";
-import { kstTodayKey } from "./kst";
+import { todayKeyInZone } from "@/lib/tz";
+import { getRequestTimeZone } from "@/lib/tz-server";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -67,7 +68,8 @@ export async function moveFragmentAction(
   }
   // 미래 날짜 금지. 날짜 선택기가 이미 막지만 Server Action은 공개 엔드포인트라
   // 클라이언트 검증만으론 부족하다 — 미래 일기가 생기면 캘린더·회상이 어긋난다.
-  if (dateKey > kstTodayKey()) {
+  // 현지 오늘까지 허용한다(해외여행 — 동쪽 여행지는 한국보다 하루 앞설 수 있다).
+  if (dateKey > todayKeyInZone(await getRequestTimeZone())) {
     return { ok: false, error: "미래 날짜로는 옮길 수 없어요" };
   }
 

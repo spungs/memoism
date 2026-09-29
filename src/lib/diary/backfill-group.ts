@@ -1,5 +1,5 @@
 import type { SubscriptionPlan } from "@prisma/client";
-import { kstDateKey } from "./kst";
+import { dateKeyInZone } from "@/lib/tz";
 
 export type BackfillLimits = {
   /** 한 번의 업로드 요청에 담을 수 있는 사진 수. */
@@ -87,11 +87,17 @@ export type PhotoGroup = {
   photoIndexes: number[];
 };
 
-function toDateKey(takenAt: string | null, todayKey: string): string | null {
+function toDateKey(
+  takenAt: string | null,
+  todayKey: string,
+  tz: string,
+): string | null {
   if (!takenAt) return null;
   const d = new Date(takenAt);
   if (Number.isNaN(d.getTime())) return null;
-  const key = kstDateKey(d);
+  // 기기가 EXIF 벽시계를 자기 시간대로 읽어 만든 순간이다. 같은 시간대로 잘라야 사진에
+  // 찍힌 그 날짜가 나온다 — KST로 자르면 뉴욕 저녁 사진이 다음 날로 넘어갔다(2026-09-29).
+  const key = dateKeyInZone(d, tz);
   // 미래는 EXIF 손상으로 본다 (Diary.createdAt 미래 금지 불변식과 같은 취급).
   if (key > todayKey) return null;
   return key;
@@ -100,12 +106,14 @@ function toDateKey(takenAt: string | null, todayKey: string): string | null {
 export function groupPhotosByExifDate(
   exifs: { takenAt: string | null }[],
   todayKey: string,
+  /** 사진을 고른 기기의 시간대. todayKey도 같은 시간대의 오늘이어야 한다. */
+  tz: string,
 ): PhotoGroup[] {
   const byDate = new Map<string, number[]>();
   const unknown: number[] = [];
 
   exifs.forEach((e, i) => {
-    const key = toDateKey(e.takenAt, todayKey);
+    const key = toDateKey(e.takenAt, todayKey, tz);
     if (key === null) {
       unknown.push(i);
       return;

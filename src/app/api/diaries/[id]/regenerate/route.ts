@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth/session";
+import { getRequestTimeZone } from "@/lib/tz-server";
 import { captureServer } from "@/lib/analytics/server";
 import { regenerateDiary } from "@/lib/diary/regenerate";
 import {
@@ -66,7 +67,12 @@ export async function POST(
   }
 
   const { id } = await params;
-  const result = await regenerateDiary(id, session.userId, options);
+  const result = await regenerateDiary(
+    id,
+    session.userId,
+    await getRequestTimeZone(),
+    options,
+  );
 
   if (!result.ok) {
     // 502가 아니라 503이다. 502는 "게이트웨이가 죽었다"는 뜻이라 Vercel 대시보드에서

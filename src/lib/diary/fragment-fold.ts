@@ -5,7 +5,7 @@
  * 실측으로 확인하기 비싼데, 조용히 틀리면 조각이 누락된다(사용자는 알아채지 못한다).
  */
 
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+import { formatHmInZone } from "@/lib/tz";
 
 /**
  * 조각 하나가 프롬프트에서 차지하는 고정 비용.
@@ -25,12 +25,9 @@ export type PromptFragment = {
   text: string;
 };
 
-/** UTC Date -> KST "HH:mm". */
-export function formatFragmentAt(d: Date): string {
-  const kst = new Date(d.getTime() + KST_OFFSET_MS);
-  const hh = String(kst.getUTCHours()).padStart(2, "0");
-  const mm = String(kst.getUTCMinutes()).padStart(2, "0");
-  return `${hh}:${mm}`;
+/** UTC Date -> 현지(`tz`) "HH:mm". 해외에서 남긴 조각은 그곳 시각이어야 한다. */
+export function formatFragmentAt(d: Date, tz: string): string {
+  return formatHmInZone(d, tz);
 }
 
 /**
@@ -64,10 +61,13 @@ export function selectFragmentsForFold(
   return { selected, skippedCount: sorted.length - selected.length };
 }
 
-/** 선택된 조각을 프롬프트 입력 형태로 변환. */
-export function toPromptFragments(selected: FoldCandidate[]): PromptFragment[] {
+/** 선택된 조각을 프롬프트 입력 형태로 변환. 시각은 현지(`tz`). */
+export function toPromptFragments(
+  selected: FoldCandidate[],
+  tz: string,
+): PromptFragment[] {
   return selected.map((f) => ({
-    at: formatFragmentAt(f.createdAt),
+    at: formatFragmentAt(f.createdAt, tz),
     text: f.content.trim(),
   }));
 }

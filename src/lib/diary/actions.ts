@@ -9,6 +9,8 @@ import { assertStorageQuota, STORAGE_FULL_MSG } from "@/lib/storage/quota";
 import { upsertDiaryEmbedding } from "./embedding";
 import { reembedDiaryWithFragments } from "./fragment-embed";
 import { diaryCreatedAtForDateKey } from "./kst";
+import { todayKeyInZone } from "@/lib/tz";
+import { getRequestTimeZone } from "@/lib/tz-server";
 import { MAX_IMAGES_PER_REQUEST } from "./limits";
 import {
   diaryInputSchema,
@@ -49,9 +51,14 @@ type ExifInput = {
 // 목록 시각이 늘 "오후 09:00"으로 보이고, 자정 직후엔 미래 가드가 오작동해
 // 날짜가 하루 밀렸다. 그래서 KST 날짜 기준으로 분기한다.
 // 앵커 로직은 diaryCreatedAtForDateKey(getOrCreateDiaryForDate와 공유)에 위임.
-function parseDiaryDate(raw: FormDataEntryValue | null): Date {
-  const key = typeof raw === "string" ? raw : "";
-  return diaryCreatedAtForDateKey(key, new Date());
+//
+// 날짜는 **현지 날짜**다(해외여행, 2026-09-29). 없거나 형식이 틀리면 현지 오늘, 현지
+// 오늘보다 늦으면 오늘로 둔다 — 날짜 선택기가 막지만 서버 액션은 공개 엔드포인트다.
+function parseDiaryDate(raw: FormDataEntryValue | null, timeZone: string): Date {
+  const today = todayKeyInZone(timeZone);
+  const key =
+    typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : today;
+  return diaryCreatedAtForDateKey(key > today ? today : key, new Date());
 }
 
 function parseMood(raw: FormDataEntryValue | null): MoodKey | null {
@@ -150,7 +157,7 @@ export async function createDiaryAction(
   });
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsFromZod(parsed) };
 
-  const diaryDate = parseDiaryDate(formData.get("date"));
+  const diaryDate = parseDiaryDate(formData.get("date"), await getRequestTimeZone());
   const source = parseSource(formData.get("source"));
   const exifs = parseExifs(formData.get("exifs"));
 
@@ -299,7 +306,7 @@ export async function updateDiaryAction(
   });
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsFromZod(parsed) };
 
-  const diaryDate = parseDiaryDate(formData.get("date"));
+  const diaryDate = parseDiaryDate(formData.get("date"), await getRequestTimeZone());
 
   await prisma.diary.update({
     where: { id },

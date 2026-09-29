@@ -7,7 +7,8 @@ import { PageHeader } from "@/components/layout/page-header";
 import { SettingsLink } from "@/components/nav/settings-link";
 import { getSession } from "@/lib/auth/session";
 import { getDiariesForMonth, getDiaryCounts } from "@/lib/diary/queries";
-import { kstTodayKey } from "@/lib/diary/kst";
+import { todayKeyInZone } from "@/lib/tz";
+import { getRequestTimeZone } from "@/lib/tz-server";
 
 export const metadata = { title: "일기" };
 
@@ -16,7 +17,8 @@ export default async function DiaryListPage() {
   if (!session) redirect("/login");
 
   // 통합 뷰: 검색창 + 접히는 월 달력 + 그 달 목록. 초기 월(이번 달)은 서버 prefetch.
-  const [ty, tm] = kstTodayKey().split("-").map(Number);
+  // 첫 화면의 이번 달은 현지 기준(해외여행). 월 조회 범위 자체는 저장 좌표(KST)다.
+  const [ty, tm] = todayKeyInZone(await getRequestTimeZone()).split("-").map(Number);
   const [monthData, counts] = await Promise.all([
     getDiariesForMonth(session.userId, ty, tm),
     getDiaryCounts(session.userId),

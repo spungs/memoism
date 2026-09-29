@@ -51,6 +51,8 @@ export type RegenerateResult =
 export async function regenerateDiary(
   diaryId: string,
   userId: string,
+  /** 요청 기기의 시간대 — AI에게 주는 사진 촬영 시각을 현지로(해외여행). */
+  timeZone: string,
   options: { content?: string; title?: string; instruction?: string } = {},
 ): Promise<RegenerateResult> {
   const diary = await prisma.diary.findFirst({
@@ -151,6 +153,7 @@ export async function regenerateDiary(
             lat: img.exifLat,
             lng: img.exifLng,
           })),
+          timeZone,
         )
       : undefined;
 

@@ -113,6 +113,7 @@ async function appendNoteToDiary(diaryId: string, note: string): Promise<void> {
 export async function organizeBackfillDay(
   userId: string,
   dateKey: string,
+  timeZone: string,
 ): Promise<
   | { ok: true; diaryId: string; title: string }
   | { ok: false; reason: "cap" | "safety" | "empty" | "error"; error: string }
@@ -138,8 +139,8 @@ export async function organizeBackfillDay(
   // 미반영 조각이 있으면 organize가 조각까지 엮는다. 없으면 사진 기반 재생성.
   const r =
     diary.fragments.length > 0
-      ? await organizeDiaryFromFragments(diary.id, userId)
-      : await regenerateDiary(diary.id, userId);
+      ? await organizeDiaryFromFragments(diary.id, userId, timeZone)
+      : await regenerateDiary(diary.id, userId, timeZone);
 
   if (r.ok) return { ok: true, diaryId: r.diary.id, title: r.diary.title };
   if (r.capExhausted) return { ok: false, reason: "cap", error: r.error };
