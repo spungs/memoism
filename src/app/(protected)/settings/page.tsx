@@ -7,6 +7,7 @@ import { todayUsage } from "@/lib/ai/usage";
 const GOOGLE_NOTICES: Record<string, string> = {
   linked: "구글 계정이 연결되었어요.",
   taken: "이 구글 계정은 다른 계정에 연결되어 있어요.",
+  already: "이미 다른 구글 계정이 연결되어 있어요.",
   error: "구글 연결에 실패했어요. 다시 시도해주세요.",
 };
 

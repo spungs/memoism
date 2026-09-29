@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import * as arctic from "arctic";
 import { cookies } from "next/headers";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getSession, signSession, buildSessionCookie } from "@/lib/auth/session";
 import {
@@ -76,10 +77,20 @@ export async function GET(request: Request) {
     if (owner && owner.id === session.userId) {
       return redirectClearing(origin, "/settings?google=linked");
     }
-    await prisma.user.update({
-      where: { id: session.userId },
-      data: { googleSub },
-    });
+    // 이미 다른 구글 계정이 붙어 있으면 조용히 바꾸지 않는다. 동시에 두 탭에서 연동하면
+    // 유니크 충돌(P2002)이 나는데, 잡지 않으면 500이었다(점검 L5).
+    try {
+      const r = await prisma.user.updateMany({
+        where: { id: session.userId, googleSub: null },
+        data: { googleSub },
+      });
+      if (r.count === 0) return redirectClearing(origin, "/settings?google=already");
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        return redirectClearing(origin, "/settings?google=taken");
+      }
+      throw e;
+    }
     return redirectClearing(origin, "/settings?google=linked");
   }
 
