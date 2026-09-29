@@ -96,7 +96,8 @@ export async function POST(
       select: { id: true },
     });
     if (character) {
-      const userContent = `${result.dateKey} 조각 정리해줘`;
+      // 날짜 키 원문(2026-09-21) 대신 사람이 읽는 라벨을 쓴다 — 답장 말풍선과 같게(점검 L16).
+      const userContent = `${result.label} 조각 정리해줘`;
       // createdAt을 명시한다. @default(now())는 Postgres now()로 컴파일되고 now()는
       // **트랜잭션 시작 시각**을 돌려주므로, 한 트랜잭션 안의 두 행이 밀리초까지 같아진다.
       // 그러면 createdAt 정렬이 순서를 보장하지 못해 답변이 요청보다 먼저 보인다.

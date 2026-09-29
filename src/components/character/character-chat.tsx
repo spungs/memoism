@@ -214,7 +214,7 @@ export function CharacterChat({
       const userMsg: Message = data.userChatMessage ?? {
         id: `organize-user-${data.diary.id}-${Date.now()}`,
         role: "user",
-        content: `${data.dateKey} 조각 정리해줘`,
+        content: `${data.label} 조각 정리해줘`,
         createdAt: new Date().toISOString(),
       };
       const msg: Message = data.chatMessage ?? {
