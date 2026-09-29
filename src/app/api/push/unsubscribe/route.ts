@@ -2,12 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { unsubscribeSchema } from "@/lib/push/schemas";
+import { unauthorized } from "@/lib/auth/unauthorized";
 
 // Web Push 구독 해제 (NEW-15). 본인 소유 구독만 삭제한다.
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "로그인이 필요해요" }, { status: 401 });
+    return unauthorized();
   }
 
   const body = await req.json().catch(() => null);

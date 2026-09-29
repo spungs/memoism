@@ -6,6 +6,7 @@ import { getRequestTimeZone } from "@/lib/tz-server";
 import { saveBackfillPhotos } from "@/lib/diary/backfill";
 import type { ClientExif } from "@/lib/diary/auto-generate";
 import { MAX_AI_INPUT_CONTENT_LENGTH } from "@/lib/diary/schemas";
+import { unauthorized } from "@/lib/auth/unauthorized";
 
 const exifItem = z.object({
   takenAt: z.string().nullable(),
@@ -24,7 +25,7 @@ const dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorized();
   }
 
   let form: FormData;

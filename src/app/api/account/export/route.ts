@@ -4,6 +4,7 @@ import { todayKeyInZone } from "@/lib/tz";
 import { getRequestTimeZone } from "@/lib/tz-server";
 import { prisma } from "@/lib/db";
 import { getSignedUrlsForOwner } from "@/lib/storage";
+import { unauthorized } from "@/lib/auth/unauthorized";
 
 // 본인 데이터 일괄 내보내기 (NEW-12).
 //   - User, Character, UserPersona, Diaries(+images), 24h chat messages
@@ -12,7 +13,7 @@ import { getSignedUrlsForOwner } from "@/lib/storage";
 export async function GET() {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorized();
   }
 
   const [user, character, persona, diaries, chatMessages] = await Promise.all([

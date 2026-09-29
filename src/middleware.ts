@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifySessionToken, signSession, SESSION_DURATION_SECONDS } from "@/lib/auth/jwt";
+import { unauthorized } from "@/lib/auth/unauthorized";
 
 // 슬라이딩 세션: 남은 유효기간이 전체의 절반(15일) 이하이면 쿠키를 재발급한다.
 // Edge 런타임에서 실행되므로 jose(Edge-safe)만 사용 — DB 접근 없음.
@@ -57,7 +58,7 @@ export async function middleware(req: NextRequest) {
     // API routes return JSON 401 so client fetches don't follow a redirect
     // into HTML and break JSON parsing. Page routes redirect to /login.
     if (isApi) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized();
     }
     const url = new URL("/login", req.url);
     if (pathname !== "/") url.searchParams.set("from", pathname);

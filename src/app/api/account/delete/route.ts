@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession, deleteSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { deleteImages } from "@/lib/storage";
+import { unauthorized } from "@/lib/auth/unauthorized";
 
 // 계정 탈퇴 (NEW-13).
 //   1) 본인의 모든 storagePath 수집
@@ -16,7 +17,7 @@ import { deleteImages } from "@/lib/storage";
 export async function POST() {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorized();
   }
 
   const images = await prisma.diaryImage.findMany({

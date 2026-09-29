@@ -5,6 +5,7 @@ import { getRequestTimeZone } from "@/lib/tz-server";
 import { prisma } from "@/lib/db";
 import { organizeDiaryFromFragments } from "@/lib/diary/organize";
 import { MAX_AI_INSTRUCTION_LENGTH } from "@/lib/diary/ai-instruction";
+import { unauthorized } from "@/lib/auth/unauthorized";
 
 /**
  * AI 재시도까지 끝낼 시간을 함수에 준다.
@@ -25,7 +26,7 @@ export async function POST(
 ) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorized();
   }
 
   // body는 선택이다 — 제안 카드는 아무것도 안 보낸다. 형식 오류만 구분해서 막는다.

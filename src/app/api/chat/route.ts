@@ -14,6 +14,7 @@ import { MAX_IMAGES_PER_REQUEST } from "@/lib/diary/limits";
 import { kstDateKey } from "@/lib/diary/kst";
 import { getRequestTimeZone } from "@/lib/tz-server";
 import type { ClientExif } from "@/lib/diary/auto-generate";
+import { unauthorized } from "@/lib/auth/unauthorized";
 
 // JSON·multipart 두 경로가 같은 상한을 쓰게 한 곳에 둔다.
 // (한쪽만 걸면 multipart로 상한을 우회할 수 있다.)
@@ -263,7 +264,7 @@ ${
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorized();
   }
   const timeZone = await getRequestTimeZone();
 

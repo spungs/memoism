@@ -1,13 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getDiariesWithThumbnails } from "@/lib/diary/queries";
+import { unauthorized } from "@/lib/auth/unauthorized";
 
 // JSON list endpoint used by TanStack Query for client refetch / cache hydration.
 // Mutations go through server actions in src/lib/diary/actions.ts.
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorized();
   }
 
   const cursor = req.nextUrl.searchParams.get("cursor") ?? undefined;

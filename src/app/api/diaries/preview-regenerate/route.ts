@@ -6,6 +6,7 @@ import { previewGenerateDiary } from "@/lib/diary/preview-generate";
 import { MAX_AI_INPUT_CONTENT_LENGTH } from "@/lib/diary/schemas";
 import { MAX_AI_INSTRUCTION_LENGTH } from "@/lib/diary/ai-instruction";
 import { MAX_IMAGES_PER_REQUEST } from "@/lib/diary/limits";
+import { unauthorized } from "@/lib/auth/unauthorized";
 
 // 저장 전 검토 게이트의 "다시 생성" 엔드포인트.
 // auto-generate와 달리 사진은 이미 업로드돼 있으므로 storagePath만 받는다 (재업로드 X).
@@ -33,7 +34,7 @@ const bodySchema = z.object({
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorized();
   }
 
   const body = await req.json().catch(() => null);

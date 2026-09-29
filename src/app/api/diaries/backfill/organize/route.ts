@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getSession } from "@/lib/auth/session";
 import { getRequestTimeZone } from "@/lib/tz-server";
 import { organizeBackfillDay } from "@/lib/diary/backfill";
+import { unauthorized } from "@/lib/auth/unauthorized";
 
 /**
  * AI 재시도까지 끝낼 시간을 함수에 준다.
@@ -27,7 +28,7 @@ const bodySchema = z.object({
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorized();
   }
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));

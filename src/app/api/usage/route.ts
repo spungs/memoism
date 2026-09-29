@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { todayUsage } from "@/lib/ai/usage";
+import { unauthorized } from "@/lib/auth/unauthorized";
 
 // AI 일일 사용량 조회 ("오늘 AI X/N" 표시용). 캡을 소모하지 않는 read-only 조회.
 export async function GET() {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+    return unauthorized();
   }
   const character = await prisma.character.findUnique({
     where: { userId: session.userId },

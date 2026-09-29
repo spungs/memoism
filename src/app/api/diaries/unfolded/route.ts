@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getRequestTimeZone } from "@/lib/tz-server";
 import { findUnfoldedDiary } from "@/lib/diary/queries";
+import { unauthorized } from "@/lib/auth/unauthorized";
 
 /**
  * 메이 채팅의 "정리해줄까?" 제안 대상 조회.
@@ -12,7 +13,7 @@ import { findUnfoldedDiary } from "@/lib/diary/queries";
 export async function GET() {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorized();
   }
   const suggestion = await findUnfoldedDiary(session.userId, await getRequestTimeZone());
   return NextResponse.json({ suggestion });

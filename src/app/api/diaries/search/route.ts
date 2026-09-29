@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { searchDiariesByText } from "@/lib/diary/queries";
 import { getSignedUrlsForOwner } from "@/lib/storage";
+import { unauthorized } from "@/lib/auth/unauthorized";
 
 const queryBodySchema = z.object({
   q: z
@@ -16,7 +17,7 @@ const queryBodySchema = z.object({
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorized();
   }
 
   const body = await req.json().catch(() => null);

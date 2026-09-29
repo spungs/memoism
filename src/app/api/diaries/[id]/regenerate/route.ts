@@ -9,6 +9,7 @@ import {
   MAX_DIARY_TITLE_LENGTH,
 } from "@/lib/diary/schemas";
 import { MAX_AI_INSTRUCTION_LENGTH } from "@/lib/diary/ai-instruction";
+import { unauthorized } from "@/lib/auth/unauthorized";
 
 /**
  * AI 재시도까지 끝낼 시간을 함수에 준다.
@@ -34,7 +35,7 @@ export async function POST(
 ) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorized();
   }
 
   // body 자체가 없는 것(구 클라이언트)과 형식이 틀린 것은 구분한다.

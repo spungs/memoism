@@ -1,6 +1,7 @@
 "use server";
 
 import { getSession } from "@/lib/auth/session";
+import { UNAUTHORIZED_MESSAGE } from "@/lib/auth/unauthorized";
 import { MAX_IMAGES_PER_REQUEST } from "@/lib/diary/limits";
 import { getSignedUrlsForOwner } from "./index";
 
@@ -22,7 +23,7 @@ export async function getDiaryImageSignedUrls(
   storagePaths: string[],
 ): Promise<SignedUrlsResult> {
   const session = await getSession();
-  if (!session) return { ok: false, error: "Unauthorized" };
+  if (!session) return { ok: false, error: UNAUTHORIZED_MESSAGE };
 
   if (!Array.isArray(storagePaths)) {
     return { ok: false, error: "잘못된 요청 형식" };
