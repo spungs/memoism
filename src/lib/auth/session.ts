@@ -4,23 +4,14 @@ import { prisma } from "@/lib/db";
 import {
   signSession,
   verifySessionToken,
-  SESSION_DURATION_SECONDS,
+  SESSION_COOKIE,
+  SESSION_COOKIE_OPTS,
   type SessionPayload,
 } from "./jwt";
-
-const SESSION_COOKIE = "session";
 
 // Re-export the Edge-safe jose helpers so existing import sites keep working.
 export { signSession, verifySessionToken };
 export type { SessionPayload };
-
-const SESSION_COOKIE_OPTS = {
-  httpOnly: true as const,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
-  path: "/",
-  maxAge: SESSION_DURATION_SECONDS,
-};
 
 // 라우트 핸들러에서 응답 객체에 직접 세션 쿠키를 부착할 때 재사용.
 // (NextResponse.redirect를 반환하는 핸들러에서는 cookies().set() 대신 이걸 써야 안정적.)

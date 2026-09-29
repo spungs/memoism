@@ -1,18 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { verifySessionToken, signSession, SESSION_DURATION_SECONDS } from "@/lib/auth/jwt";
+import {
+  verifySessionToken,
+  signSession,
+  SESSION_DURATION_SECONDS,
+  SESSION_COOKIE,
+  SESSION_COOKIE_OPTS,
+} from "@/lib/auth/jwt";
 import { unauthorized } from "@/lib/auth/unauthorized";
 
 // 슬라이딩 세션: 남은 유효기간이 전체의 절반(15일) 이하이면 쿠키를 재발급한다.
 // Edge 런타임에서 실행되므로 jose(Edge-safe)만 사용 — DB 접근 없음.
 const SESSION_REFRESH_THRESHOLD = SESSION_DURATION_SECONDS / 2;
-
-const SESSION_COOKIE_OPTS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
-  path: "/",
-  maxAge: SESSION_DURATION_SECONDS,
-};
 
 // Exact-match whitelist. Adding a sub-route under /login or /signup later requires
 // updating this list explicitly — preferred over prefix matching to avoid auth
@@ -30,7 +28,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = req.cookies.get("session")?.value;
+  const token = req.cookies.get(SESSION_COOKIE)?.value;
   const session = token ? await verifySessionToken(token) : null;
 
   // OAuth 엔드포인트: 로그아웃 상태(로그인/가입)와 로그인 상태(설정 연동) 둘 다에서
@@ -91,7 +89,7 @@ export async function middleware(req: NextRequest) {
           email: session.email,
           tokenVersion: session.tokenVersion,
         });
-        response.cookies.set("session", newToken, SESSION_COOKIE_OPTS);
+        response.cookies.set(SESSION_COOKIE, newToken, SESSION_COOKIE_OPTS);
       } catch {
         // 재발급 실패 시 기존 쿠키로 계속 진행 (로그아웃 없음)
       }

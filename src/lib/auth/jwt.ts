@@ -47,3 +47,14 @@ export async function verifySessionToken(
 }
 
 export { SESSION_DURATION_SECONDS };
+
+// 세션 쿠키 이름·옵션. 미들웨어(재발급)와 session.ts(발급)가 각자 정의해 두 벌이었다 —
+// 한쪽만 바뀌면 재발급 쿠키 속성이 달라진다(점검 L8). Edge-safe라 여기 둔다.
+export const SESSION_COOKIE = "session";
+export const SESSION_COOKIE_OPTS = {
+  httpOnly: true as const,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: SESSION_DURATION_SECONDS,
+};
