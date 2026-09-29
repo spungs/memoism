@@ -34,6 +34,27 @@ describe("resolveCaptureDate", () => {
     });
   });
 
+  it("밤 21~23시엔 아직 같은 날이라 오늘로 보낸다", () => {
+    // 22:00·23:59 KST(7/23)에 24시간을 빼면 7/22가 된다 — 자정 전 기록이 전날로
+    // 가던 버그(2026-09-29 점검 H1). "자정을 넘겨도 오늘"은 자정 **이후**에만 뜻이 있다.
+    for (const utc of ["2026-07-23T13:00:00Z", "2026-07-23T14:59:00Z"]) {
+      expect(resolveCaptureDate("국수 먹었어", new Date(utc))).toEqual({
+        kind: "resolved",
+        dateKey: "2026-07-23",
+        label: "오늘",
+        fromExplicit: false,
+      });
+    }
+  });
+
+  it("새벽 3:59까지는 직전 하루, 4:00부터는 오늘", () => {
+    // KST 7/24 03:59 == UTC 7/23 18:59, KST 7/24 04:00 == UTC 7/23 19:00
+    const r1 = resolveCaptureDate("국수 먹었어", new Date("2026-07-23T18:59:00Z"));
+    const r2 = resolveCaptureDate("국수 먹었어", new Date("2026-07-23T19:00:00Z"));
+    expect(r1.kind === "resolved" && [r1.dateKey, r1.label]).toEqual(["2026-07-23", "어제"]);
+    expect(r2.kind === "resolved" && [r2.dateKey, r2.label]).toEqual(["2026-07-24", "오늘"]);
+  });
+
   it('심야라도 "오늘"이라고 쓰면 명시 표현이 이긴다(스펙 §4 규칙①>④)', () => {
     // 심야 보정은 "날짜 표현 없는" 기록에만 적용된다. "오늘"은 명시 표현이므로
     // KST 기준 오늘(7/24)로 간다. 이 동작이 바뀌면 사용자 기대와 어긋날 수 있어
