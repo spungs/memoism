@@ -493,10 +493,15 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
         isLoading={logoutLoading}
       />
 
-      <PasswordSheet
-        isOpen={passwordOpen}
-        onClose={() => setPasswordOpen(false)}
-      />
+      {/* 열 때마다 새로 마운트한다 — 직전 변경 성공 상태(state.ok)가 남아 있으면
+          다시 열자마자 0.6초 뒤 저절로 닫혔다(점검 M14). BottomSheet는 닫히면
+          아무것도 그리지 않아 닫힘 애니메이션 손실은 없다. */}
+      {passwordOpen && (
+        <PasswordSheet
+          isOpen={passwordOpen}
+          onClose={() => setPasswordOpen(false)}
+        />
+      )}
 
       <ConfirmSheet
         isOpen={deleteOpen}

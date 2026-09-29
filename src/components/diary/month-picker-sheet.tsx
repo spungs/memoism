@@ -116,7 +116,7 @@ export function MonthPickerSheet({
                   border: isToday && !isCurrent
                     ? "1px solid var(--separator)"
                     : "1px solid transparent",
-                  backgroundColor: isCurrent ? "var(--fg)" : "var(--fill-secondary)",
+                  backgroundColor: isCurrent ? "var(--fg)" : "var(--fill-2)",
                   color: isCurrent
                     ? "var(--bg)"
                     : isFuture
@@ -146,7 +146,7 @@ export function MonthPickerSheet({
             padding: "var(--space-3) var(--space-4)",
             borderRadius: "var(--radius-md)",
             border: "none",
-            backgroundColor: "var(--fill-secondary)",
+            backgroundColor: "var(--fill-2)",
             color: "var(--fg)",
             fontFamily: "var(--font-sans)",
             fontSize: "var(--text-md)",

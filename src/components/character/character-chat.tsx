@@ -362,6 +362,14 @@ export function CharacterChat({
     setMessages((prev) => [...prev, userMsg]);
     setDraft("");
     setPicked([]);
+    // 실패하면 보낸 것처럼 남기지 않고 입력 상태로 되돌린다. 예전엔 사진만 되돌리고
+    // 글은 말풍선만 남긴 채 입력창을 비워, 기록된 줄 알았는데 원문이 사라졌다(점검 M13).
+    // 기다리는 동안 새로 친 글이 있으면 덮지 않는다.
+    const rollback = () => {
+      setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
+      if (photos.length > 0) setPicked(photos);
+      if (text) setDraft((cur) => cur || text);
+    };
 
     try {
       let res: Response;
@@ -401,11 +409,7 @@ export function CharacterChat({
           return;
         }
         setError(data?.error ?? "메이가 잠시 응답하지 못했어요. 잠시 후 다시 시도해주세요.");
-        // 사진은 되돌려준다 — 안 보냈는데 "사진 N장" 말풍선만 남으면 거짓말이 된다.
-        if (photos.length > 0) {
-          setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
-          setPicked(photos);
-        }
+        rollback();
         return;
       }
       photos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
@@ -431,10 +435,7 @@ export function CharacterChat({
       ]);
     } catch {
       setError("메이가 잠시 응답하지 못했어요. 잠시 후 다시 시도해주세요.");
-      if (photos.length > 0) {
-        setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
-        setPicked(photos);
-      }
+      rollback();
     } finally {
       setSending(false);
       setUsageSignal((n) => n + 1);

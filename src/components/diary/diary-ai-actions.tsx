@@ -49,6 +49,9 @@ export function DiaryAiActions({
   const [reverting, startRevert] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [usageSignal, setUsageSignal] = useState(0);
+  // 정리에 성공하면 0으로 내린다. prop은 페이지를 열 때 값이라, 그대로 쓰면 정리 뒤에도
+  // "조각 N개로 정리하기"가 남고 다시 누르면 조각 없음 오류가 났다(점검 M11).
+  const [unfolded, setUnfolded] = useState(unfoldedCount);
   // 재정리 방향 지시 — 이미 한 번 정리한 뒤(version > 0)에만 노출한다.
   // 최초 정리는 버튼 하나로 무마찰 유지.
   const [instructionChips, setInstructionChips] = useState<string[]>([]);
@@ -63,10 +66,10 @@ export function DiaryAiActions({
   // 미반영 조각이 있으면 organize로 간다. organize는 본문을 서버가 DB에서 읽는다 —
   // 조각이 입력의 주인공이라 화면 본문을 덮어쓸 근거가 없고, 사용자가 저장 안 한
   // 편집은 어차피 저장 버튼이 담당한다.
-  const hasUnfolded = unfoldedCount > 0;
+  const hasUnfolded = unfolded > 0;
   // 버튼 문구. 상한 초과 안내가 막힌 버튼을 이름으로 가리켜야 해서 따로 둔다.
   const actionLabel = hasUnfolded
-    ? `조각 ${unfoldedCount}개로 정리하기`
+    ? `조각 ${unfolded}개로 정리하기`
     : aiGenerationVersion === 0
       ? "일기로 정리하기"
       : "다시 정리하기";
@@ -109,6 +112,7 @@ export function DiaryAiActions({
         hasPreviousContent: d.previousContent !== null,
         aiGenerationVersion: d.aiGenerationVersion,
       });
+      if (hasUnfolded) setUnfolded(0);
       // 지시가 반영된 결과가 나왔으니 비운다. 남겨두면 다음 재정리에 또 적용된다.
       setInstructionChips([]);
       setInstructionText("");
