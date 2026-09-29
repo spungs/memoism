@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isAuthorizedCron } from "@/lib/cron-auth";
 import { prisma } from "@/lib/db";
 import { sendPushToSubscriptions } from "@/lib/push/web-push";
 import { CHARACTER_NAME } from "@/lib/character/utils";
@@ -12,8 +13,7 @@ import { CHARACTER_NAME } from "@/lib/character/utils";
 // 핸들러까지 도달하도록 src/middleware.ts가 `/api/cron/` 경로를 우회 처리한다.
 // 본 핸들러는 CRON_SECRET으로 자체 인증한다.
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCron(req.headers.get("authorization"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

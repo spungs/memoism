@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isAuthorizedCron } from "@/lib/cron-auth";
 import { scanOrphans, deleteOrphans, type OrphanScan } from "@/lib/storage/gc";
 
 // 고아 이미지 GC 엔드포인트 (탈퇴와 무관한 상시 청소).
@@ -55,8 +56,7 @@ function summarize(scan: OrphanScan) {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCron(req.headers.get("authorization"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
