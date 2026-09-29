@@ -230,7 +230,7 @@ components:
   moodBadge:
     rounded: "{rounded.pill}"
     backgroundColor: "color-mix(in srgb, {colors.mood} 14%, transparent)"
-    color: "mood 색을 25% 어둡게"
+    color: "mood 색 75% + --mood-ink (라이트 검정 / 다크 흰색)"
     fontSize: 12px
     fontWeight: 600
   aiChip:
@@ -392,7 +392,7 @@ success `#34C759` · warning `#FF9500` · danger `#FF3B30` · info `#007AFF`
 - destructive: `#FF3B30`
 
 ### MoodBadge / MoodPicker
-mood 색 14% 배경 캡슐 + mood 진한 글자 12px/600. **테두리 없음** (v1의 1.5px border 폐지). Picker는 한 줄 수평 스크롤 유지, 선택 시 mood 색 배경 + 흰 글자 + scale 스프링.
+mood 색 14% 배경 캡슐 + mood 진한 글자 12px/600. **테두리 없음** (v1의 1.5px border 폐지). Picker는 6칸 한 줄 그리드(스크롤 없음), 선택 시 mood 색 배경 + 진한 글자(`onColor`, 화남만 흰 글자 — 흰 글자는 나머지에서 대비 3:1 미만) + scale 스프링.
 
 ### AI chip ("✨ AI")
 `fill.2` 배경 + secondary 글자 11px — **무채색으로 후퇴** (본문을 절대 압도하지 않는다).

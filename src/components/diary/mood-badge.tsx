@@ -32,7 +32,7 @@ export function MoodBadge({ mood, size = "md" }: MoodBadgeProps) {
         backgroundColor: `color-mix(in srgb, ${color} 14%, transparent)`,
         fontFamily: "var(--font-sans)",
         fontSize: size === "sm" ? 11 : "var(--text-xs)",
-        color: `color-mix(in srgb, ${color} 75%, #000)`,
+        color: `color-mix(in srgb, ${color} 75%, var(--mood-ink))`,
         fontWeight: 600,
         lineHeight: 1,
         whiteSpace: "nowrap",

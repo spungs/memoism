@@ -84,7 +84,7 @@ export function MoodPicker({ value, onChange }: MoodPickerProps) {
                   fontFamily: 'var(--font-sans)',
                   fontSize: 'var(--text-xs)',
                   fontWeight: 600,
-                  color: isSelected ? '#fff' : 'var(--fg-muted)',
+                  color: isSelected ? mood.onColor : 'var(--fg-muted)',
                   letterSpacing: 0,
                 }}
               >

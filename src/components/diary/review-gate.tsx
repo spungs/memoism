@@ -696,7 +696,7 @@ export function ReviewGate() {
               padding: 0,
             }}
           />
-          <div style={{ height: 1, backgroundColor: "rgba(60,56,50,0.10)" }} />
+          <div style={{ height: 1, backgroundColor: "var(--separator)" }} />
           <textarea
             ref={textareaRef}
             value={editedContent}
