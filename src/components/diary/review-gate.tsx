@@ -11,7 +11,7 @@ import { AiInstructionInput } from "./ai-instruction-input";
 import { ContentLengthHint, isOverAiLimit } from "./content-length-hint";
 import { buildInstruction } from "@/lib/diary/ai-instruction";
 import { pickRegenerateText } from "@/lib/diary/regenerate-input";
-import { kstTodayKey } from "@/lib/diary/kst";
+import { useDeviceTodayKey } from "@/lib/tz-client";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 import { DRAFT_KEY_NEW, PENDING_DRAFT_KEY } from "./draft-keys";
 
@@ -100,6 +100,8 @@ export function ReviewGate() {
   const [editedTitle, setEditedTitle] = useState("");
   const [editedContent, setEditedContent] = useState("");
   const [mood, setMood] = useState<MoodKey>(DEFAULT_MOOD);
+  // 날짜 선택 상한 — 기기(현지) 기준 오늘.
+  const todayKey = useDeviceTodayKey();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [signedUrls, setSignedUrls] = useState<(string | null)[]>([]);
   const [regenerating, setRegenerating] = useState(false);
@@ -556,7 +558,7 @@ export function ReviewGate() {
           <div style={{ marginTop: "var(--space-3)" }}>
             <DiaryDatePicker
               value={draftState.date}
-              max={kstTodayKey()}
+              max={todayKey}
               onChange={handleDateChange}
             />
           </div>

@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 import { DiaryDatePicker } from "@/components/diary/date-picker";
-import { kstTodayKey } from "@/lib/diary/kst";
+import { todayKeyInZone } from "@/lib/tz";
+import { useDeviceTimeZone } from "@/lib/tz-client";
 import {
   deleteFragmentAction,
   moveFragmentAction,
@@ -17,10 +18,10 @@ export type TimelineFragment = {
   createdAt: Date;
 };
 
-/** KST 시각 라벨 (12:31). */
-function timeLabel(d: Date): string {
+/** 시각 라벨 (12:31). 보는 기기 시간대 — 여행 중엔 현지 시각, 돌아오면 한국 시각. */
+function timeLabel(d: Date, timeZone: string): string {
   return d.toLocaleTimeString("ko-KR", {
-    timeZone: "Asia/Seoul",
+    timeZone,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -57,6 +58,7 @@ export function FragmentTimeline({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const timeZone = useDeviceTimeZone();
 
   if (fragments.length === 0) return null;
 
@@ -147,7 +149,7 @@ export function FragmentTimeline({
                     paddingTop: 2,
                   }}
                 >
-                  {timeLabel(f.createdAt)}
+                  {timeLabel(f.createdAt, timeZone)}
                 </span>
 
                 {isEditing ? (
@@ -249,7 +251,7 @@ export function FragmentTimeline({
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
                   <DiaryDatePicker
                     value={diaryDateKey}
-                    max={kstTodayKey()}
+                    max={todayKeyInZone(timeZone)}
                     onChange={(picked) => move(f.id, picked)}
                   />
                 </div>

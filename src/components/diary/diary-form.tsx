@@ -10,7 +10,7 @@ import {
 } from "@/lib/diary/actions";
 import {
   extractExif,
-  uniqueKstDateKeys,
+  uniqueDateKeys,
   type ExifMeta,
 } from "@/lib/diary/exif";
 import { compressImage } from "@/lib/diary/image-compress";
@@ -27,6 +27,7 @@ import { AiBusyOverlay, Spinner } from "@/components/ui/ai-busy-overlay";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 // DRAFT_KEY_NEW: create 모드에서 작성 중 내용을 자동저장하는 키. 새로고침·세션만료로 인한 유실 방지.
 import { DRAFT_KEY_NEW, PENDING_DRAFT_KEY } from "./draft-keys";
+import { useDeviceTimeZone } from "@/lib/tz-client";
 
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000; // 24시간 후 만료
 
@@ -252,6 +253,7 @@ function PhotoThumb({
 
 export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
   const router = useRouter();
+  const timeZone = useDeviceTimeZone();
   const [pending, startTransition] = useTransition();
 
   const [title, setTitle] = useState(initial?.title ?? "");
@@ -281,10 +283,11 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     lat: null,
     lng: null,
   }));
-  const dateKeys = uniqueKstDateKeys([
-    ...existingExif,
-    ...pickedImages.map((p) => p.exif),
-  ]);
+  // 사진 날짜는 기기 시간대로 자른다(해외에서 찍은 사진도 찍힌 그 날짜로).
+  const dateKeys = uniqueDateKeys(
+    [...existingExif, ...pickedImages.map((p) => p.exif)],
+    timeZone,
+  );
   // 사진이 2일 이상에 걸치면 → 배지에 날짜 표기 + 경고 배너 + 생성 전 확인.
   const isMultiDate = dateKeys.length >= 2;
   const totalImageCount = visibleExisting.length + pickedImages.length;

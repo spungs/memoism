@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { DiaryDatePicker } from "@/components/diary/date-picker";
-import { dateKeyLabel, kstTodayKey } from "@/lib/diary/kst";
+import { dateKeyLabel } from "@/lib/diary/kst";
+import { useDeviceTodayKey } from "@/lib/tz-client";
 import { recaptureDateAction } from "@/lib/diary/capture-actions";
 
 type Entry = { dateKey: string; diaryId: string; imageIds: string[] };
@@ -51,6 +52,8 @@ export function CaptureCorrectionSheet({
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // 날짜 선택 상한 — 기기(현지) 기준 오늘.
+  const todayKey = useDeviceTodayKey();
   const multiDay = entries.length > 1;
 
   const close = () => {
@@ -126,7 +129,7 @@ export function CaptureCorrectionSheet({
           <div style={{ paddingBottom: "var(--space-4)" }}>
             <DiaryDatePicker
               value={dateKey}
-              max={kstTodayKey()}
+              max={todayKey}
               onChange={move}
             />
           </div>

@@ -17,6 +17,8 @@ import { extractExif, exifToWire } from "@/lib/diary/exif";
 import { compressImages } from "@/lib/diary/image-compress";
 import { MAX_IMAGES_PER_REQUEST } from "@/lib/diary/limits";
 import { dateKeyLabel } from "@/lib/diary/kst";
+import { dateKeyInZone, shiftDateKey, todayKeyInZone } from "@/lib/tz";
+import { useDeviceTimeZone } from "@/lib/tz-client";
 
 type Role = "user" | "assistant";
 type RelatedDiary = { id: string; title: string; createdAt: string };
@@ -58,21 +60,21 @@ function photoCountOf(m: Message): number {
 
 type PickedPhoto = { id: string; file: File; previewUrl: string };
 
-// Asia/Seoul 기준 YYYY-MM-DD 키 (날짜 구분선 비교용). en-CA = YYYY-MM-DD 포맷.
-function kstDayKey(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+// 날짜 구분선 비교용 YYYY-MM-DD 키. 보는 기기 시간대 기준.
+function dayKey(iso: string, timeZone: string): string {
+  return dateKeyInZone(new Date(iso), timeZone);
 }
 
-// 날짜 구분선 라벨: 오늘 / 어제 / "6월 10일 (수)". KST는 DST가 없어 24h 차감으로 어제 계산 안전.
-function dayDividerLabel(iso: string): string {
-  const now = Date.now();
-  const today = kstDayKey(new Date(now).toISOString());
-  const yesterday = kstDayKey(new Date(now - 24 * 60 * 60 * 1000).toISOString());
-  const key = kstDayKey(iso);
+// 날짜 구분선 라벨: 오늘 / 어제 / "6월 10일 (수)". 어제는 달력 날짜로 센다 — 서머타임이
+// 있는 시간대에선 24시간 차감이 하루가 아닐 수 있다.
+function dayDividerLabel(iso: string, timeZone: string): string {
+  const today = todayKeyInZone(timeZone);
+  const yesterday = shiftDateKey(today, -1);
+  const key = dayKey(iso, timeZone);
   if (key === today) return "오늘";
   if (key === yesterday) return "어제";
   return new Date(iso).toLocaleDateString("ko-KR", {
-    timeZone: "Asia/Seoul",
+    timeZone,
     month: "long",
     day: "numeric",
     weekday: "short",
@@ -105,6 +107,7 @@ export function CharacterChat({
   initialPhotoVisionOptIn,
 }: Props) {
   const router = useRouter();
+  const timeZone = useDeviceTimeZone();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   // "새 대화" 경계 시각(ISO). 이 시각 이후가 현재 대화 — 그 앞에 "새 대화" 구분선을 그린다.
   // 경계는 이제 설정 화면에서만 바뀐다 → 서버가 새 값을 내려주면 그대로 반영된다.
@@ -581,12 +584,12 @@ export function CharacterChat({
             : [];
           // 날짜가 바뀌면(또는 첫 메시지) 날짜 구분선 — 카톡식 연속 스크롤 + 날짜 divider.
           const showDateDivider =
-            !prev || kstDayKey(prev.createdAt) !== kstDayKey(m.createdAt);
+            !prev || dayKey(prev.createdAt, timeZone) !== dayKey(m.createdAt, timeZone);
           // 구분선은 날짜 하나로 통일한다. 예전엔 "새 대화" 경계선이 이 자리를
           // 가로채서, 리셋한 날의 날짜 표시가 통째로 사라졌다.
           return (
             <Fragment key={m.id}>
-              {showDateDivider && <DateDivider label={dayDividerLabel(m.createdAt)} />}
+              {showDateDivider && <DateDivider label={dayDividerLabel(m.createdAt, timeZone)} />}
               <div
                 style={{
                   marginTop: showDateDivider ? 0 : sameSenderAsPrev ? 4 : 12,

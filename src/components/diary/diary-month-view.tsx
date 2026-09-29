@@ -8,7 +8,7 @@ import { DiarySearchView } from "./diary-search-view";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 import { MoodBadge } from "./mood-badge";
 import { MOODS, KNOWN_MOOD_KEYS } from "./mood-data";
-import { kstTodayKey } from "@/lib/diary/kst";
+import { useDeviceTodayKey } from "@/lib/tz-client";
 import type { CalendarEntry } from "@/lib/diary/queries";
 
 interface Props {
@@ -237,7 +237,8 @@ export function DiaryMonthView(props: Props) {
 
 function MonthCalendarList({ initialYear, initialMonth, initialDays }: Props) {
   const router = useRouter();
-  const todayKey = kstTodayKey();
+  // 캘린더의 오늘은 기기(현지) 기준 — 해외에서도 그곳 날짜가 오늘로 표시된다.
+  const todayKey = useDeviceTodayKey();
   const [ty, tm] = todayKey.split("-").map(Number);
   const todayYm = ym(ty, tm);
 

@@ -11,6 +11,7 @@ import { ThemeToggle } from "@/components/settings/theme-toggle";
 import { PageHeader } from "@/components/layout/page-header";
 import { BackButton } from "@/components/nav/back-button";
 import { IOSSwitch } from "@/components/ui/ios-switch";
+import { deviceTimeZone, todayKeyInZone } from "@/lib/tz";
 
 const APP_VERSION = "v0.1.0";
 
@@ -124,7 +125,8 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      const today = new Date().toISOString().slice(0, 10);
+      // toISOString()은 UTC 날짜라 한국 자정~오전 9시엔 전날 날짜가 붙었다. 기기 날짜로.
+      const today = todayKeyInZone(deviceTimeZone());
       a.download = `memoism-export-${today}.json`;
       document.body.appendChild(a);
       a.click();
