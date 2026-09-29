@@ -12,6 +12,7 @@ import {
   type CaptureEntry,
 } from "@/lib/diary/capture-photos";
 import type { ClientExif } from "@/lib/diary/auto-generate";
+import { STORAGE_FULL_MSG } from "@/lib/storage/quota";
 
 export type CaptureRef = {
   /**
@@ -104,6 +105,9 @@ const PHOTO_FALLBACK =
 /** 사진을 볼 수 있는데 응답 생성만 실패한 경우 — "못 본다"고 하면 거짓말이 된다. */
 const PHOTO_SEEN_FALLBACK = "사진은 일기에 넣어뒀어. 뭐였는지 한 줄 남겨줄래?";
 
+/** 사진 저장이 실패했을 때의 안내. 글이 같이 왔으면 답장 앞에 붙는다. */
+const PHOTO_SAVE_FAILED_NOTICE = "사진은 저장하지 못했어. 조금 뒤에 다시 보내줄래?";
+
 /**
  * 칩 라벨 — **실제로 저장된 날**을 말한다. 사진이 EXIF로 다른 날에 가면
  * 메시지 날짜("오늘")를 그대로 쓰는 순간 칩이 거짓말을 한다.
@@ -167,6 +171,10 @@ export async function handleCaptureMessage(
   const fromExplicit = date.kind === "resolved" ? date.fromExplicit : false;
 
   const entries: CaptureEntry[] = [];
+  // 사진 저장이 실패해도 글 기록은 이어간다. 예전엔 여기서 바로 반환해 같이 보낸 글까지
+  // 사라졌고, 오류 원문이 메이의 말로 채팅에 남았다(점검 M3).
+  let photosSaved = false;
+  let photoFailNotice: string | null = null;
   if (photos.length > 0) {
     const exifKeys = exifs.map((e) =>
       // 기기가 촬영 시각(EXIF 벽시계)을 자기 시간대로 읽어 보낸 순간이다. 같은 시간대로
@@ -176,18 +184,27 @@ export async function handleCaptureMessage(
     );
     const photoDates = resolvePhotoDates(base, fromExplicit, exifKeys, todayKey);
     const saved = await savePhotosByDate(userId, photos, exifs, photoDates);
-    if (!saved.ok) {
-      return { handled: true, reply: saved.error, captureRef: null };
+    if (saved.ok) {
+      photosSaved = true;
+      entries.push(...saved.entries);
+    } else {
+      // 공간 부족은 할 수 있는 일이 있어 그대로 알리고, 나머지는 고정 문구로.
+      photoFailNotice =
+        saved.error === STORAGE_FULL_MSG ? STORAGE_FULL_MSG : PHOTO_SAVE_FAILED_NOTICE;
+      if (!(message && textIsRecord)) {
+        return { handled: true, reply: photoFailNotice, captureRef: null };
+      }
     }
-    entries.push(...saved.entries);
   }
+  const withPhotoNotice = (reply: string) =>
+    photoFailNotice ? `${photoFailNotice}\n\n${reply}` : reply;
 
   if (date.kind === "ambiguous") {
-    // 사진은 이미 제 날짜로 저장됐다. 되묻는 대상은 텍스트뿐 — 사용자가 날짜를
+    // 사진은 (저장에 성공했다면) 이미 제 날짜로 갔다. 되묻는 대상은 텍스트뿐 — 사용자가 날짜를
     // 확정해 다시 보내면 그때 조각으로 저장된다. 칩은 사진이 어디 갔는지 알린다.
     return {
       handled: true,
-      reply: date.question,
+      reply: withPhotoNotice(date.question),
       captureRef:
         entries.length > 0
           ? {
@@ -225,7 +242,7 @@ export async function handleCaptureMessage(
   // 사진이 있으면 텍스트가 같이 왔든 아니든 "못 본다"는 사실을 알린다.
   // 예전엔 사진만 온 경우에만 알려서, 사진+글을 보내면 메이가 사진을 아예
   // 없었던 것처럼 되물어 사용자가 무시당했다고 느꼈다.
-  const hasPhotos = photos.length > 0;
+  const hasPhotos = photosSaved;
   const dateLabels = [
     ...new Set(entries.map((e) => dateKeyLabel(e.dateKey))),
   ].join(", ");
@@ -286,12 +303,13 @@ export async function handleCaptureMessage(
 
   return {
     handled: true,
-    reply:
+    reply: withPhotoNotice(
       reply.trim() || (hasPhotos
         ? seeing
           ? PHOTO_SEEN_FALLBACK
           : PHOTO_FALLBACK
         : FALLBACK_REPLY),
+    ),
     captureRef: {
       diaryId: primary.diaryId,
       dateKey: primary.dateKey,

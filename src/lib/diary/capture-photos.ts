@@ -13,6 +13,9 @@ export type CaptureEntry = {
   imageIds: string[];
 };
 
+/** 사진 저장 실패 안내. 오류 원문 대신 이 문구를 준다(메이 채팅·밀린 날 채우기 공용). */
+export const PHOTO_SAVE_FAILED_MSG = "사진을 저장하지 못했어요. 잠시 후 다시 시도해주세요.";
+
 /**
  * 채팅으로 받은 사진을 **각자의 날짜** 일기에 DiaryImage로 저장한다.
  * `photos[i]`는 `dateKeys[i]`로 간다 — 여러 날 사진을 한 날에 몰지 않는다.
@@ -57,10 +60,9 @@ export async function savePhotosByDate(
     for (const p of photos) uploaded.push(await saveImage(p, userId));
   } catch (e) {
     await Promise.all(uploaded.map((path) => deleteImage(path)));
-    return {
-      ok: false,
-      error: e instanceof Error ? e.message : "사진 업로드에 실패했어요",
-    };
+    // 원문(스토리지 오류)은 로그에만 — 메이 채팅에 그대로 남았다(점검 M3).
+    console.error("[capture-photos] upload failed:", e instanceof Error ? e.message : e);
+    return { ok: false, error: PHOTO_SAVE_FAILED_MSG };
   }
 
   try {
@@ -102,9 +104,7 @@ export async function savePhotosByDate(
   } catch (e) {
     // DB 실패 시 업로드분 보상 삭제 (Plan 02 규약: 고아를 남기지 않는다)
     await Promise.all(uploaded.map((path) => deleteImage(path)));
-    return {
-      ok: false,
-      error: e instanceof Error ? e.message : "사진 저장에 실패했어요",
-    };
+    console.error("[capture-photos] save failed:", e instanceof Error ? e.message : e);
+    return { ok: false, error: PHOTO_SAVE_FAILED_MSG };
   }
 }
