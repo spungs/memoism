@@ -13,8 +13,8 @@ import { buildInstruction } from "@/lib/diary/ai-instruction";
 import { pickRegenerateText } from "@/lib/diary/regenerate-input";
 import { kstTodayKey } from "@/lib/diary/kst";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
+import { DRAFT_KEY_NEW, PENDING_DRAFT_KEY } from "./draft-keys";
 
-const PENDING_DRAFT_KEY = "memoism:pendingDraft";
 const DRAFT_TTL_MS = 5 * 60 * 1000; // 5분 만료 — 사용자가 너무 오래 자리비울 때 보호
 
 type PendingDraft = {
@@ -236,16 +236,29 @@ export function ReviewGate() {
       fd.set("mood", mood);
       fd.set("date", draftState.date);
 
-      const result = await createDiaryAction(fd);
-      if (!result.ok) {
-        setSubmitError(result.error ?? "저장에 실패했어요");
-        return;
-      }
+      try {
+        const result = await createDiaryAction(fd);
+        if (!result.ok) {
+          setSubmitError(result.error ?? "저장에 실패했어요");
+          return;
+        }
 
-      leavingRef.current = true;
-      sessionStorage.removeItem(PENDING_DRAFT_KEY);
-      router.push(`/diary/${result.data.id}`);
-      router.refresh();
+        leavingRef.current = true;
+        sessionStorage.removeItem(PENDING_DRAFT_KEY);
+        // 작성 화면이 AI 정리로 넘어올 때 일부러 남겨둔 자동저장 초안이다(취소하고
+        // 돌아가면 복원하려고). 여기서 저장했으니 지운다 — 남기면 다음 새 일기에서
+        // "작성 중이던 내용" 배너로 불러와 같은 일기가 한 번 더 저장된다(점검 H4).
+        try { localStorage.removeItem(DRAFT_KEY_NEW); } catch { /* 무시 */ }
+        router.push(`/diary/${result.data.id}`);
+        router.refresh();
+      } catch {
+        // 서버 액션이 예외를 던지면(배포 스큐로 액션 ID 소멸·네트워크 단절 등) 잡지 않으면
+        // 에러 바운더리가 화면을 내리고, 고친 제목·본문은 state에만 있어 사라진다(점검 H3).
+        // 여기서 잡으면 화면이 그대로라 입력이 보존된다. 작성 화면(diary-form)과 같은 처리.
+        setSubmitError(
+          "저장 중 문제가 생겼어요. 고친 내용은 그대로 있으니 잠시 후 다시 저장해주세요.",
+        );
+      }
     });
   };
 

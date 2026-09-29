@@ -25,10 +25,9 @@ import { DiaryDatePicker } from "./date-picker";
 import { DEFAULT_MOOD, MoodPicker, type MoodKey } from "./mood-picker";
 import { AiBusyOverlay, Spinner } from "@/components/ui/ai-busy-overlay";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
+// DRAFT_KEY_NEW: create 모드에서 작성 중 내용을 자동저장하는 키. 새로고침·세션만료로 인한 유실 방지.
+import { DRAFT_KEY_NEW, PENDING_DRAFT_KEY } from "./draft-keys";
 
-const PENDING_DRAFT_KEY = "memoism:pendingDraft";
-// create 모드에서 작성 중 내용을 자동저장하는 키. 새로고침·세션만료로 인한 유실 방지.
-const DRAFT_KEY_NEW = "memoism:draft:new";
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000; // 24시간 후 만료
 
 interface NewDraft {
