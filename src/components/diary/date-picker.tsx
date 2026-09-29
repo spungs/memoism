@@ -148,6 +148,7 @@ export function DiaryDatePicker({ value, max, onChange, defaultOpen = false }: D
             <button
               type="button"
               onClick={goPrev}
+              aria-label="이전 달"
               style={navBtnStyle}
             >
               ‹
@@ -164,6 +165,7 @@ export function DiaryDatePicker({ value, max, onChange, defaultOpen = false }: D
               type="button"
               onClick={goNext}
               disabled={!canGoNext}
+              aria-label="다음 달"
               style={{ ...navBtnStyle, opacity: canGoNext ? 1 : 0.25 }}
             >
               ›

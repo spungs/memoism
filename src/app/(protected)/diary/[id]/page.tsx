@@ -56,8 +56,9 @@ export default async function DiaryDetailPage({ params }: PageProps) {
       ? await getSignedUrlsForOwner(imagePaths, session.userId)
       : [];
 
+  // 레이아웃이 이미 <main>이다 — 중첩하면 랜드마크가 둘이 된다(점검 L20).
   return (
-    <main
+    <div
       style={{
         minHeight: "100vh",
         backgroundColor: "var(--bg)",
@@ -79,7 +80,6 @@ export default async function DiaryDetailPage({ params }: PageProps) {
       >
         <Link
           href="/diary"
-          aria-label="목록으로"
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -220,6 +220,6 @@ export default async function DiaryDetailPage({ params }: PageProps) {
           diaryDateKey={kstDateKey(diary.createdAt)}
         />
       </article>
-    </main>
+    </div>
   );
 }

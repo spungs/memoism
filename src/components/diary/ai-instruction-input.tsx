@@ -82,7 +82,6 @@ export function AiInstructionInput({
                 fontSize: "var(--text-sm)",
                 fontWeight: 600,
                 cursor: disabled ? "default" : "pointer",
-                outline: "none",
                 transition:
                   "background-color var(--duration-fast) var(--ease-out)",
               }}

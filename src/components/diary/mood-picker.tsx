@@ -73,7 +73,6 @@ export function MoodPicker({ value, onChange }: MoodPickerProps) {
                   ? mood.color
                   : 'var(--fill-2)',
                 cursor: 'pointer',
-                outline: 'none',
                 transition: 'background-color var(--duration-fast) var(--ease-out), transform var(--duration-base) var(--ease-bounce)',
                 transform: isSelected ? 'scale(1.08)' : 'scale(1)',
               }}
