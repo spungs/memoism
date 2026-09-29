@@ -5,6 +5,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PostHogProvider } from "@/providers/posthog-provider";
 import { PageTracker } from "@/components/analytics/page-tracker";
 import { QueryProvider } from "@/providers/query-provider";
+import { TZ_COOKIE } from "@/lib/tz";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -44,6 +45,11 @@ export const viewport: Viewport = {
     키·로직은 ThemeToggle(settings)과 동일해야 한다. */
 const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('memoism-theme');var d=t==='dark'||((!t||t==='auto')&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark');}catch(e){}})();`;
 
+/** 기기 시간대를 쿠키로 서버에 알린다 — 해외에서도 "오늘"·새벽 규칙·사진 날짜를 현지
+    기준으로 정하려고(src/lib/tz.ts). 첫 페인트 전에 심어 이후 모든 요청에 실리게 하고,
+    여행 중 앱이 백그라운드에서 돌아올 때(시간대가 바뀌었을 수 있다) 다시 확인한다. */
+const TZ_INIT_SCRIPT = `(function(){function s(){try{var z=Intl.DateTimeFormat().resolvedOptions().timeZone;if(!z)return;var c='${TZ_COOKIE}='+encodeURIComponent(z);if(document.cookie.split('; ').indexOf(c)<0)document.cookie=c+';path=/;max-age=31536000;samesite=lax';}catch(e){}}s();document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')s();});})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -53,6 +59,7 @@ export default function RootLayout({
     <html lang="ko" suppressHydrationWarning>
       <body className="antialiased">
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: TZ_INIT_SCRIPT }} />
         <PostHogProvider>
           <QueryProvider>
             <div className="app-shell">{children}</div>
