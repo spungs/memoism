@@ -111,16 +111,31 @@ export async function recaptureDateAction(
 
   await prisma.$transaction(async (tx) => {
     if (ref.fragmentId) {
+      // 정리 표시는 떠난 일기 기준 — 새 일기에서 정리에 들어가도록 푼다(점검 M4).
       await tx.diaryFragment.updateMany({
         where: { id: ref.fragmentId, diary: { userId: session.userId } },
-        data: { diaryId: toDiaryId },
+        data: { diaryId: toDiaryId, foldedAt: null },
       });
     }
     if (imageIds.length) {
-      await tx.diaryImage.updateMany({
-        where: { id: { in: imageIds }, diary: { userId: session.userId } },
-        data: { diaryId: toDiaryId },
+      // 대상 일기의 기존 사진 뒤에 이어 붙인다. 번호를 그대로 두면 기존 사진과
+      // 겹쳐 순서가 정해지지 않는다(유니크 제약이 없어 조용히 겹친다).
+      const agg = await tx.diaryImage.aggregate({
+        where: { diaryId: toDiaryId },
+        _max: { orderIndex: true },
       });
+      const moving = await tx.diaryImage.findMany({
+        where: { id: { in: imageIds }, diary: { userId: session.userId } },
+        select: { id: true },
+        orderBy: { orderIndex: "asc" },
+      });
+      const nextOrder = (agg._max.orderIndex ?? -1) + 1;
+      for (const [i, img] of moving.entries()) {
+        await tx.diaryImage.update({
+          where: { id: img.id },
+          data: { diaryId: toDiaryId, orderIndex: nextOrder + i },
+        });
+      }
     }
     await tx.chatMessage.update({
       where: { id: chatMessageId },

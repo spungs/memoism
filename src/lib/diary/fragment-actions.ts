@@ -82,9 +82,11 @@ export async function moveFragmentAction(
   );
   if (toDiaryId === fromDiaryId) return { ok: true };
 
+  // 정리 표시(foldedAt)는 떠난 일기 본문 기준이다. 새 일기에선 아직 정리 전이라
+  // 풀어야 그 날 정리에 들어간다 — 안 풀면 "정리할 새 조각이 없어요"가 떴다(점검 M4).
   await prisma.diaryFragment.update({
     where: { id: fragmentId },
-    data: { diaryId: toDiaryId },
+    data: { diaryId: toDiaryId, foldedAt: null },
   });
 
   await reembedDiaryWithFragments(fromDiaryId);
