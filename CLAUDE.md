@@ -78,6 +78,15 @@ Current domains: `auth`, `diary`, `character`, `storage` (image upload helpers).
 - PWA wrapper via `@ducanh2912/next-pwa` in `next.config.ts` — disabled in dev. The service worker (`public/sw.js`, `workbox-*.js`, etc.) is build-generated; don't edit by hand and don't commit it.
 - Korean is the primary UI language (`<html lang="ko">`, all error strings are Korean). Match this when adding user-facing text.
 
+### Dates: 현지 날짜 vs 저장 기준점
+
+날짜는 두 좌표계로 나눠 다룬다(해외여행 대응, `docs/superpowers/plans/2026-09-29-local-timezone-dates.md`).
+
+- **현지 날짜** — "오늘이 며칠인지", 새벽 기록 규칙, "어제·지난주" 해석, 사진 촬영일, 날짜 상한, AI에게 주는 오늘·시각, 시각 표시. 기기 시간대 기준이다. 서버는 쿠키 `tz`(루트 레이아웃 인라인 스크립트가 심음)를 `getRequestTimeZone()`(`src/lib/tz-server.ts`)으로 읽어 **인자로** 넘기고, 클라이언트는 렌더 중엔 `useDeviceTimeZone()`/`useDeviceTodayKey()`(`src/lib/tz-client.ts`), 핸들러에선 `deviceTimeZone()`을 쓴다. 도구는 `src/lib/tz.ts`.
+- **저장 기준점** — 일기가 어느 칸에 속하는지. KST 고정(`src/lib/diary/kst.ts`): `diaryCreatedAtForDateKey`(앵커), `kstDayRangeFromKey`·`kstMonthRangeUtc`(조회 범위), `kstDateKey(diary.createdAt)`(일기의 날짜). 현지 날짜로 정한 dateKey를 그대로 여기에 넘긴다 — 그래서 한국에 돌아와도 여행 중 일기 날짜가 바뀌지 않는다.
+- 새 코드에서 `kstTodayKey()`로 "사용자의 오늘"을 구하지 말 것. 22시 리마인더와 사용 횟수 초기화(`usage.ts`)는 결정에 따라 KST 그대로다.
+- 클라이언트 컴포넌트가 렌더 중 `deviceTimeZone()`을 직접 부르면 서버(UTC)와 달라 하이드레이션 불일치가 난다 — 훅을 쓸 것.
+
 ### Path aliases
 
 `@/*` → `src/*` (see `tsconfig.json`). Use it consistently — mixed relative/aliased imports for the same target are a code-review smell here.
