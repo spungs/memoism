@@ -23,12 +23,17 @@ function getSecret(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
+// 같은 JWT_SECRET으로 구글 가입 대기 토큰(purpose: "google_signup")도 서명한다.
+// 세션 토큰에는 purpose: "session"을 붙이고, 검증에서 용도와 페이로드 모양을 함께 본다
+// — 대기 토큰을 세션 쿠키에 넣으면 미들웨어를 통과해 재서명까지 됐다(점검 L4).
+const SESSION_PURPOSE = "session";
+
 export async function signSession(payload: {
   userId: string;
   email: string;
   tokenVersion: number;
 }): Promise<string> {
-  return new SignJWT(payload)
+  return new SignJWT({ ...payload, purpose: SESSION_PURPOSE })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_DURATION_SECONDS}s`)
@@ -40,6 +45,15 @@ export async function verifySessionToken(
 ): Promise<SessionPayload | null> {
   try {
     const { payload } = await jwtVerify<SessionPayload>(token, getSecret());
+    // purpose가 없는 토큰은 이 변경 전에 발급된 세션이라 받는다(30일 안에 자연 교체).
+    if (payload.purpose !== undefined && payload.purpose !== SESSION_PURPOSE) return null;
+    if (
+      typeof payload.userId !== "string" ||
+      typeof payload.email !== "string" ||
+      typeof payload.tokenVersion !== "number"
+    ) {
+      return null;
+    }
     return payload;
   } catch {
     return null;
