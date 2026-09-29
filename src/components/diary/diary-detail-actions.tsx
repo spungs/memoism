@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { deleteDiaryAction } from "@/lib/diary/actions";
+import { safeAction } from "@/lib/safe-action";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 
 interface DiaryDetailActionsProps {
@@ -19,7 +20,7 @@ export function DiaryDetailActions({ diaryId }: DiaryDetailActionsProps) {
 
   const handleConfirm = () => {
     startTransition(async () => {
-      const result = await deleteDiaryAction(diaryId);
+      const result = await safeAction(() => deleteDiaryAction(diaryId));
       if (!result.ok) {
         setErrorMessage(result.error);
         setShowConfirm(false);

@@ -7,6 +7,7 @@ import { DiaryDatePicker } from "@/components/diary/date-picker";
 import { dateKeyLabel } from "@/lib/diary/kst";
 import { useDeviceTodayKey } from "@/lib/tz-client";
 import { recaptureDateAction } from "@/lib/diary/capture-actions";
+import { safeAction } from "@/lib/safe-action";
 
 type Entry = { dateKey: string; diaryId: string; imageIds: string[] };
 
@@ -64,7 +65,7 @@ export function CaptureCorrectionSheet({
 
   const move = (picked: string) => {
     startTransition(async () => {
-      const r = await recaptureDateAction(chatMessageId, picked);
+      const r = await safeAction(() => recaptureDateAction(chatMessageId, picked));
       if (!r.ok) {
         setError(r.error);
         return;

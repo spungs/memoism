@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { Sparkles, Undo2 } from "lucide-react";
 import { revertDiaryAction } from "@/lib/diary/actions";
+import { safeAction } from "@/lib/safe-action";
 import { AiInstructionInput } from "./ai-instruction-input";
 import { isOverAiLimit } from "./content-length-hint";
 import { MAX_AI_INPUT_CONTENT_LENGTH } from "@/lib/diary/schemas";
@@ -135,7 +136,7 @@ export function DiaryAiActions({
   const handleRevert = () => {
     setError(null);
     startRevert(async () => {
-      const result = await revertDiaryAction(diaryId);
+      const result = await safeAction(() => revertDiaryAction(diaryId));
       if (!result.ok) {
         setError(result.error);
         return;

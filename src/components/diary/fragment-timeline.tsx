@@ -10,6 +10,7 @@ import {
   moveFragmentAction,
   updateFragmentAction,
 } from "@/lib/diary/fragment-actions";
+import { safeAction } from "@/lib/safe-action";
 
 export type TimelineFragment = {
   id: string;
@@ -70,7 +71,7 @@ export function FragmentTimeline({
 
   const save = (id: string) => {
     startTransition(async () => {
-      const r = await updateFragmentAction(id, draft);
+      const r = await safeAction(() => updateFragmentAction(id, draft));
       if (!r.ok) {
         setError(r.error);
         return;
@@ -82,7 +83,7 @@ export function FragmentTimeline({
 
   const move = (id: string, dateKey: string) => {
     startTransition(async () => {
-      const r = await moveFragmentAction(id, dateKey);
+      const r = await safeAction(() => moveFragmentAction(id, dateKey));
       if (!r.ok) setError(r.error);
       else setError(null);
       setMovingId(null);
@@ -93,7 +94,7 @@ export function FragmentTimeline({
     const id = confirmDeleteId;
     if (!id) return;
     startTransition(async () => {
-      const r = await deleteFragmentAction(id);
+      const r = await safeAction(() => deleteFragmentAction(id));
       if (!r.ok) setError(r.error);
       else setError(null);
       setConfirmDeleteId(null);

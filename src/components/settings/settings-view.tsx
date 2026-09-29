@@ -1,9 +1,10 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { unstable_rethrow, useRouter } from "next/navigation";
 import { logoutAction, changePasswordAction, type ChangePasswordState } from "@/lib/auth/actions";
 import { setPhotoVisionConsentAction } from "@/lib/character/actions";
+import { ACTION_FAILED_MESSAGE, safeAction } from "@/lib/safe-action";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { PushToggle } from "@/components/settings/push-toggle";
@@ -94,6 +95,7 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
   const router = useRouter();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -109,7 +111,17 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
 
   const handleLogout = async () => {
     setLogoutLoading(true);
-    await logoutAction();
+    setLogoutError(null);
+    try {
+      await logoutAction();
+    } catch (e) {
+      // 성공해도 redirect 에러로 reject된다 — 그건 다시 던져 이동에 맡긴다.
+      unstable_rethrow(e);
+      // 네트워크 단절 등으로 실패하면 로딩이 안 풀려, 로딩 중엔 닫기를 막는 확인
+      // 시트에 갇혔다(점검 M15).
+      setLogoutError(ACTION_FAILED_MESSAGE);
+      setLogoutLoading(false);
+    }
   };
 
   const handleExport = async () => {
@@ -157,7 +169,7 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
 
   const handleVisionToggle = async (next: boolean) => {
     setVisionOn(next); // 낙관적
-    const r = await setPhotoVisionConsentAction(next);
+    const r = await safeAction(() => setPhotoVisionConsentAction(next));
     if (!r.ok) setVisionOn(!next); // 실패하면 되돌린다
   };
 
@@ -457,7 +469,10 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
         <div style={CARD_STYLE}>
           <button
             type="button"
-            onClick={() => setLogoutOpen(true)}
+            onClick={() => {
+              setLogoutError(null);
+              setLogoutOpen(true);
+            }}
             className="pressable"
             style={{
               ...ROW_STYLE,
@@ -487,7 +502,7 @@ export function SettingsView({ email, googleLinked, hasPassword, googleNotice, u
         onClose={() => !logoutLoading && setLogoutOpen(false)}
         onConfirm={handleLogout}
         title="로그아웃 할까요?"
-        description="다시 로그인하면 모든 기록을 다시 볼 수 있어요."
+        description={logoutError ?? "다시 로그인하면 모든 기록을 다시 볼 수 있어요."}
         confirmLabel="로그아웃"
         confirmVariant="danger"
         isLoading={logoutLoading}
