@@ -841,7 +841,9 @@ export function CharacterChat({
             ref={textareaRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            disabled={sending}
+            // disabled면 포커스를 잃어 보낼 때마다 모바일 키보드가 닫혔다(점검 L15).
+            // readOnly는 포커스를 유지한 채 전송 중 입력만 막는다. 전송은 버튼·send()가 막는다.
+            readOnly={sending}
             // 한도가 차도 입력은 열어둔다 — 기록은 캡을 쓰지 않는다.
             // "물어보기"는 회상만 가리켰다 — 이 입력창은 이제 기록이 주 용도다.
             placeholder={`${characterName}에게 말하기`}
