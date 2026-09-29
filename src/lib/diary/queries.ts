@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { todayKeyInZone } from "@/lib/tz";
-import { getSignedUrl, getSignedUrlsByPath } from "@/lib/storage";
+import { getSignedUrlsByPath } from "@/lib/storage";
 import { fragmentPreview } from "./fragment-preview";
 import {
   dateKeyLabel,
@@ -101,22 +101,6 @@ export async function getDiary(id: string, userId: string) {
   });
 }
 
-export async function getRecentDiaries(userId: string, take = 3) {
-  return prisma.diary.findMany({
-    where: { userId, ...NOT_EMPTY_DIARY },
-    orderBy: { createdAt: "desc" },
-    take,
-    select: {
-      id: true,
-      title: true,
-      createdAt: true,
-      content: true,
-      source: true,
-      mood: true,
-    },
-  });
-}
-
 /**
  * 홈 "이번 달" 요약용 카운트.
  *   - total: 유저 전체 일기 수
@@ -178,51 +162,6 @@ export async function searchDiariesByText(userId: string, query: string) {
 export type DiaryListItemWithThumbnail = DiaryListItem & {
   thumbnailUrl: string | null;
 };
-
-/**
- * 오늘(KST 자정 기준) 작성된 일기 1개 조회. 첫 이미지 signed URL 포함.
- * 없으면 null — 홈 "오늘 첫 줄 시작해볼까?" CTA 분기에 사용.
- */
-export async function getTodayDiary(userId: string) {
-  const now = new Date();
-  const kstOffsetMs = 9 * 60 * 60 * 1000;
-  const kstNow = new Date(now.getTime() + kstOffsetMs);
-  const startUtcMs =
-    Date.UTC(
-      kstNow.getUTCFullYear(),
-      kstNow.getUTCMonth(),
-      kstNow.getUTCDate(),
-    ) - kstOffsetMs;
-  const startUtc = new Date(startUtcMs);
-  const endUtc = new Date(startUtcMs + 24 * 60 * 60 * 1000);
-
-  const diary = await prisma.diary.findFirst({
-    where: {
-      userId,
-      createdAt: { gte: startUtc, lt: endUtc },
-    },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      title: true,
-      content: true,
-      mood: true,
-      source: true,
-      createdAt: true,
-      images: {
-        select: { storagePath: true },
-        orderBy: { orderIndex: "asc" },
-        take: 1,
-      },
-    },
-  });
-  if (!diary) return null;
-
-  const path = diary.images[0]?.storagePath;
-  const thumbnailUrl =
-    path && path.startsWith(`${userId}/`) ? await getSignedUrl(path) : null;
-  return { ...diary, thumbnailUrl };
-}
 
 /**
  * getDiaries + 각 item의 첫 이미지 storagePath를 signed URL로 변환.

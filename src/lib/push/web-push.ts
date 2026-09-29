@@ -1,3 +1,4 @@
+import "server-only";
 import webpush from "web-push";
 import { prisma } from "@/lib/db";
 
@@ -107,18 +108,4 @@ export async function sendPushToSubscriptions(
   }
 
   return { sent, pruned };
-}
-
-/**
- * 특정 사용자의 모든 구독에 발송. 만료 구독 prune 포함.
- */
-export async function sendPushToUser(
-  userId: string,
-  payload: PushPayload,
-): Promise<SendResult> {
-  const subs = await prisma.pushSubscription.findMany({
-    where: { userId },
-    select: { endpoint: true, p256dh: true, auth: true },
-  });
-  return sendPushToSubscriptions(subs, payload);
 }

@@ -42,20 +42,3 @@ export async function createFragment(
   await reembedDiaryWithFragments(diaryId);
   return { diaryId, fragmentId: fragment.id };
 }
-
-/** 한 일기의 조각들을 시간순으로 조회 (일기 상세 타임라인용). */
-export async function listFragmentsForDiary(
-  diaryId: string,
-): Promise<FragmentRow[]> {
-  return prisma.diaryFragment.findMany({
-    where: { diaryId },
-    orderBy: { createdAt: "asc" },
-    select: {
-      id: true,
-      kind: true,
-      content: true,
-      storagePath: true,
-      createdAt: true,
-    },
-  });
-}

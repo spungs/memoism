@@ -289,16 +289,6 @@ export async function getSignedUrl(storagePath: string): Promise<string | null> 
 }
 
 /**
- * Issue signed URLs for multiple paths in parallel.
- * Preserves order; null entries indicate per-path failures.
- */
-export async function getSignedUrls(
-  storagePaths: string[],
-): Promise<(string | null)[]> {
-  return Promise.all(storagePaths.map(getSignedUrl));
-}
-
-/**
  * 여러 path의 signed URL을 batch 1회 호출로 발급 (개별 N회 대비 네트워크 비용 절감).
  * path → signedUrl Map 반환. 실패/누락 path는 Map에 없음(caller가 null fallback).
  */
