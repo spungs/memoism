@@ -23,6 +23,9 @@ const eslintConfig = [
       "public/sw.js.map",
       "public/swe-worker-*.js",
       "public/workbox-*.js",
+      // 빌드가 만드는 커스텀 워커 번들 (.gitignore와 같은 목록, 점검 D3)
+      "public/worker-*.js",
+      "public/worker-*.js.map",
       "public/fallback-*.js",
     ],
   },

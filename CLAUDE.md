@@ -21,17 +21,18 @@ pnpm db:migrate     # prisma migrate dev — create + apply a named migration
 pnpm db:generate    # regenerate Prisma client after schema changes
 pnpm db:studio      # open Prisma Studio
 
-docker compose up -d postgres   # local Postgres on :5432, user/pass/db all "memoism"
+docker compose up -d postgres   # local Postgres on :5432 (compose default), user/pass/db all "memoism" — keep the port in .env.local in sync if you remap it
 ```
 
 `postinstall` runs `prisma generate`, so a fresh `pnpm install` produces a working client. After editing `prisma/schema.prisma` re-run `pnpm db:generate` (or `db:push`/`db:migrate`).
 
 ## Environment
 
-Copy `.env.local.example` → `.env.local`. Two vars are required:
+Copy `.env.local.example` → `.env.local` (it lists every var). These are required:
 
 - `DATABASE_URL` — Postgres URL **including `?schema=app`**. Every Prisma model is mapped to the `app` schema in single-schema mode (no `@@schema` annotations).
 - `JWT_SECRET` — HS256 signing key for session cookies. Rotating it invalidates all sessions.
+- `CRON_SECRET` — required in any deployed env. `/api/cron/*` rejects every call when it is unset (`src/lib/cron-auth.ts`).
 
 `prisma.config.ts` loads `.env` then `.env.local` (latter overrides) so Prisma CLI sees the same values as the Next runtime.
 
@@ -39,7 +40,7 @@ Copy `.env.local.example` → `.env.local`. Two vars are required:
 
 ### Auth: JWT cookie + middleware route gate
 
-- `src/lib/auth/session.ts` signs HS256 JWTs with `jose` and stores them in an httpOnly `session` cookie (7-day TTL).
+- `src/lib/auth/session.ts` signs HS256 JWTs with `jose` and stores them in an httpOnly `session` cookie (30-day TTL, `SESSION_DURATION_SECONDS` in `jwt.ts`). The middleware re-issues the cookie once less than half the TTL remains (sliding session). Cookie name/options live in `jwt.ts` only.
 - `src/middleware.ts` is the single source of truth for route protection. It runs on every non-asset path: authed users hitting `/login` or `/signup` are bounced to `/`; unauthed users hitting anything else get redirected to `/login` (page routes) or get a JSON 401 (paths under `/api/`). When adding a new public route, add it to `PUBLIC_PATHS` in `middleware.ts`.
 - The route group `src/app/(auth)` and `src/app/(protected)` is **organisational only** — protection comes from middleware, not from layout checks. Don't rely on the group name to enforce auth.
 - Server Actions (`src/lib/*/actions.ts`) and API routes still call `getSession()` themselves before mutating, since middleware only checks cookie validity, not authorization for a specific resource.
@@ -60,21 +61,20 @@ Current domains: `auth`, `diary`, `character`, `storage` (image upload helpers).
 
 ### Diary image lifecycle
 
-`updateDiaryAction` uses an `imageMode` form field with three values: absent / `"__keep__"` (no change), `"remove"` (drop existing), or a new file in the `image` field (replace). On replace/remove the old image is deleted from storage **after** the DB update succeeds. `deleteDiaryAction` deletes all images after the row is removed. Preserve this ordering — uploading before DB write would orphan files on validation failure.
+A diary holds up to 10 photos as `DiaryImage` rows ordered by `orderIndex`. `updateDiaryAction` takes `removeImageIds` (JSON id list) plus new files in `image`: removed rows are deleted inside the DB transaction (with the storage counter decrement), and their files are deleted from storage **after** it commits via `deleteUnreferencedImages`, which skips any file another row still references. `deleteDiaryAction` follows the same DB → storage order. Preserve it — deleting files first loses photos when the DB write fails.
 
 ### Character & subscription invariants (per `prisma/schema.prisma` comments)
 
 - `User` ↔ `Character` is 1:1. Signup creates both inside one `prisma.$transaction` (`signupAction`); never create a `User` without a `Character`.
-- Trial starts at signup for 30 days (`trialEndDate` in `src/lib/character/utils.ts`).
-- `Character.coinBalance` is a denormalised cache of `SUM(CoinTransaction.amount)`. **Always update it inside the same transaction as the `CoinTransaction` insert**, or the cache drifts.
-- `Character.isAsleep` is a derived visual flag; `subscriptionStatus` is authoritative.
+- The gamification columns (coins, sleep state, trial, per-user name) were dropped — see the `Character` comment in `schema.prisma`. The character name is fixed (`CHARACTER_NAME` in `src/lib/character/utils.ts`).
+- `subscriptionStatus` (beta users default to `ACTIVE`) plus `plan` decide the daily AI cap (`src/lib/ai/usage.ts`).
 
 ### UI stack
 
 - Tailwind v4 + shadcn (style `base-nova`, neutral base, CSS variables) configured in `components.json`. CSS lives in `src/app/globals.css`. Component aliases: `@/components/ui` for shadcn primitives, `@/components/<domain>` for feature components.
 - Base UI primitives via `@base-ui/react`, icons via `lucide-react`.
-- Forms use `react-hook-form` + `@hookform/resolvers/zod`, sharing the same Zod schemas the Server Actions validate against.
-- Client cache via `@tanstack/react-query` (provider in `src/providers/query-provider.tsx`).
+- Forms are plain React state / `useActionState` calling Server Actions, which validate with the Zod schemas in `schemas.ts`. (`react-hook-form` is installed but unused.)
+- `@tanstack/react-query` has a provider mounted (`src/providers/query-provider.tsx`) but no queries use it yet.
 - PWA wrapper via `@ducanh2912/next-pwa` in `next.config.ts` — disabled in dev. The service worker (`public/sw.js`, `workbox-*.js`, etc.) is build-generated; don't edit by hand and don't commit it.
 - Korean is the primary UI language (`<html lang="ko">`, all error strings are Korean). Match this when adding user-facing text.
 
