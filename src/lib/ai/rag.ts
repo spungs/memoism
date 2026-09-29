@@ -137,6 +137,9 @@ function ymd(dateKey: string): { y: number; m: number; day: number } {
  * 뉴욕 밤에 "어제"라고 하면 뉴욕의 어제다. 범위는 저장 좌표(KST 하루 경계)로 만든다.
  * 일기는 KST 칸에 앵커되므로(kst.ts) 같은 날짜키면 같은 칸을 가리킨다.
  */
+const DOT_DATE_RE =
+  /(?<![\d.])(\d{1,2})\.(\d{1,2})(?!\d|\.\d)(?=$|[\s,.!?~)]|에|엔|날|부터|까지|쯤)(?!\s+(?:시간|배|분|초|km|kg|키로|킬로|리터|%))/g;
+
 export function parseDateRefs(message: string, now: Date, tz: string): DateRange[] {
   const todayKey = todayKeyInZone(tz, now);
   const ranges: DateRange[] = [];
@@ -162,9 +165,16 @@ export function parseDateRefs(message: string, now: Date, tz: string): DateRange
     add(thisYear, +mt[1], +mt[2], `${mt[1]}월 ${mt[2]}일`);
     rest = rest.replace(mt[0], " ");
   }
-  // M/D 또는 M.D 슬래시·점 형식 (예: 6/8, 6.8) → 현지 올해.
+  // M/D 슬래시 형식 (예: 6/8) → 현지 올해.
   // 앞에서 연도 포함·한국어 형식이 이미 처리된 rest 기준으로 파싱해 중복을 방지한다.
-  for (const mt of rest.matchAll(/\b(\d{1,2})[\/.](\d{1,2})\b/g)) {
+  for (const mt of rest.matchAll(/\b(\d{1,2})\/(\d{1,2})\b/g)) {
+    add(thisYear, +mt[1], +mt[2], `${mt[1]}월 ${mt[2]}일`);
+  }
+  // M.D 점 형식 (예: 6.8, 9.20에) → 현지 올해. 소수("2.5시간", "1.5배")와 모양이
+  // 같아서 **뒤에 오는 말**로 가른다: 끝·공백·문장부호·날짜 조사만 날짜로 본다.
+  // 예전 `\b` 판정은 한글 앞을 경계로 봐서 소수를 날짜로 잡았고, 같이 보낸 사진까지
+  // 그 날짜로 갔다(점검 M2). 띄어 쓴 단위("2.5 시간")와 버전 번호("1.2.3")도 뺀다.
+  for (const mt of rest.matchAll(DOT_DATE_RE)) {
     add(thisYear, +mt[1], +mt[2], `${mt[1]}월 ${mt[2]}일`);
   }
   // 상대 표현

@@ -28,3 +28,31 @@ describe("parseDateRefs — 기준 날짜는 현지(2026-09-29)", () => {
     expect(keys("3월 1일", NY_NYE, "Asia/Seoul")).toEqual(["2027-03-01"]);
   });
 });
+
+describe("parseDateRefs — 점 형식과 소수 구분 (점검 M2)", () => {
+  const NOW = new Date("2026-09-29T03:00:00Z"); // 서울 9/29 12:00
+  const k = (m: string) => keys(m, NOW, "Asia/Seoul");
+
+  it("소수·단위는 날짜로 보지 않는다", () => {
+    expect(k("2.5시간 걸었어")).toEqual([]);
+    expect(k("1.5배 빨랐어")).toEqual([]);
+    expect(k("2.5 시간 걸었어")).toEqual([]);
+    expect(k("버전 1.2.3 올렸어")).toEqual([]);
+    expect(k("112.5 나왔어")).toEqual([]);
+  });
+
+  it('"오늘 2.5시간"은 오늘 하나만 — 두 개로 잡혀 되묻지 않는다', () => {
+    expect(k("오늘 2.5시간 걸었어")).toEqual(["2026-09-29"]);
+  });
+
+  it("점 형식 날짜는 계속 알아본다", () => {
+    expect(k("6.8")).toEqual(["2026-06-08"]);
+    expect(k("6.8에 뭐 했지")).toEqual(["2026-06-08"]);
+    expect(k("9.20 성수동 갔던 날")).toEqual(["2026-09-20"]);
+    expect(k("6.8. 한강")).toEqual(["2026-06-08"]);
+  });
+
+  it("슬래시 형식은 그대로", () => {
+    expect(k("6/8에 뭐 했지")).toEqual(["2026-06-08"]);
+  });
+});
