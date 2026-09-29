@@ -340,12 +340,12 @@
   - 안전 펜스 차단: 경로에 따라 200 / 400 / 502 / 503입니다. 정상 차단이 로그에서는 서버 장애로 집계됩니다.
   - organize는 `capExhausted`가 undefined로 나갈 수 있습니다.
   - 고치는 방향: 결과 → 상태 코드 매핑 함수를 하나로 통일합니다.
-- [ ] **L2. 촬영시각 검증 없음 + 검증 스키마 3벌 복사**
+- [x] **L2. 촬영시각 검증 없음 + 검증 스키마 3벌 복사** — 수정 `c080f584`
   - 위치: `diaries/backfill/photos/route.ts:8-12`, `lib/diary/capture-photos.ts:44-46`, `79`, `102-108`
   - `takenAt: z.string().nullable()`은 "hello"도 통과시킵니다. Invalid Date가 되어 트랜잭션이 실패하고, Prisma 원문이 반환되며, 트랜잭션 밖에서 먼저 만든 빈 일기가 남습니다.
   - chat은 `Date.parse`로 막고 있습니다(`chat/route.ts:319-326`).
   - 고치는 방향: `lib/diary/schemas.ts`에 공용 `clientExifSchema`를 둡니다.
-- [ ] **L3. `GET /api/diaries?take=0`(또는 음수)이면 500**
+- [x] **L3. `GET /api/diaries?take=0`(또는 음수)이면 500** — 수정 `c080f584`
   - 위치: `diaries/route.ts:14-20`, `lib/diary/queries.ts:70`, `79-83`
   - `items[-1].id`에 접근하다 예외가 납니다.
   - 고치는 방향: `z.coerce.number().int().min(1).max(100)`로 검증합니다.
@@ -356,14 +356,14 @@
 - [ ] **L5. 구글 연동 경쟁 상태와 덮어쓰기**
   - 위치: `auth/google/callback/route.ts:64-83`
   - P2002 오류가 처리되지 않아 500이 나고, 이미 연결된 다른 googleSub를 조용히 교체합니다.
-- [ ] **L6. 날짜키 정규식이 7곳에 복사돼 있고 실제 달력 날짜인지 검증하지 않음**
+- [x] **L6. 날짜키 정규식이 7곳에 복사돼 있고 실제 달력 날짜인지 검증하지 않음** — 수정 `c080f584`
   - 위치: `backfill/organize/route.ts:16`, `backfill/photos/route.ts:13`, `lib/diary/kst.ts:47-53`, `60`, `fragment-actions.ts:65`, `capture-actions.ts:72`, `capture-date.ts:85`
   - "2026-02-31"도 통과하고, 3월 3일 범위를 조회하게 됩니다.
-  - 고치는 방향: `kst.ts`에 `isValidDateKey()`와 `dateKeySchema`를 하나씩 둡니다.
-- [ ] **L7. 개발용 임베딩 백필 라우트가 운영에 열려 있음**
+  - 고치는 방향: `kst.ts`에 `isValidDateKey()`와 `dateKeySchema`를 하나씩 둡니다. → 날짜 키 도구가 모인 `tz.ts`에 `isValidDateKey()`, `diary/schemas.ts`에 `dateKeySchema`를 두었습니다.
+- [x] **L7. 개발용 임베딩 백필 라우트가 운영에 열려 있음** — 수정 `61eb69ad`
   - 위치: `diaries/backfill-embeddings/route.ts:5-14`, `lib/diary/embedding.ts:48-51`, `103`
   - 로그인한 누구나 호출할 수 있고 rate limit이 없으며, 예외 원문을 반환합니다.
-- [ ] **L8. 세션 쿠키 옵션이 두 파일에 중복 정의됨**
+- [x] **L8. 세션 쿠키 옵션이 두 파일에 중복 정의됨** — 수정 `64afc323`
   - 위치: `middleware.ts:8-14`, `lib/auth/session.ts:17-23`
   - 고치는 방향: `jwt.ts`에서 한 번만 export합니다.
 
@@ -378,7 +378,7 @@
   - 밀린 날 채우기에서 메모를 이어 붙여 2000자를 넘기면 차감 후 불투명한 오류가 납니다.
 - [ ] **L11. 사진 일부를 못 받으면 EXIF 요약 번호가 사진과 어긋남**
   - 위치: `regenerate.ts:146-155`, `organize.ts:166-175`, `preview-generate.ts:116`
-- [ ] **L12. `releaseIncrement`가 반납 시점의 날짜를 다시 계산함**
+- [x] **L12. `releaseIncrement`가 반납 시점의 날짜를 다시 계산함** — 수정 `640fa2b3`
   - 위치: `lib/ai/usage.ts:129-135`
   - 자정을 넘기면 새 날짜 행에서 감산됩니다.
   - 고치는 방향: `checkAndIncrement`가 차감한 date를 반환하고, 반납할 때 그 값을 씁니다.
@@ -387,7 +387,7 @@
   - `embedding.ts:80-107`: 백필 임베딩에 조각이 빠집니다.
   - `fragment-actions.ts:36-45`: 조각 수정에 길이 상한이 없습니다.
   - `fragment-fold.ts:58`: 루프가 `break`라서 긴 조각 하나가 예산을 넘으면 그날 정리가 영원히 안 됩니다.
-- [ ] **L14. 서버 전용 표시 누락, 미사용 함수, 로컬 시간 생성자**
+- [x] **L14. 서버 전용 표시 누락, 미사용 함수, 로컬 시간 생성자** — 수정 `c26e8767`
   - `lib/push/web-push.ts`에 `import "server-only"`가 없습니다(VAPID 비밀키를 다룸).
   - 미사용 export 7개:
     - `fragments.ts:47 listFragmentsForDiary`
@@ -397,11 +397,11 @@
     - `web-push.ts:110 sendPushToUser`
     - `character/vision-consent.ts:13 getPhotoVisionOptIn`
     - `diary/exif.ts:83 validateSameDayKST`
-  - `rag.ts:178`의 `new Date(y, m-1, d)`가 서버 로컬 시간대를 씁니다. 지금은 결과가 같지만 규약에 어긋납니다.
+  - `rag.ts:178`의 `new Date(y, m-1, d)`가 서버 로컬 시간대를 씁니다. 지금은 결과가 같지만 규약에 어긋납니다. → 시간대 작업(`7af67a66`)에서 이미 없어졌습니다.
 
 ### 화면
 
-- [ ] **L15. 채팅을 보낼 때마다 키보드가 닫힘**
+- [x] **L15. 채팅을 보낼 때마다 키보드가 닫힘** — 수정 `4785a0fc`
   - 위치: `character-chat.tsx:840`, `441`
   - 전송 중 textarea를 `disabled`로 막아서 finally의 `focus()`가 먹지 않습니다.
   - 고치는 방향: `readOnly`로 바꾸고 전송 버튼만 막습니다.
@@ -444,7 +444,7 @@
 
 ## 설정·문서
 
-- [ ] **D1. CLAUDE.md가 실제 코드와 다름**
+- [x] **D1. CLAUDE.md가 실제 코드와 다름** — 수정 `e9c06ffc`
   - 세션 유지 기간: "7-day TTL"이라고 적혀 있지만 실제는 30일입니다(`lib/auth/jwt.ts:10`).
   - "Diary image lifecycle"의 `imageMode`: 코드에 없습니다(여러 장 사진 구조로 바뀜).
   - "Character & subscription invariants"의 coinBalance·CoinTransaction·isAsleep·trial: schema에서 제거됐습니다(`prisma/schema.prisma:201` 주석).
@@ -454,7 +454,7 @@
 - [ ] **D2. 안 쓰는 의존성**
   - `react-hook-form`, `@hookform/resolvers`: 사용처 0곳
   - `@tanstack/react-query`: `providers/query-provider.tsx`만 있고 실제 쿼리가 없습니다. devtools도 함께 들어갑니다.
-- [ ] **D3. 린트가 빌드 산출물을 검사함**
+- [x] **D3. 린트가 빌드 산출물을 검사함** — 수정 `e9c06ffc`
   - `eslint.config.mjs`의 ignores에 `public/worker-*.js`(와 `.map`)가 빠져 있습니다. `.gitignore`에는 있습니다.
 - [ ] **D4. 마이그레이션 없이 `db push`로 운영함**
   - `prisma/migrations/`가 없습니다. 지금은 운영·로컬 DB가 모두 스키마와 일치하지만, 변경 이력이 남지 않아 되돌리거나 추적하기 어렵습니다.
