@@ -5,13 +5,14 @@ import { deleteImages } from "@/lib/storage";
 
 // 계정 탈퇴 (NEW-13).
 //   1) 본인의 모든 storagePath 수집
-//   2) Storage 일괄 삭제 (best-effort)
-//   3) User 삭제 — schema onDelete:Cascade로 Character/Diary/DiaryImage/DiaryEmbedding/
+//   2) User 삭제 — schema onDelete:Cascade로 Character/Diary/DiaryImage/DiaryEmbedding/
 //      ChatMessage/UserPersona/UsageLog가 모두 정리됨
-//   4) 세션 쿠키 삭제
+//   3) 세션 쿠키 삭제
+//   4) Storage 일괄 삭제 (best-effort)
 //
-// 순서: Storage 먼저 → DB 마지막. DB 삭제 후 Storage 실패하면 orphan 파일이 남으니
-// Storage가 먼저 끝나야 한다. Storage가 일부 실패해도 DB는 진행해 사용자 탈퇴 의사 존중.
+// 순서: DB 먼저 → Storage 나중 (CLAUDE.md 규약). 예전엔 Storage를 먼저 지워서, DB
+// 삭제가 실패하면 계정은 살아 있는데 사진만 전부 사라졌다(2026-09-29 점검 M6).
+// Storage가 실패해 남은 파일은 참조가 없으니 고아 GC(gc-orphans)가 48시간 뒤 줍는다.
 export async function POST() {
   const session = await getSession();
   if (!session) {
@@ -24,6 +25,9 @@ export async function POST() {
   });
   const paths = images.map((i) => i.storagePath);
 
+  await prisma.user.delete({ where: { id: session.userId } });
+  await deleteSession();
+
   if (paths.length > 0) {
     try {
       await deleteImages(paths);
@@ -32,12 +36,9 @@ export async function POST() {
         "[account/delete] storage cleanup failed:",
         e instanceof Error ? e.message : e,
       );
-      // 계속 진행 — DB는 삭제해야 사용자 의사 존중
+      // 탈퇴는 이미 끝났다 — 남은 파일은 고아 GC가 정리한다.
     }
   }
-
-  await prisma.user.delete({ where: { id: session.userId } });
-  await deleteSession();
 
   return NextResponse.json({ ok: true });
 }
