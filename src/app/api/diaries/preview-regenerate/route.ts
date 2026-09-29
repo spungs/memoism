@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { previewGenerateDiary } from "@/lib/diary/preview-generate";
 import { MAX_AI_INPUT_CONTENT_LENGTH } from "@/lib/diary/schemas";
 import { MAX_AI_INSTRUCTION_LENGTH } from "@/lib/diary/ai-instruction";
+import { MAX_IMAGES_PER_REQUEST } from "@/lib/diary/limits";
 
 // 저장 전 검토 게이트의 "다시 생성" 엔드포인트.
 // auto-generate와 달리 사진은 이미 업로드돼 있으므로 storagePath만 받는다 (재업로드 X).
@@ -19,8 +20,11 @@ const exifItemSchema = z.object({
 });
 
 const bodySchema = z.object({
-  storagePaths: z.array(z.string()),
-  exifs: z.array(exifItemSchema),
+  // 검토 화면이 보내는 건 최초 정리 때 올린 사진뿐이라 한 요청 상한을 넘을 일이 없다.
+  // 상한이 없으면 경로 하나를 수십 번 반복해 사용 횟수 1회로 수십 장짜리 AI 호출을
+  // 만들 수 있었다(점검 H5).
+  storagePaths: z.array(z.string()).max(MAX_IMAGES_PER_REQUEST),
+  exifs: z.array(exifItemSchema).max(MAX_IMAGES_PER_REQUEST),
   text: z.string().max(MAX_AI_INPUT_CONTENT_LENGTH).optional(),
   instruction: z.string().max(MAX_AI_INSTRUCTION_LENGTH).optional(),
 });
@@ -49,6 +53,18 @@ export async function POST(req: NextRequest) {
     );
   }
   const parsed = result0.data;
+
+  // 업로드는 항상 `{userId}/...`에 저장된다. 다운로드는 service role 권한이라 경로만
+  // 알면 남의 사진도 받아지므로 본인 경로만 허용한다(점검 H5). 저장 액션의
+  // parseStoragePaths와 같은 규칙이지만, 여기선 걸러내지 않고 거절한다 — exifs와
+  // 인덱스가 짝이라 일부만 빼면 사진과 촬영정보가 어긋난다.
+  const prefix = `${session.userId}/`;
+  if (parsed.storagePaths.some((p) => !p.startsWith(prefix) || p.includes(".."))) {
+    return NextResponse.json(
+      { ok: false, error: "사진 정보가 올바르지 않아요" },
+      { status: 400 },
+    );
+  }
 
   if (parsed.exifs.length !== parsed.storagePaths.length) {
     return NextResponse.json(
