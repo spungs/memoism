@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { captureServer } from "@/lib/analytics/server";
 import { getSession } from "@/lib/auth/session";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { deleteImage, getObjectSize, saveImage } from "@/lib/storage";
 import { assertStorageQuota, STORAGE_FULL_MSG } from "@/lib/storage/quota";
@@ -132,6 +133,20 @@ function parseStoragePaths(
   } catch {
     return null;
   }
+}
+
+/** 지운 사진 행 크기의 합만큼 사용량 카운터를 깎는다. 호출자 트랜잭션 안에서 부른다. */
+async function decrementStorageUsed(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  rows: { size_bytes: number }[],
+): Promise<void> {
+  const bytes = rows.reduce((sum, r) => sum + Number(r.size_bytes), 0);
+  if (bytes <= 0) return;
+  await tx.character.update({
+    where: { userId },
+    data: { storageUsedBytes: { decrement: BigInt(bytes) } },
+  });
 }
 
 function parseRemoveImageIds(raw: FormDataEntryValue | null): string[] {
@@ -369,30 +384,19 @@ export async function updateDiaryAction(
   // 매칭 안 되는 id는 무시. DB row 삭제 후 Storage 정리(DB→Storage 순서, lifecycle invariant).
   const removeImageIds = parseRemoveImageIds(formData.get("removeImageIds"));
   if (removeImageIds.length > 0) {
-    const toRemove = await prisma.diaryImage.findMany({
-      where: { id: { in: removeImageIds }, diaryId: id },
-      select: { id: true, storagePath: true, sizeBytes: true },
+    // row 삭제와 카운터 감산은 원자적으로. 감산은 **이번에 실제로 지운 행**의 크기로 한다
+    // — 먼저 읽은 값으로 깎으면 두 번 누른 요청이 같은 사진을 두 번 감산했다(점검 L9).
+    const removed = await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<{ storage_path: string; size_bytes: number }[]>`
+        DELETE FROM app.diary_images
+        WHERE id IN (${Prisma.join(removeImageIds)}) AND diary_id = ${id}
+        RETURNING storage_path, size_bytes`;
+      await decrementStorageUsed(tx, session.userId, rows);
+      return rows;
     });
-    if (toRemove.length > 0) {
-      const removedBytes = toRemove.reduce((sum, img) => sum + img.sizeBytes, 0);
-      // row 삭제와 카운터 감산은 원자적으로
-      await prisma.$transaction([
-        prisma.diaryImage.deleteMany({
-          where: { id: { in: toRemove.map((img) => img.id) }, diaryId: id },
-        }),
-        ...(removedBytes > 0
-          ? [
-              prisma.character.update({
-                where: { userId: session.userId },
-                data: { storageUsedBytes: { decrement: BigInt(removedBytes) } },
-              }),
-            ]
-          : []),
-      ]);
-      // Storage 정리는 best-effort (실패해도 DB는 이미 삭제됨). 다른 일기가 아직 쓰는
-      // 파일은 남긴다(점검 H8).
-      await deleteUnreferencedImages(toRemove.map((img) => img.storagePath));
-    }
+    // Storage 정리는 best-effort (실패해도 DB는 이미 삭제됨). 다른 일기가 아직 쓰는
+    // 파일은 남긴다(점검 H8).
+    await deleteUnreferencedImages(removed.map((r) => r.storage_path));
   }
 
   // 새로 추가된 사진 저장 — createDiaryAction과 동일한 File→saveImage 경로.
@@ -546,33 +550,26 @@ export async function deleteDiaryAction(
   const session = await getSession();
   if (!session) return { ok: false, error: "로그인이 필요합니다" };
 
-  // 삭제 전에 이미지 storagePath 수집해 cascade 후 Storage에서도 제거.
-  // cascade는 DiaryImage별 삭제 이벤트를 주지 않으므로 감산할 바이트도 여기서 미리 합산한다.
-  const existing = await prisma.diary.findFirst({
+  const owned = await prisma.diary.findFirst({
     where: { id, userId: session.userId },
-    select: {
-      id: true,
-      images: { select: { storagePath: true, sizeBytes: true } },
-    },
+    select: { id: true },
   });
-  if (!existing) return { ok: false, error: "일기를 찾을 수 없습니다" };
+  if (!owned) return { ok: false, error: "일기를 찾을 수 없습니다" };
 
-  const freedBytes = existing.images.reduce((sum, img) => sum + img.sizeBytes, 0);
-  await prisma.$transaction([
-    prisma.diary.delete({ where: { id } }),
-    ...(freedBytes > 0
-      ? [
-          prisma.character.update({
-            where: { userId: session.userId },
-            data: { storageUsedBytes: { decrement: BigInt(freedBytes) } },
-          }),
-        ]
-      : []),
-  ]);
+  // 사진 행을 먼저 지우며 실제로 지운 크기만 감산한다(cascade는 행별 크기를 주지 않는다).
+  // 미리 읽은 값으로 깎으면 두 번 누른 삭제나 동시에 사진을 뺀 수정이 이중 감산했다(점검 L9).
+  const removed = await prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<{ storage_path: string; size_bytes: number }[]>`
+      DELETE FROM app.diary_images WHERE diary_id = ${id}
+      RETURNING storage_path, size_bytes`;
+    await tx.diary.deleteMany({ where: { id, userId: session.userId } });
+    await decrementStorageUsed(tx, session.userId, rows);
+    return rows;
+  });
 
   // Storage 정리 (best-effort, 실패해도 DB는 이미 삭제됨). 다른 일기가 아직 쓰는
   // 파일은 남긴다(점검 H8).
-  await deleteUnreferencedImages(existing.images.map((img) => img.storagePath));
+  await deleteUnreferencedImages(removed.map((r) => r.storage_path));
 
   revalidatePath("/diary");
   revalidatePath("/");
