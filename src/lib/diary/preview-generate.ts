@@ -114,8 +114,15 @@ export async function previewGenerateDiary(
   }
 
   // EXIF도 사진이 실제로 붙을 때만 준다. 사진 없이 "EXIF 사실"과 촬영순서 지시만
-  // 남으면 모델이 붙지 않은 사진을 전제로 서술한다.
-  const exifSummary = photos.length > 0 ? buildExifSummary(input.exifs, input.timeZone) : undefined;
+  // 남으면 모델이 붙지 않은 사진을 전제로 서술한다. 받아온 사진 것만 넘겨야 요약의
+  // "사진 N" 번호가 모델이 받은 사진과 맞는다(점검 L11).
+  const exifSummary =
+    photos.length > 0
+      ? buildExifSummary(
+          input.exifs.filter((_, i) => photoResults[i] !== null),
+          input.timeZone,
+        )
+      : undefined;
 
   let draft: DiaryGenerationOutput;
   try {

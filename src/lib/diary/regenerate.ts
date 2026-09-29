@@ -155,15 +155,18 @@ export async function regenerateDiary(
     };
   }
 
-  // EXIF도 사진이 실제로 붙을 때만 준다.
+  // EXIF도 사진이 실제로 붙을 때만, **받아온 사진 것만** 준다. 못 받은 사진의 EXIF까지
+  // 넘기면 요약의 "사진 N" 번호가 모델이 받은 사진과 어긋났다(점검 L11).
   const exifSummary =
     photos.length > 0
       ? buildExifSummary(
-          diary.images.map((img) => ({
-            takenAt: img.exifTakenAt,
-            lat: img.exifLat,
-            lng: img.exifLng,
-          })),
+          diary.images
+            .filter((_, i) => photoResults[i] !== null)
+            .map((img) => ({
+              takenAt: img.exifTakenAt,
+              lat: img.exifLat,
+              lng: img.exifLng,
+            })),
           timeZone,
         )
       : undefined;
