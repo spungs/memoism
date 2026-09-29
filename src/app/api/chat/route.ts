@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { chat } from "@/lib/ai/gemini";
 import { findRelevantDiaries, type RelevantDiary } from "@/lib/ai/rag";
-import { checkAndIncrement } from "@/lib/ai/usage";
+import { checkAndIncrement, releaseIncrement } from "@/lib/ai/usage";
 import { screenUserText, CRISIS_REPLY } from "@/lib/ai/safety";
 import { enforceVerifiedHotline } from "@/lib/ai/hotline-guard";
 import { handleCaptureMessage } from "@/lib/ai/capture";
@@ -558,6 +558,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (e) {
     console.error("[chat] Gemini error:", e instanceof Error ? e.message : e);
+    // 답을 못 줬으니 위에서 차감한 횟수를 돌려준다. 일기 4경로(auto-generate·preview·
+    // regenerate·organize)와 같은 규약이다(usage.ts, 점검 H6).
+    await releaseIncrement(session.userId);
     return NextResponse.json(
       { error: "메이가 잠시 응답하지 못했어요. 잠시 후 다시 시도해주세요." },
       { status: 502 },
