@@ -137,7 +137,7 @@ export async function regenerateDiary(
   );
   if (!effectiveMode) {
     // 여기까지 왔으면 캡은 이미 차감됐다 — AI는 부르지도 못했으니 돌려준다.
-    await releaseIncrement(userId);
+    await releaseIncrement(userId, cap.chargedDate);
     return {
       ok: false,
       error: "사진을 불러오지 못했어요. 잠시 후 다시 시도해주세요.",
@@ -179,7 +179,7 @@ export async function regenerateDiary(
       return { ok: false, error: e.reply, safetyBlocked: true };
     }
     // 결과를 못 줬으니 차감한 횟수를 돌려준다(펜스 차단은 제외 — usage.ts 참고).
-    await releaseIncrement(userId);
+    await releaseIncrement(userId, cap.chargedDate);
     return {
       ok: false,
       error: e instanceof Error ? e.message : "정리 실패",

@@ -28,7 +28,8 @@ export function limitFor(tier: Tier, path: AiPath): number | null {
 
 export type CapResult =
   // remaining: null = 캡 없는 경로(capture). JSON 직렬화 안전하게 null을 쓴다.
-  | { allowed: true; remaining: number | null; tier: Tier }
+  // chargedDate: 차감한 날짜 행. 반납(releaseIncrement)이 이 값을 그대로 쓴다. 캡 없는 경로는 null.
+  | { allowed: true; remaining: number | null; tier: Tier; chargedDate: Date | null }
   | { allowed: false; remaining: 0; tier: Tier; reason: "daily_cap" };
 
 /**
@@ -75,7 +76,7 @@ export async function checkAndIncrement(
   // 캡 없는 경로는 DB를 아예 건드리지 않는다. 캡처는 하루에 수십 번 일어나므로
   // 매번 트랜잭션을 여는 것 자체가 낭비다.
   if (limit === null) {
-    return { allowed: true, remaining: null, tier };
+    return { allowed: true, remaining: null, tier, chargedDate: null };
   }
 
   const date = todayKST();
@@ -107,7 +108,7 @@ export async function checkAndIncrement(
       select: { aiCallCount: true },
     });
     const used = row?.aiCallCount ?? limit;
-    return { allowed: true, remaining: Math.max(0, limit - used), tier };
+    return { allowed: true, remaining: Math.max(0, limit - used), tier, chargedDate: date };
   });
 }
 
@@ -122,14 +123,19 @@ export async function checkAndIncrement(
  * 안전 펜스 차단은 되돌리지 않는다. 모델이 정상 응답한 결과라 비용이 실제로 났고,
  * 되돌리면 같은 글로 무한히 재시도할 수 있게 된다.
  *
- * 카운터가 0이면 아무것도 하지 않는다(음수 방지). 자정을 넘겨 실패하면 어제 행이
- * 아니라 오늘 행을 보게 되지만, 그 경우 `gt: 0` 조건에 막혀 조용히 지나간다 —
- * 남의 날 카운터를 깎는 것보다 낫다.
+ * 반납은 **차감한 날짜 행**에서 한다(`CapResult.chargedDate`). 예전엔 반납 시점의
+ * 날짜를 다시 계산해서, 자정 직전에 차감하고 자정 뒤에 실패하면 새 날짜 행에서 깎았다
+ * — 그날 첫 호출이면 0이라 조용히 지나가 어제 몫은 돌려받지 못했다(점검 L12).
+ * 카운터가 0이면 아무것도 하지 않는다(음수 방지).
  */
-export async function releaseIncrement(userId: string): Promise<void> {
-  const date = todayKST();
+export async function releaseIncrement(
+  userId: string,
+  chargedDate: Date | null,
+): Promise<void> {
+  // 캡 없는 경로는 차감하지 않았으니 돌려줄 것도 없다.
+  if (!chargedDate) return;
   await prisma.usageLog.updateMany({
-    where: { userId, date, aiCallCount: { gt: 0 } },
+    where: { userId, date: chargedDate, aiCallCount: { gt: 0 } },
     data: { aiCallCount: { decrement: 1 } },
   });
 }

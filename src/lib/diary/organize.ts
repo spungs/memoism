@@ -201,7 +201,7 @@ export async function organizeDiaryFromFragments(
       return { ok: false, error: e.reply, safetyBlocked: true };
     }
     // 결과를 못 줬으니 차감한 횟수를 돌려준다(펜스 차단은 제외 — usage.ts 참고).
-    await releaseIncrement(userId);
+    await releaseIncrement(userId, cap.chargedDate);
     // 실패 시 foldedAt은 찍히지 않는다 — 다음에 다시 시도할 수 있다.
     return { ok: false, error: e instanceof Error ? e.message : "정리 실패" };
   }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkAndIncrement, limitFor, usageFromCount } from "./usage";
+import { checkAndIncrement, limitFor, releaseIncrement, usageFromCount } from "./usage";
 
 describe("limitFor", () => {
   it("capture 경로는 티어와 무관하게 무제한(null)", () => {
@@ -29,6 +29,14 @@ describe("checkAndIncrement — capture 경로", () => {
     expect(r.allowed).toBe(true);
     expect(r.remaining).toBeNull();
     expect(r.tier).toBe("FREE");
+    // 차감하지 않았으니 반납할 날짜도 없다.
+    expect(r.allowed && r.chargedDate).toBeNull();
+  });
+
+  it("차감 날짜가 없으면 반납도 DB를 건드리지 않는다 (점검 L12)", async () => {
+    await expect(
+      releaseIncrement("00000000-0000-0000-0000-000000000000", null),
+    ).resolves.toBeUndefined();
   });
 
   it("만료 사용자도 capture는 통과한다(캡처는 티어 무관 무제한)", async () => {

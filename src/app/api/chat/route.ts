@@ -569,7 +569,7 @@ export async function POST(req: NextRequest) {
     console.error("[chat] Gemini error:", e instanceof Error ? e.message : e);
     // 답을 못 줬으니 위에서 차감한 횟수를 돌려준다. 일기 4경로(auto-generate·preview·
     // regenerate·organize)와 같은 규약이다(usage.ts, 점검 H6).
-    await releaseIncrement(session.userId);
+    await releaseIncrement(session.userId, cap.chargedDate);
     return NextResponse.json(
       { error: "메이가 잠시 응답하지 못했어요. 잠시 후 다시 시도해주세요." },
       { status: 502 },
