@@ -13,6 +13,7 @@ import { buildInstruction } from "@/lib/diary/ai-instruction";
 import { pickRegenerateText } from "@/lib/diary/regenerate-input";
 import { useDeviceTodayKey } from "@/lib/tz-client";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
+import { AiBusyOverlay } from "@/components/ui/ai-busy-overlay";
 import { DRAFT_KEY_NEW, PENDING_DRAFT_KEY } from "./draft-keys";
 
 const DRAFT_TTL_MS = 5 * 60 * 1000; // 5분 만료 — 사용자가 너무 오래 자리비울 때 보호
@@ -105,6 +106,8 @@ export function ReviewGate() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [signedUrls, setSignedUrls] = useState<(string | null)[]>([]);
   const [regenerating, setRegenerating] = useState(false);
+  // 진행 중인 다시 생성 요청 취소 핸들 (작성·수정 화면과 같은 방식).
+  const regenAbortRef = useRef<AbortController | null>(null);
   const [regenError, setRegenError] = useState<string | null>(null);
   const [usageSignal, setUsageSignal] = useState(0);
   const [usingOriginal, setUsingOriginal] = useState(false);
@@ -270,6 +273,8 @@ export function ReviewGate() {
     if (!draftState || regenerating || pending) return;
     setRegenError(null);
     setRegenerating(true);
+    const ac = new AbortController();
+    regenAbortRef.current = ac;
     try {
       // 무엇을 입력으로 보낼지는 pickRegenerateText가 정한다 (판단 근거는 그 파일 주석).
       // 고친 본문이면 그걸, 안 고쳤고 지시도 없으면 최초 입력으로 되돌려 새로 뽑는다.
@@ -294,6 +299,7 @@ export function ReviewGate() {
           text,
           instruction,
         }),
+        signal: ac.signal,
       });
       const data = await res.json();
 
@@ -331,10 +337,13 @@ export function ReviewGate() {
           : prev,
       );
     } catch (e) {
+      // 사용자가 취소한 경우는 에러로 표시하지 않는다.
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setRegenError(e instanceof Error ? e.message : "다시 생성 실패");
     } finally {
       setRegenerating(false);
       setUsageSignal((n) => n + 1);
+      regenAbortRef.current = null;
     }
   };
 
@@ -867,6 +876,15 @@ export function ReviewGate() {
           </p>
         )}
       </div>
+
+      {/* 생성 중엔 화면 전체를 막는다. 입력이 열려 있으면 기다리며 고친 본문을 결과가
+          덮어썼다(점검 M10). 작성·수정 화면과 같은 오버레이·취소. */}
+      {regenerating && (
+        <AiBusyOverlay
+          label={"작성한 내용과 사진을 바탕으로\n일기를 다시 정리하고 있어요"}
+          onCancel={() => regenAbortRef.current?.abort()}
+        />
+      )}
     </div>
   );
 }
