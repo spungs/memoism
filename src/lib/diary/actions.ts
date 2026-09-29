@@ -8,6 +8,7 @@ import { deleteImage, getObjectSize, saveImage } from "@/lib/storage";
 import { assertStorageQuota, STORAGE_FULL_MSG } from "@/lib/storage/quota";
 import { upsertDiaryEmbedding } from "./embedding";
 import { reembedDiaryWithFragments } from "./fragment-embed";
+import { deleteUnreferencedImages } from "./image-cleanup";
 import { diaryCreatedAtForDateKey } from "./kst";
 import { todayKeyInZone } from "@/lib/tz";
 import { getRequestTimeZone } from "@/lib/tz-server";
@@ -95,6 +96,16 @@ function parseExifs(raw: FormDataEntryValue | null): ExifInput[] {
 const MAX_STORAGE_PATHS = 100;
 
 /**
+ * 미리 올린 사진이 이미 다른 DiaryImage에 들어가 있을 때. 같은 초안을 다시 저장한
+ * 경우다(첫 저장 응답이 끊겨 재시도). `diaryId`가 있으면 그 일기가 이 초안의 첫 저장이다.
+ */
+class AlreadySavedError extends Error {
+  constructor(readonly diaryId: string | null) {
+    super("already_saved");
+  }
+}
+
+/**
  * 검토 게이트가 넘긴 storagePath 목록. 업로드는 항상 `{userId}/...`로 저장되므로
  * 본인 접두사만 통과시킨다 — 남의 경로를 심어 사진을 노출시키거나
  * 일기 삭제 시 남의 파일을 지우는 걸 차단.
@@ -166,7 +177,9 @@ export async function createDiaryAction(
     formData.get("storagePaths"),
     session.userId,
   );
-  const preuploaded = parsedPaths && parsedPaths.length > 0 ? parsedPaths : null;
+  // 같은 경로가 두 번 오면 DiaryImage 두 행이 한 파일을 가리키게 된다 — 중복부터 없앤다(점검 H8).
+  const preuploaded =
+    parsedPaths && parsedPaths.length > 0 ? [...new Set(parsedPaths)] : null;
   const files = preuploaded
     ? []
     : formData
@@ -235,10 +248,30 @@ export async function createDiaryAction(
 
   const totalNewBytes = imagesCreate.reduce((sum, img) => sum + img.sizeBytes, 0);
 
+  let diary: { id: string };
   try {
     // 일기·이미지 insert와 사용량 카운터를 한 트랜잭션으로 — 한쪽만 반영되면
     // storageUsedBytes 캐시가 드리프트한다(coinBalance와 같은 규약).
-    const diary = await prisma.$transaction(async (tx) => {
+    diary = await prisma.$transaction(async (tx) => {
+      if (preuploaded) {
+        // 같은 사용자의 저장을 한 줄로 세운다. 응답이 끊겨 다시 누른 요청이 첫 요청과
+        // 겹쳐도 아래 확인이 둘 다 "아직 없음"으로 통과하지 않게(트랜잭션 끝에 풀린다).
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${session.userId}))`;
+        // 이미 일기에 들어간 사진이면 새 일기를 만들지 않는다. 만들면 한 파일을 일기 두
+        // 개가 나눠 갖고, 한쪽을 지울 때 남은 쪽 사진이 깨진다(점검 H8).
+        const taken = await tx.diaryImage.findMany({
+          where: { storagePath: { in: storagePaths } },
+          select: { diaryId: true, diary: { select: { userId: true } } },
+        });
+        if (taken.length > 0) {
+          const ids = new Set(taken.map((r) => r.diaryId));
+          const sameDraft =
+            ids.size === 1 &&
+            taken.length === storagePaths.length &&
+            taken.every((r) => r.diary.userId === session.userId);
+          throw new AlreadySavedError(sameDraft ? [...ids][0] : null);
+        }
+      }
       const created = await tx.diary.create({
         data: {
           userId: session.userId,
@@ -260,19 +293,15 @@ export async function createDiaryAction(
       }
       return created;
     });
-
-    // 임베딩 best-effort (실패해도 저장 결과엔 영향 없음)
-    await upsertDiaryEmbedding(diary.id, parsed.data.title, parsed.data.content);
-
-    revalidatePath("/diary");
-    revalidatePath("/");
-    await captureServer("diary_created", session.userId, {
-      source,
-      image_count: storagePaths.length,
-      has_mood: parsed.data.mood != null,
-    });
-    return { ok: true, data: diary };
   } catch (e) {
+    if (e instanceof AlreadySavedError) {
+      // 같은 초안의 첫 저장이 이미 끝났다 — 새로 만들지 않고 그 일기로 보낸다.
+      if (e.diaryId) return { ok: true, data: { id: e.diaryId } };
+      return {
+        ok: false,
+        error: "이미 다른 일기에 저장된 사진이 있어요. 새로고침한 뒤 다시 확인해주세요.",
+      };
+    }
     // DB 실패 시 직접 업로드한 이미지 보상 정리
     // (preuploaded는 caller가 관리 — review-gate가 sessionStorage에 보관)
     if (uploadedToCleanup.length > 0) {
@@ -283,6 +312,19 @@ export async function createDiaryAction(
       error: e instanceof Error ? e.message : "일기 저장 실패",
     };
   }
+
+  // 여기부터는 커밋 이후다. 예전엔 아래까지 위 try 안에 있어, 여기서 예외가 나면 보상
+  // 정리가 **이미 저장된** 사진 파일을 지울 수 있었다(점검 H8). 아래는 모두 best-effort다.
+  await upsertDiaryEmbedding(diary.id, parsed.data.title, parsed.data.content);
+
+  revalidatePath("/diary");
+  revalidatePath("/");
+  await captureServer("diary_created", session.userId, {
+    source,
+    image_count: storagePaths.length,
+    has_mood: parsed.data.mood != null,
+  });
+  return { ok: true, data: diary };
 }
 
 export async function updateDiaryAction(
@@ -343,8 +385,9 @@ export async function updateDiaryAction(
             ]
           : []),
       ]);
-      // Storage 정리는 best-effort (실패해도 DB는 이미 삭제됨)
-      await Promise.all(toRemove.map((img) => deleteImage(img.storagePath)));
+      // Storage 정리는 best-effort (실패해도 DB는 이미 삭제됨). 다른 일기가 아직 쓰는
+      // 파일은 남긴다(점검 H8).
+      await deleteUnreferencedImages(toRemove.map((img) => img.storagePath));
     }
   }
 
@@ -523,8 +566,9 @@ export async function deleteDiaryAction(
       : []),
   ]);
 
-  // Storage 정리 (best-effort, 실패해도 DB는 이미 삭제됨)
-  await Promise.all(existing.images.map((img) => deleteImage(img.storagePath)));
+  // Storage 정리 (best-effort, 실패해도 DB는 이미 삭제됨). 다른 일기가 아직 쓰는
+  // 파일은 남긴다(점검 H8).
+  await deleteUnreferencedImages(existing.images.map((img) => img.storagePath));
 
   revalidatePath("/diary");
   revalidatePath("/");
