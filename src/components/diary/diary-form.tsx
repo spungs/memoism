@@ -300,6 +300,8 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
 
   const [aiPending, setAiPending] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  // 남은 칸보다 많이 고르면 몇 장만 담겼는지 알린다(채팅·밀린 날 채우기와 같게, 점검 M16).
+  const [photoNotice, setPhotoNotice] = useState<string | null>(null);
   const [usageSignal, setUsageSignal] = useState(0);
   // 진행 중인 AI 생성 요청을 취소(Abort)하기 위한 핸들.
   const aiAbortRef = useRef<AbortController | null>(null);
@@ -326,13 +328,16 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     ta.style.height = Math.max(120, ta.scrollHeight) + "px";
   }, [content]);
 
-  // 미리보기 URL revoke on unmount
+  // 미리보기 URL revoke on unmount. 빈 deps 클로저는 첫 렌더의 빈 배열만 봐서 아무것도
+  // 해제하지 않았다(점검 M16) — 최신 목록을 ref로 들고 있다가 해제한다(character-chat과 같은 방식).
+  const pickedImagesRef = useRef<PickedImage[]>([]);
   useEffect(() => {
-    return () => {
-      for (const img of pickedImages) URL.revokeObjectURL(img.previewUrl);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    pickedImagesRef.current = pickedImages;
+  }, [pickedImages]);
+  useEffect(
+    () => () => pickedImagesRef.current.forEach((img) => URL.revokeObjectURL(img.previewUrl)),
+    [],
+  );
 
   // create 모드 — 마운트 시 localStorage draft 존재 확인 → 복원 배너 표시
   useEffect(() => {
@@ -405,6 +410,11 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     const files = Array.from(e.target.files ?? []);
     if (fileInputRef.current) fileInputRef.current.value = "";
     const accepted = files.slice(0, slotsLeft);
+    setPhotoNotice(
+      files.length > accepted.length
+        ? `사진은 한 번에 ${MAX_IMAGES_PER_REQUEST}장까지예요. ${accepted.length}장만 담았어요.`
+        : null,
+    );
     if (accepted.length === 0) return;
 
     // 1) 썸네일을 즉시 화면에 띄운다(스피너 표시). previewUrl은 EXIF 없이 바로 생성 가능.
@@ -972,6 +982,19 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
               📷 {dateKeys.map(shortDateLabel).join("·")}{" "}
               {dateKeys.length}일 사진이 섞여 있어요. 일기는 하루 단위라 한
               날 사진만 두길 권해요.
+            </p>
+          )}
+          {photoNotice && (
+            <p
+              role="status"
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-sm)",
+                color: "var(--fg-muted)",
+                margin: 0,
+              }}
+            >
+              {photoNotice}
             </p>
           )}
           {slotsLeft > 0 && (

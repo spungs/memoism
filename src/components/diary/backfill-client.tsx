@@ -390,6 +390,8 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
 
   async function handlePick(e: React.ChangeEvent<HTMLInputElement>) {
     const chosen = Array.from(e.target.files ?? []);
+    // 값을 비워야 같은 사진을 다시 골라도 change가 난다(작성·채팅 화면과 같게, 점검 M16).
+    e.target.value = "";
     if (chosen.length === 0) return;
     setError(null);
     setNotice(null);
