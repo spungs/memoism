@@ -1,4 +1,26 @@
 import { z } from "zod";
+import { isValidDateKey } from "@/lib/tz";
+
+/**
+ * 클라이언트가 보낸 사진 한 장의 EXIF. 라우트 세 곳이 같은 모양을 각자 복사해 뒀다.
+ *
+ * 촬영 시각은 **날짜로 파싱되는 문자열**만 받는다. 문자열이기만 하면 통과시켜 "hello"가
+ * Invalid Date가 됐고, 사진 저장 트랜잭션이 통째로 실패해 Prisma 원문이 나가고 트랜잭션
+ * 밖에서 먼저 만든 빈 일기가 남았다(점검 L2). 정상 클라이언트는 ISO 문자열만 보낸다.
+ */
+export const clientExifSchema = z.object({
+  takenAt: z
+    .string()
+    .refine((s) => !Number.isNaN(Date.parse(s)), "사진 촬영 시각 형식이 잘못됐어요")
+    .nullable(),
+  lat: z.number().nullable(),
+  lng: z.number().nullable(),
+});
+
+/** 날짜 키 "YYYY-MM-DD" — 달력에 있는 날짜만 (점검 L6). */
+export const dateKeySchema = z
+  .string()
+  .refine(isValidDateKey, "날짜 형식이 올바르지 않아요");
 
 /** 제목 상한. 저장 검증과 재정리 API가 같은 값을 봐야 drift가 안 생긴다. */
 export const MAX_DIARY_TITLE_LENGTH = 200;

@@ -1,5 +1,5 @@
 import { parseDateRefs } from "@/lib/ai/rag";
-import { hourInZone, shiftDateKey, todayKeyInZone } from "@/lib/tz";
+import { hourInZone, isValidDateKey, shiftDateKey, todayKeyInZone } from "@/lib/tz";
 import { kstDateKey } from "./kst";
 
 /** 캡처 대상 날짜 판정 결과. ambiguous면 저장하지 않고 사용자에게 되묻는다. */
@@ -90,7 +90,7 @@ export function resolvePhotoDates(
 ): string[] {
   return exifDateKeys.map((k) => {
     if (fromExplicit) return base;
-    if (!k || !/^\d{4}-\d{2}-\d{2}$/.test(k) || k > todayKey) return base;
+    if (!k || !isValidDateKey(k) || k > todayKey) return base;
     return k;
   });
 }

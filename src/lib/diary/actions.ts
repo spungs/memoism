@@ -10,7 +10,7 @@ import { upsertDiaryEmbedding } from "./embedding";
 import { reembedDiaryWithFragments } from "./fragment-embed";
 import { deleteUnreferencedImages } from "./image-cleanup";
 import { diaryCreatedAtForDateKey } from "./kst";
-import { todayKeyInZone } from "@/lib/tz";
+import { isValidDateKey, todayKeyInZone } from "@/lib/tz";
 import { getRequestTimeZone } from "@/lib/tz-server";
 import { MAX_IMAGES_PER_REQUEST } from "./limits";
 import {
@@ -58,7 +58,7 @@ type ExifInput = {
 function parseDiaryDate(raw: FormDataEntryValue | null, timeZone: string): Date {
   const today = todayKeyInZone(timeZone);
   const key =
-    typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : today;
+    typeof raw === "string" && isValidDateKey(raw) ? raw : today;
   return diaryCreatedAtForDateKey(key > today ? today : key, new Date());
 }
 
@@ -81,7 +81,11 @@ function parseExifs(raw: FormDataEntryValue | null): ExifInput[] {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.map((item): ExifInput => ({
-      takenAt: typeof item?.takenAt === "string" ? item.takenAt : null,
+      // 파싱되는 날짜만 — 아니면 Invalid Date로 저장 전체가 실패한다(점검 L2, chat과 같은 규약).
+      takenAt:
+        typeof item?.takenAt === "string" && !Number.isNaN(Date.parse(item.takenAt))
+          ? item.takenAt
+          : null,
       lat: typeof item?.lat === "number" ? item.lat : null,
       lng: typeof item?.lng === "number" ? item.lng : null,
     }));

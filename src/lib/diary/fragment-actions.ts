@@ -5,7 +5,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { reembedDiaryWithFragments } from "./fragment-embed";
 import { getOrCreateDiaryForDate } from "./queries";
-import { todayKeyInZone } from "@/lib/tz";
+import { isValidDateKey, todayKeyInZone } from "@/lib/tz";
 import { getRequestTimeZone } from "@/lib/tz-server";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -63,7 +63,7 @@ export async function moveFragmentAction(
   const session = await getSession();
   if (!session) return { ok: false, error: "로그인이 필요합니다" };
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+  if (!isValidDateKey(dateKey)) {
     return { ok: false, error: "날짜 형식이 올바르지 않습니다" };
   }
   // 미래 날짜 금지. 날짜 선택기가 이미 막지만 Server Action은 공개 엔드포인트라

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSession } from "@/lib/auth/session";
 import { getRequestTimeZone } from "@/lib/tz-server";
 import { previewGenerateDiary } from "@/lib/diary/preview-generate";
-import { MAX_AI_INPUT_CONTENT_LENGTH } from "@/lib/diary/schemas";
+import { MAX_AI_INPUT_CONTENT_LENGTH, clientExifSchema } from "@/lib/diary/schemas";
 import { MAX_AI_INSTRUCTION_LENGTH } from "@/lib/diary/ai-instruction";
 import { MAX_IMAGES_PER_REQUEST } from "@/lib/diary/limits";
 import { unauthorized } from "@/lib/auth/unauthorized";
@@ -15,18 +15,13 @@ import { unauthorized } from "@/lib/auth/unauthorized";
 // text는 검토화면 textarea의 *현재* 값이다. mode는 받지 않는다 — 클라이언트가 보낸
 // 최초 mode를 믿으면 사용자가 고친 본문이 버려진다(사진만 첨부 시 mode A).
 
-const exifItemSchema = z.object({
-  takenAt: z.string().nullable(),
-  lat: z.number().nullable(),
-  lng: z.number().nullable(),
-});
 
 const bodySchema = z.object({
   // 검토 화면이 보내는 건 최초 정리 때 올린 사진뿐이라 한 요청 상한을 넘을 일이 없다.
   // 상한이 없으면 경로 하나를 수십 번 반복해 사용 횟수 1회로 수십 장짜리 AI 호출을
   // 만들 수 있었다(점검 H5).
   storagePaths: z.array(z.string()).max(MAX_IMAGES_PER_REQUEST),
-  exifs: z.array(exifItemSchema).max(MAX_IMAGES_PER_REQUEST),
+  exifs: z.array(clientExifSchema).max(MAX_IMAGES_PER_REQUEST),
   text: z.string().max(MAX_AI_INPUT_CONTENT_LENGTH).optional(),
   instruction: z.string().max(MAX_AI_INSTRUCTION_LENGTH).optional(),
 });

@@ -5,15 +5,9 @@ import { todayKeyInZone } from "@/lib/tz";
 import { getRequestTimeZone } from "@/lib/tz-server";
 import { saveBackfillPhotos } from "@/lib/diary/backfill";
 import type { ClientExif } from "@/lib/diary/auto-generate";
-import { MAX_AI_INPUT_CONTENT_LENGTH } from "@/lib/diary/schemas";
+import { MAX_AI_INPUT_CONTENT_LENGTH, dateKeySchema, clientExifSchema } from "@/lib/diary/schemas";
 import { unauthorized } from "@/lib/auth/unauthorized";
 
-const exifItem = z.object({
-  takenAt: z.string().nullable(),
-  lat: z.number().nullable(),
-  lng: z.number().nullable(),
-});
-const dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 /**
  * 밀린 날 채우기 ① — 사진을 날짜별로 저장한다. 날짜별 메모(`notes`)가 있으면
@@ -45,7 +39,7 @@ export async function POST(req: NextRequest) {
   let notes: Record<string, string>;
   try {
     exifs = z
-      .array(exifItem)
+      .array(clientExifSchema)
       .parse(JSON.parse(String(form.get("exifs") ?? "[]")));
     dateKeys = z
       .array(dateKeySchema)

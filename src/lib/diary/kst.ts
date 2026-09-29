@@ -1,5 +1,7 @@
 // src/lib/diary/kst.ts
 // KST(UTC+9) 날짜 유틸 — 캘린더/월 집계 공용. 순수 함수(클라·서버 양쪽 import 가능).
+import { isValidDateKey } from "@/lib/tz";
+
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 /** Date → KST 기준 "YYYY-MM-DD". */
@@ -72,7 +74,7 @@ export function latestPossibleTodayKey(now: Date): string {
  *   - 그보다 먼 미래 → now(예전 동작). 호출자가 미리 걸러야 한다.
  */
 export function diaryCreatedAtForDateKey(dateKey: string, now: Date): Date {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return now;
+  if (!isValidDateKey(dateKey)) return now;
   const today = kstDateKey(now);
   if (dateKey === today) return now;
   if (dateKey > today && dateKey > latestPossibleTodayKey(now)) return now;

@@ -7,7 +7,7 @@ import { getSignedUrlsForOwner } from "@/lib/storage";
 import { reembedDiaryWithFragments } from "./fragment-embed";
 import { getOrCreateDiaryForDate } from "./queries";
 import { dateKeyLabel } from "./kst";
-import { todayKeyInZone } from "@/lib/tz";
+import { isValidDateKey, todayKeyInZone } from "@/lib/tz";
 import { getRequestTimeZone } from "@/lib/tz-server";
 
 /**
@@ -71,7 +71,7 @@ export async function recaptureDateAction(
 ): Promise<Result> {
   const session = await getSession();
   if (!session) return { ok: false, error: "로그인이 필요합니다" };
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+  if (!isValidDateKey(dateKey)) {
     return { ok: false, error: "날짜 형식이 올바르지 않습니다" };
   }
   // 현지 오늘까지 허용한다(해외여행 — 동쪽 여행지는 한국보다 하루 앞설 수 있다).

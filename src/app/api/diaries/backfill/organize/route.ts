@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { getRequestTimeZone } from "@/lib/tz-server";
 import { organizeBackfillDay } from "@/lib/diary/backfill";
 import { unauthorized } from "@/lib/auth/unauthorized";
+import { dateKeySchema } from "@/lib/diary/schemas";
 
 /**
  * AI 재시도까지 끝낼 시간을 함수에 준다.
@@ -15,7 +16,7 @@ import { unauthorized } from "@/lib/auth/unauthorized";
 export const maxDuration = 90;
 
 const bodySchema = z.object({
-  dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  dateKey: dateKeySchema,
 });
 
 /**

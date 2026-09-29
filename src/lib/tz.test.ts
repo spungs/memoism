@@ -4,6 +4,7 @@ import {
   dateKeyInZone,
   formatHmInZone,
   hourInZone,
+  isValidDateKey,
   normalizeTimeZone,
   shiftDateKey,
   todayKeyInZone,
@@ -75,5 +76,17 @@ describe("normalizeTimeZone", () => {
     expect(normalizeTimeZone("")).toBe(DEFAULT_TIME_ZONE);
     expect(normalizeTimeZone("Not/AZone")).toBe(DEFAULT_TIME_ZONE);
     expect(normalizeTimeZone("x".repeat(200))).toBe(DEFAULT_TIME_ZONE);
+  });
+});
+
+describe("isValidDateKey (점검 L6)", () => {
+  it("달력에 있는 날짜만 참", () => {
+    expect(isValidDateKey("2026-09-29")).toBe(true);
+    expect(isValidDateKey("2028-02-29")).toBe(true); // 윤년
+  });
+  it("없는 날짜·모양이 다른 값은 거짓", () => {
+    for (const k of ["2026-02-31", "2026-02-29", "2026-13-01", "2026-00-10", "2026-9-29", "2026-09-29T00", ""]) {
+      expect(isValidDateKey(k), k).toBe(false);
+    }
   });
 });

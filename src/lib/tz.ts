@@ -72,6 +72,21 @@ export function formatHmInZone(date: Date, tz: string): string {
   return `${String(hour).padStart(2, "0")}:${minute}`;
 }
 
+/**
+ * "YYYY-MM-DD" 모양이면서 달력에 실제로 있는 날짜인지. 모양만 보면 "2026-02-31"이
+ * 통과해 3월 3일 범위를 조회했다(점검 L6). 날짜 키를 받는 곳은 모두 이걸 쓴다.
+ */
+export function isValidDateKey(key: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
+  const [y, m, d] = key.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return (
+    dt.getUTCFullYear() === y &&
+    dt.getUTCMonth() === m - 1 &&
+    dt.getUTCDate() === d
+  );
+}
+
 /** 달력 날짜 산술 — 시간대와 무관하다(UTC 자정 기준으로 계산). */
 export function shiftDateKey(dateKey: string, days: number): string {
   const [y, m, d] = dateKey.split("-").map(Number);
