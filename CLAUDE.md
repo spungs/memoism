@@ -73,8 +73,7 @@ A diary holds up to 10 photos as `DiaryImage` rows ordered by `orderIndex`. `upd
 
 - Tailwind v4 + shadcn (style `base-nova`, neutral base, CSS variables) configured in `components.json`. CSS lives in `src/app/globals.css`. Component aliases: `@/components/ui` for shadcn primitives, `@/components/<domain>` for feature components.
 - Base UI primitives via `@base-ui/react`, icons via `lucide-react`.
-- Forms are plain React state / `useActionState` calling Server Actions, which validate with the Zod schemas in `schemas.ts`. (`react-hook-form` is installed but unused.)
-- `@tanstack/react-query` has a provider mounted (`src/providers/query-provider.tsx`) but no queries use it yet.
+- Forms are plain React state / `useActionState` calling Server Actions, which validate with the Zod schemas in `schemas.ts`.
 - PWA wrapper via `@ducanh2912/next-pwa` in `next.config.ts` — disabled in dev. The service worker (`public/sw.js`, `workbox-*.js`, etc.) is build-generated; don't edit by hand and don't commit it.
 - Korean is the primary UI language (`<html lang="ko">`, all error strings are Korean). Match this when adding user-facing text.
 

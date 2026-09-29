@@ -7,7 +7,7 @@ import { unauthorized } from "@/lib/auth/unauthorized";
 // 0·음수면 마지막 항목 인덱스가 -1이 되어 500이 났다(점검 L3).
 const takeSchema = z.coerce.number().int().min(1).max(100);
 
-// JSON list endpoint used by TanStack Query for client refetch / cache hydration.
+// JSON list endpoint (cursor pagination) for client-side fetches.
 // Mutations go through server actions in src/lib/diary/actions.ts.
 export async function GET(req: NextRequest) {
   const session = await getSession();
