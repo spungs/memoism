@@ -256,7 +256,9 @@ export function ReviewGate() {
         // 돌아가면 복원하려고). 여기서 저장했으니 지운다 — 남기면 다음 새 일기에서
         // "작성 중이던 내용" 배너로 불러와 같은 일기가 한 번 더 저장된다(점검 H4).
         try { localStorage.removeItem(DRAFT_KEY_NEW); } catch { /* 무시 */ }
-        router.push(`/diary/${result.data.id}`);
+        // 검토하는 사이 그날 일기가 생겼거나 날짜를 바꿔 일기가 있는 날이 되면 저장은 그 일기에
+        // 이어진다(하루에 일기 하나, 점검 M5) — 작성 화면과 같이 상세 화면이 알린다.
+        router.push(`/diary/${result.data.id}${result.data.merged ? "?notice=merged" : ""}`);
         router.refresh();
       } catch {
         // 서버 액션이 예외를 던지면(배포 스큐로 액션 ID 소멸·네트워크 단절 등) 잡지 않으면

@@ -13,7 +13,7 @@ import {
   moodKeySchema,
 } from "@/lib/diary/schemas";
 import { findDiaryForDate } from "@/lib/diary/queries";
-import { appendToDayAndOrganize } from "@/lib/diary/day-merge";
+import { appendToDay } from "@/lib/diary/day-merge";
 import { MAX_IMAGES_PER_REQUEST } from "@/lib/diary/limits";
 import { STORAGE_FULL_MSG } from "@/lib/storage/quota";
 import { todayKeyInZone } from "@/lib/tz";
@@ -101,8 +101,8 @@ async function handlePOST(req: NextRequest) {
   const timeZone = await getRequestTimeZone();
 
   // 하루에 일기는 하나다(점검 M5). 정리할 날짜에 일기가 이미 있으면(메이와 나눈 조각이
-  // 모인 일기 포함) 검토 화면에서 새 일기를 만들지 않고, 그 일기에 합친 뒤 제자리에서
-  // 정리한다 — 직접 쓴 글과 그날 조각이 한 번에 엮인다(day-merge.ts).
+  // 모인 일기 포함) 검토 화면에서 새 일기를 만들지 않고 그 일기에 합친다. 정리는 화면이
+  // 이어서 따로 부른다 — 직접 쓴 글과 그날 조각이 한 일기에서 엮인다(day-merge.ts).
   const dateRaw = formData.get("date");
   if (typeof dateRaw === "string" && dateRaw.length > 0) {
     const dk = dateKeySchema.safeParse(dateRaw);
@@ -123,7 +123,7 @@ async function handlePOST(req: NextRequest) {
         );
       }
       const mood = moodKeySchema.safeParse(formData.get("mood"));
-      const merged = await appendToDayAndOrganize({
+      const merged = await appendToDay({
         userId: session.userId,
         diaryId: sameDay.id,
         dateKey: dk.data,
@@ -131,7 +131,6 @@ async function handlePOST(req: NextRequest) {
         exifs,
         text,
         mood: mood.success ? mood.data : undefined,
-        timeZone,
       });
       if (!merged.ok) {
         return NextResponse.json(
@@ -139,12 +138,7 @@ async function handlePOST(req: NextRequest) {
           { status: merged.error === STORAGE_FULL_MSG ? 400 : 503 },
         );
       }
-      return NextResponse.json({
-        merged: true,
-        diaryId: merged.diaryId,
-        organized: merged.organized,
-        reason: merged.reason ?? null,
-      });
+      return NextResponse.json({ merged: true, diaryId: merged.diaryId });
     }
   }
 

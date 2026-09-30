@@ -4,7 +4,7 @@ import { savePhotosByDate } from "./capture-photos";
 import { reembedDiaryWithFragments } from "./fragment-embed";
 import { organizeDiaryFromFragments } from "./organize";
 import { regenerateDiary } from "./regenerate";
-import { kstDayRangeFromKey } from "./kst";
+import { findDiaryForDate } from "./queries";
 import { backfillLimitsFor, type BackfillLimits } from "./backfill-group";
 import { effectiveTier } from "@/lib/ai/usage";
 import type { ClientExif } from "./auto-generate";
@@ -142,10 +142,13 @@ export async function organizeBackfillDay(
   | { ok: true; diaryId: string; title: string }
   | { ok: false; reason: "cap" | "safety" | "empty" | "error"; error: string }
 > {
-  const { startUtc, endUtc } = kstDayRangeFromKey(dateKey);
-  const diary = await prisma.diary.findFirst({
-    where: { userId, createdAt: { gte: startUtc, lt: endUtc } },
-    orderBy: { createdAt: "asc" },
+  // 사진·글을 붙인 쪽(getOrCreateDiaryForDate·새 일기 합치기)과 같은 규칙으로 고른다.
+  // 예전엔 그날 가장 이른 행을 따로 골라, 한 날에 일기가 여럿인 예전 데이터에서 글은 A에
+  // 붙고 정리는 B가 됐다.
+  const target = await findDiaryForDate(userId, dateKey);
+  if (!target) return { ok: false, reason: "empty", error: "그 날 일기가 없어요" };
+  const diary = await prisma.diary.findUnique({
+    where: { id: target.id },
     select: {
       id: true,
       content: true,

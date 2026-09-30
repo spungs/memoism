@@ -270,7 +270,9 @@ export async function findDiaryForDate(
   const { startUtc, endUtc } = kstDayRangeFromKey(dateKey);
   const rows = await tx.diary.findMany({
     where: { userId, createdAt: { gte: startUtc, lt: endUtc } },
-    orderBy: { createdAt: "asc" },
+    // 지난 날짜 일기는 모두 정오로 앵커돼 시각이 같다 — id로 순서를 고정해야 합치기와
+    // 정리가 같은 일기를 고른다.
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     select: {
       id: true,
       title: true,

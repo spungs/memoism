@@ -55,7 +55,9 @@ export default async function DiaryDetailPage({ params, searchParams }: PageProp
   if (!session) redirect("/login");
 
   const { id } = await params;
-  const notice = NOTICES[(await searchParams)?.notice ?? ""] ?? null;
+  // 자기 키만 본다 — "constructor" 같은 값이 Object.prototype의 함수를 꺼내 렌더가 깨졌다.
+  const noticeKey = (await searchParams)?.notice ?? "";
+  const notice = Object.hasOwn(NOTICES, noticeKey) ? NOTICES[noticeKey] : null;
   const diary = await getDiary(id, session.userId);
   if (!diary) notFound();
 

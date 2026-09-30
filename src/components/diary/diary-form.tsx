@@ -598,11 +598,25 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
         return;
       }
 
-      // 그날 일기에 합쳐 제자리에서 정리했다 — 검토 화면 없이 그 일기로 간다. 정리가
-      // 막혔어도 쓴 글·사진은 이미 들어갔으니 초안을 지우고, 상세 화면이 이유를 알린다.
+      // 그날 일기에 합쳤다 — 검토 화면 없이 그 일기에서 정리한다. 쓴 글·사진은 이미
+      // 들어갔으니 초안부터 지운다. 정리를 기다리다 취소·오류가 나도 같은 글·사진을
+      // 다시 보내지 않게(합치기와 정리를 한 요청에 묶었을 땐 두 번 저장됐다).
       if (data.merged) {
         try { localStorage.removeItem(DRAFT_KEY_NEW); } catch { /* 무시 */ }
-        const notice = data.organized ? "organized" : (data.reason ?? "failed");
+        let notice: string;
+        try {
+          const orgRes = await fetch("/api/diaries/backfill/organize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ dateKey: draftDate }),
+            signal: ac.signal,
+          });
+          const org = await readJson(orgRes);
+          notice = orgRes.ok && org ? "organized" : (org?.reason ?? "failed");
+        } catch {
+          // 취소했거나 연결이 끊겼다. 합친 글·사진은 저장돼 있으니 그 일기로 간다.
+          notice = "merged";
+        }
         router.push(`/diary/${data.diaryId}?notice=${notice}`);
         router.refresh();
         return;
