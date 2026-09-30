@@ -37,6 +37,7 @@ describe("parseDateRefs — 점 형식과 소수 구분 (점검 M2)", () => {
     expect(k("2.5시간 걸었어")).toEqual([]);
     expect(k("1.5배 빨랐어")).toEqual([]);
     expect(k("2.5일 걸렸어")).toEqual([]);
+    expect(k("3.5(km) 뛰었어")).toEqual([]);
     expect(k("2.5 시간 걸었어")).toEqual([]);
     expect(k("버전 1.2.3 올렸어")).toEqual([]);
     expect(k("112.5 나왔어")).toEqual([]);
