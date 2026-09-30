@@ -8,11 +8,11 @@ import { createFragment } from "@/lib/diary/fragments";
 import { dateKeyLabel } from "@/lib/diary/kst";
 import { dateKeyInZone, todayKeyInZone } from "@/lib/tz";
 import {
+  PHOTO_SAVE_FAILED_MSG,
   savePhotosByDate,
   type CaptureEntry,
 } from "@/lib/diary/capture-photos";
 import type { ClientExif } from "@/lib/diary/auto-generate";
-import { STORAGE_FULL_MSG } from "@/lib/storage/quota";
 
 export type CaptureRef = {
   /**
@@ -188,9 +188,10 @@ export async function handleCaptureMessage(
       photosSaved = true;
       entries.push(...saved.entries);
     } else {
-      // 공간 부족은 할 수 있는 일이 있어 그대로 알리고, 나머지는 고정 문구로.
+      // 일시적인 저장 실패만 메이 말투의 고정 문구로 바꾼다. 공간 부족·파일 거절(형식·용량·
+      // 손상)은 사용자가 할 수 있는 일이 있어 사유를 그대로 알린다.
       photoFailNotice =
-        saved.error === STORAGE_FULL_MSG ? STORAGE_FULL_MSG : PHOTO_SAVE_FAILED_NOTICE;
+        saved.error === PHOTO_SAVE_FAILED_MSG ? PHOTO_SAVE_FAILED_NOTICE : saved.error;
       if (!(message && textIsRecord)) {
         return { handled: true, reply: photoFailNotice, captureRef: null };
       }
