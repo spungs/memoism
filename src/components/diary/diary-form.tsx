@@ -570,6 +570,9 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     setAiError(null);
     const ac = new AbortController();
     aiAbortRef.current = ac;
+    // 다른 화면으로 갈 때는 오버레이를 걷지 않는다 — 걷으면 이동이 끝날 때까지 폼(사진·글)이
+    // 다시 눌리는 상태로 드러나, 한 번 더 누르면 같은 사진·글이 또 합쳐졌다.
+    let leaving = false;
     try {
       const { compressed, exifs } = await buildExifsAndCompress();
 
@@ -617,6 +620,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
           // 취소했거나 연결이 끊겼다. 합친 글·사진은 저장돼 있으니 그 일기로 간다.
           notice = "merged";
         }
+        leaving = true;
         router.push(`/diary/${data.diaryId}?notice=${notice}`);
         router.refresh();
         return;
@@ -639,13 +643,14 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
         }),
       );
       // AI 생성 성공 후 review 이동 → draft는 유지(뒤로가기 시 복원용)
+      leaving = true;
       router.push("/diary/review");
     } catch (e) {
       // 사용자가 취소한 경우는 에러로 표시하지 않는다.
       if (e instanceof DOMException && e.name === "AbortError") return;
       setAiError(NETWORK_ERROR_MESSAGE);
     } finally {
-      setAiPending(false);
+      if (!leaving) setAiPending(false);
       setUsageSignal((n) => n + 1);
       aiAbortRef.current = null;
     }

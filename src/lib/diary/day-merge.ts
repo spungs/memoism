@@ -1,4 +1,5 @@
 import "server-only";
+import { after } from "next/server";
 import { prisma } from "@/lib/db";
 import { savePhotosByDate } from "./capture-photos";
 import { appendNoteToDiary } from "./backfill";
@@ -54,6 +55,8 @@ export async function appendToDay(input: {
   }
 
   // 정리를 못 하게 되더라도(취소·횟수 소진) 합친 본문이 회상에 잡히게 다시 임베딩한다.
-  await reembedDiaryWithFragments(input.diaryId);
+  // 응답 뒤에 한다 — 임베딩(모델 호출)까지 기다리면 합치기는 끝났는데 화면이 모르는 구간이
+  // 길어져, 그 사이 취소·재시도로 같은 사진이 또 합쳐질 틈이 커진다.
+  after(() => reembedDiaryWithFragments(input.diaryId));
   return { ok: true, diaryId: input.diaryId };
 }
