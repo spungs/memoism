@@ -373,6 +373,13 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
   const [notes, setNotes] = useState<Record<string, string>>({});
   // 메모가 안전 펜스에 걸리면 서버가 돌려주는 상담 안내. 결과 아래에 한 번만 보여준다.
   const [safetyReply, setSafetyReply] = useState<string | null>(null);
+  // 이미 저장에 성공한 사진 인덱스와 그 날짜의 일기. 중간에 끊긴 뒤 다시 누르면 남은
+  // 사진만 보낸다 — 전부 다시 보내면 사진·용량 카운터가 중복됐다(점검 M7).
+  // 새로 사진을 고르면 비운다(인덱스가 새 파일 기준이 된다).
+  const uploadedRef = useRef<Set<number>>(new Set());
+  const uploadedDiaryIdsRef = useRef<Map<string, string>>(new Map());
+  // 사진은 저장됐지만 메모를 붙이지 못한 날짜. 재시도 사이에도 유지해 결과에서 알린다.
+  const noteFailedRef = useRef<Set<string>>(new Set());
 
   // 새로 고르거나 화면을 떠날 때 이전 blob: URL 을 놓아준다.
   useEffect(() => {
@@ -391,6 +398,9 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
     setResults(null);
     setSafetyReply(null);
     setNotes({});
+    uploadedRef.current = new Set();
+    uploadedDiaryIdsRef.current = new Map();
+    noteFailedRef.current = new Set();
     setBusy("사진을 읽는 중…");
     try {
       // 순서가 중요하다. EXIF(가벼움) → 날짜 묶기 → 한도 적용 → 압축(비쌈).
@@ -489,8 +499,9 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
     }
 
     // 결과 행을 그날 일기로 잇는 데 쓴다. 사진 저장 응답에서 모은다 — 한도에
-    // 걸려 정리를 못 부른 날도 일기는 이미 있다.
-    const diaryIdByDate = new Map<string, string>();
+    // 걸려 정리를 못 부른 날도 일기는 이미 있다. 앞선 시도에서 저장한 날도 포함한다.
+    const diaryIdByDate = uploadedDiaryIdsRef.current;
+    const noteFailed = noteFailedRef.current;
 
     // 날짜별 메모. 사진과 같은 요청으로 보내 그날 일기 본문이 된다.
     const noteByDate = new Map<string, string>();
@@ -510,12 +521,14 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
     for (const g of targets) {
       for (const i of g.photoIndexes) dateKeyByIndex.set(i, g.dateKey!);
     }
+    // 앞선 시도에서 이미 저장한 사진은 다시 보내지 않는다.
+    const pending = keep.filter((i) => !uploadedRef.current.has(i));
     const chunks = chunkBySize(
       files.map((f) => f.size),
-      keep,
+      pending,
     );
 
-    let sent = 0;
+    let sent = keep.length - pending.length;
     for (const chunk of chunks) {
       setBusy(`사진 저장 중… ${sent}/${keep.length}장`);
       const fd = new FormData();
@@ -560,13 +573,15 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
         )) {
           diaryIdByDate.set(d, id);
         }
+        for (const d of (saved.noteFailed ?? []) as string[]) noteFailed.add(d);
+        for (const i of chunk) uploadedRef.current.add(i);
       } catch {
         setBusy(null);
         // 앞 묶음이 이미 저장됐으면 그렇게 말한다 — 전부 날아간 줄 알고 처음부터
         // 다시 고르게 만들지 않는다.
         setError(
           sent > 0
-            ? `사진 ${sent}장까지 저장했어요. 연결을 확인하고 다시 시도해주세요.`
+            ? `사진 ${sent}장까지 저장했어요. 연결을 확인하고 다시 누르면 남은 사진만 보내요.`
             : "사진을 올리다가 연결이 끊겼어요.",
         );
         return;
@@ -576,7 +591,7 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
 
     // ② 날짜를 하나씩 정리 — 진행률이 여기서 나온다(스펙 §9).
     const savedOnly = (dk: string) =>
-      noteByDate.has(dk) ? "사진·메모만 저장했어요" : "사진만 저장했어요";
+      noteByDate.has(dk) && !noteFailed.has(dk) ? "사진·메모만 저장했어요" : "사진만 저장했어요";
     const out: DayResult[] = [];
     for (let i = 0; i < targets.length; i++) {
       const dk = targets[i].dateKey!;
@@ -627,6 +642,12 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
     }
     setBusy(null);
     setResults(out);
+    // 결과 화면에서도 보이는 자리(error)에 둔다 — notice는 결과가 뜨면 숨는다.
+    if (noteFailed.size > 0) {
+      setError(
+        `${[...noteFailed].map(dateKeyLabel).join(", ")} 메모는 저장하지 못했어요. 그 날 일기에서 직접 적어주세요.`,
+      );
+    }
     router.refresh();
   }
 

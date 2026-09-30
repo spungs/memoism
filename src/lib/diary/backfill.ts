@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { savePhotosByDate } from "./capture-photos";
+import { reembedDiaryWithFragments } from "./fragment-embed";
 import { organizeDiaryFromFragments } from "./organize";
 import { regenerateDiary } from "./regenerate";
 import { kstDayRangeFromKey } from "./kst";
@@ -45,7 +46,13 @@ export async function saveBackfillPhotos(
   dateKeys: string[],
   notes: Record<string, string> = {},
 ): Promise<
-  | { ok: true; savedDates: string[]; diaryIds: Record<string, string> }
+  | {
+      ok: true;
+      savedDates: string[];
+      diaryIds: Record<string, string>;
+      /** 사진은 저장됐지만 메모를 붙이지 못한 날짜. 화면이 알려준다. */
+      noteFailed: string[];
+    }
   | { ok: false; error: string }
 > {
   if (photos.length === 0) return { ok: false, error: "사진이 없어요" };
@@ -63,9 +70,24 @@ export async function saveBackfillPhotos(
 
   const saved = await savePhotosByDate(userId, photos, exifs, dateKeys);
   if (!saved.ok) return { ok: false, error: saved.error };
+  // 메모는 사진 트랜잭션 밖이다. 여기서 던지면 사진은 저장됐는데 500이 나가, 화면이
+  // 실패로 알고 다시 보내 사진이 중복됐다 — 날짜별로 잡아서 알려준다(점검 M7).
+  const noteFailed: string[] = [];
   for (const e of saved.entries) {
     const note = notes[e.dateKey]?.trim();
-    if (note) await appendNoteToDiary(e.diaryId, note);
+    if (!note) continue;
+    try {
+      // 메모가 본문에 들어가면 회상이 찾을 수 있게 다시 임베딩한다(best-effort).
+      if (await appendNoteToDiary(e.diaryId, note)) {
+        await reembedDiaryWithFragments(e.diaryId);
+      }
+    } catch (err) {
+      console.error(
+        "[backfill] note append failed:",
+        err instanceof Error ? err.message : err,
+      );
+      noteFailed.push(e.dateKey);
+    }
   }
   return {
     ok: true,
@@ -73,6 +95,7 @@ export async function saveBackfillPhotos(
     // 결과 화면이 날짜를 그날 일기로 잇는 데 쓴다. 정리가 한도에 걸려 organize를
     // 부르지 못한 날도 사진은 여기서 이미 일기에 들어가 있다.
     diaryIds: Object.fromEntries(saved.entries.map((e) => [e.dateKey, e.diaryId])),
+    noteFailed,
   };
 }
 
@@ -81,16 +104,16 @@ export async function saveBackfillPhotos(
  *
  * 이미 들어 있으면 건너뛴다 — 한 날짜 사진이 여러 요청으로 나뉘면 요청마다 같은
  * 메모가 오고, 업로드가 끊겨 처음부터 다시 누를 때도 같은 메모가 다시 온다.
- * 그날 일기에 이미 쓴 글이 있으면 덮지 않고 뒤에 잇는다.
+ * 그날 일기에 이미 쓴 글이 있으면 덮지 않고 뒤에 잇는다. 본문을 바꿨으면 true.
  */
-async function appendNoteToDiary(diaryId: string, note: string): Promise<void> {
+async function appendNoteToDiary(diaryId: string, note: string): Promise<boolean> {
   const diary = await prisma.diary.findUnique({
     where: { id: diaryId },
     select: { content: true },
   });
-  if (!diary) return;
+  if (!diary) return false;
   const current = diary.content.trim();
-  if (current.includes(note)) return;
+  if (current.includes(note)) return false;
   await prisma.diary.update({
     where: { id: diaryId },
     data: {
@@ -98,6 +121,7 @@ async function appendNoteToDiary(diaryId: string, note: string): Promise<void> {
       contentEditedAt: new Date(),
     },
   });
+  return true;
 }
 
 /**

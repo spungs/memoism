@@ -74,5 +74,12 @@ async function handlePOST(req: NextRequest) {
     notes,
   );
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
-  return NextResponse.json({ savedDates: r.savedDates, diaryIds: r.diaryIds });
+  return NextResponse.json({
+    savedDates: r.savedDates,
+    diaryIds: r.diaryIds,
+    noteFailed: r.noteFailed,
+  });
 }
+
+// 처리 못 한 예외도 JSON으로 — 화면이 res.json()에서 터지지 않게(점검 M8).
+export const POST = withJsonErrors(handlePOST);
