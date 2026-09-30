@@ -36,6 +36,7 @@ describe("parseDateRefs — 점 형식과 소수 구분 (점검 M2)", () => {
   it("소수·단위는 날짜로 보지 않는다", () => {
     expect(k("2.5시간 걸었어")).toEqual([]);
     expect(k("1.5배 빨랐어")).toEqual([]);
+    expect(k("2.5일 걸렸어")).toEqual([]);
     expect(k("2.5 시간 걸었어")).toEqual([]);
     expect(k("버전 1.2.3 올렸어")).toEqual([]);
     expect(k("112.5 나왔어")).toEqual([]);
@@ -50,6 +51,7 @@ describe("parseDateRefs — 점 형식과 소수 구분 (점검 M2)", () => {
     expect(k("6.8에 뭐 했지")).toEqual(["2026-06-08"]);
     expect(k("9.20 성수동 갔던 날")).toEqual(["2026-09-20"]);
     expect(k("6.8. 한강")).toEqual(["2026-06-08"]);
+    expect(k("6.8(토) 한강")).toEqual(["2026-06-08"]);
   });
 
   it("슬래시 형식은 그대로", () => {

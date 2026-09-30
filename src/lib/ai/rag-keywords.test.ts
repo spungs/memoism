@@ -52,10 +52,10 @@ describe("composeRecallContent — 정리 안 한 조각을 회상 본문에 붙
   });
 });
 
-describe("composeRecallContent — 메모 상한", () => {
-  it("하루치 메모가 길면 2,000자에서 자른다", () => {
-    const out = composeRecallContent("", ["가".repeat(3000)]);
-    expect(out.length).toBeLessThan(2100);
-    expect(out.endsWith("…")).toBe(true);
+describe("composeRecallContent — 길이로 자르지 않는다", () => {
+  it("메모가 길어도 마지막(가장 최근) 조각까지 남긴다", () => {
+    const out = composeRecallContent("", ["가".repeat(3000), "방금 남긴 말"]);
+    expect(out.endsWith("방금 남긴 말")).toBe(true);
+    expect(out).not.toContain("…");
   });
 });

@@ -132,16 +132,14 @@ type DateRange = { startUtc: Date; endUtc: Date; label: string };
  * 채팅으로만 기록한 날은 본문이 비어 있다. 벡터 검색은 조각까지 임베딩해 그날을 찾아
  * 오는데 프롬프트엔 본문만 넣어서, 메이에게는 빈 날로 보였다 — "성수동 언제 갔지?"에
  * 기록이 없다고 하거나 지어냈다(점검 M1). 정리된 조각은 이미 본문에 들어 있어 뺀다.
+ *
+ * 길이로 자르지 않는다 — 본문을 200자로 자르다 뒤쪽 내용을 못 찾고 지어낸 적이 있어
+ * 회상 맥락엔 길이 제한을 두지 않기로 했다. 자르면 잘리는 쪽이 가장 최근 조각이다.
  */
-// 하루치 메모 상한 — 정리 입력 상한과 같다. 조각이 많은 날 프롬프트가 끝없이 불지 않게.
-const MAX_RECALL_MEMO_CHARS = 2000;
-
 export function composeRecallContent(content: string, unfoldedTexts: string[]): string {
   const notes = unfoldedTexts.map((s) => s.trim()).filter((s) => s.length > 0);
   if (notes.length === 0) return content;
-  let joined = notes.join(" / ");
-  if (joined.length > MAX_RECALL_MEMO_CHARS) joined = `${joined.slice(0, MAX_RECALL_MEMO_CHARS)}…`;
-  const memo = `[아직 일기로 정리 안 한 메모] ${joined}`;
+  const memo = `[아직 일기로 정리 안 한 메모] ${notes.join(" / ")}`;
   return content.trim() ? `${content}\n${memo}` : memo;
 }
 
@@ -184,7 +182,7 @@ function ymd(dateKey: string): { y: number; m: number; day: number } {
  * 일기는 KST 칸에 앵커되므로(kst.ts) 같은 날짜키면 같은 칸을 가리킨다.
  */
 const DOT_DATE_RE =
-  /(?<![\d.])(\d{1,2})\.(\d{1,2})(?!\d|\.\d)(?=$|[\s,.!?~)]|에|엔|날|부터|까지|쯤)(?!\s+(?:시간|배|분|초|km|kg|키로|킬로|리터|%))/g;
+  /(?<![\d.])(\d{1,2})\.(\d{1,2})(?!\d|\.\d)(?=$|[\s,.!?~()]|에|엔|날|부터|까지|쯤)(?!\s+(?:시간|배|분|초|km|kg|키로|킬로|리터|%))/g;
 
 export function parseDateRefs(message: string, now: Date, tz: string): DateRange[] {
   const todayKey = todayKeyInZone(tz, now);
@@ -217,7 +215,8 @@ export function parseDateRefs(message: string, now: Date, tz: string): DateRange
     add(thisYear, +mt[1], +mt[2], `${mt[1]}월 ${mt[2]}일`);
   }
   // M.D 점 형식 (예: 6.8, 9.20에) → 현지 올해. 소수("2.5시간", "1.5배")와 모양이
-  // 같아서 **뒤에 오는 말**로 가른다: 끝·공백·문장부호·날짜 조사만 날짜로 본다.
+  // 같아서 **뒤에 오는 말**로 가른다: 끝·공백·문장부호·괄호("6.8(토)")·날짜 조사만 날짜로 본다.
+  // "6.8일"은 넣지 않는다 — "2.5일 걸렸어"를 2월 5일로 읽게 된다.
   // 예전 `\b` 판정은 한글 앞을 경계로 봐서 소수를 날짜로 잡았고, 같이 보낸 사진까지
   // 그 날짜로 갔다(점검 M2). 띄어 쓴 단위("2.5 시간")와 버전 번호("1.2.3")도 뺀다.
   for (const mt of rest.matchAll(DOT_DATE_RE)) {
