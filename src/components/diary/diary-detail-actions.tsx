@@ -98,6 +98,7 @@ export function DiaryDetailActions({ diaryId }: DiaryDetailActionsProps) {
         description={errorMessage ?? undefined}
         confirmLabel="확인"
         confirmVariant="primary"
+        hideCancel
       />
     </div>
   );

@@ -14,6 +14,7 @@ import { pickRegenerateText } from "@/lib/diary/regenerate-input";
 import { useDeviceTodayKey } from "@/lib/tz-client";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 import { AiBusyOverlay } from "@/components/ui/ai-busy-overlay";
+import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 import { DRAFT_KEY_NEW, PENDING_DRAFT_KEY } from "./draft-keys";
 import { NETWORK_ERROR_MESSAGE, readJson, responseErrorMessage } from "@/lib/http/client";
 
@@ -364,14 +365,11 @@ export function ReviewGate() {
     setSignedUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleCancel = () => {
-    if (
-      !window.confirm(
-        "작성 중인 내용을 버릴까요? 업로드한 사진도 함께 정리됩니다.",
-      )
-    ) {
-      return;
-    }
+  // 취소 확인은 앱 시트로 묻는다 — 브라우저 confirm은 앱과 모양이 달랐다(점검 L17).
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const handleCancel = () => setConfirmCancel(true);
+  const discardAndLeave = () => {
+    setConfirmCancel(false);
     leavingRef.current = true;
     sessionStorage.removeItem(PENDING_DRAFT_KEY);
     // V2: storagePaths를 garbage collector cron이 정리. 베타엔 그대로 두고 사용자가 다시 시도하면 신규 업로드.
@@ -557,11 +555,6 @@ export function ReviewGate() {
               <li>{multiDay ? "가장 이른 시각" : "촬영 시각"} · {exifTimeLabel}</li>
             )}
             {exifHasLocation && <li>위치 정보 있음</li>}
-            {multiDay && (
-              <li style={{ color: "var(--danger)" }}>
-                ⚠️ 서로 다른 날 사진이 섞여 있어요. 한 날 사진만 두는 걸 권해요.
-              </li>
-            )}
           </ul>
 
           {/* 일기 날짜 — 촬영일이 기본값, 캘린더로 변경 가능 */}
@@ -880,6 +873,16 @@ export function ReviewGate() {
 
       {/* 생성 중엔 화면 전체를 막는다. 입력이 열려 있으면 기다리며 고친 본문을 결과가
           덮어썼다(점검 M10). 작성·수정 화면과 같은 오버레이·취소. */}
+      <ConfirmSheet
+        isOpen={confirmCancel}
+        onClose={() => setConfirmCancel(false)}
+        onConfirm={discardAndLeave}
+        title="작성 중인 내용을 버릴까요?"
+        description="올린 사진도 함께 정리돼요."
+        confirmLabel="버리기"
+        confirmVariant="danger"
+      />
+
       {regenerating && (
         <AiBusyOverlay
           label={"작성한 내용과 사진을 바탕으로\n일기를 다시 정리하고 있어요"}

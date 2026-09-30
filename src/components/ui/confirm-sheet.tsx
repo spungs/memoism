@@ -11,6 +11,8 @@ interface ConfirmSheetProps {
   confirmLabel?: string;
   confirmVariant?: "danger" | "primary";
   isLoading?: boolean;
+  /** 알림처럼 버튼 하나만 둔다. "확인"과 "취소"가 같은 동작일 때(점검 L17). */
+  hideCancel?: boolean;
 }
 
 export function ConfirmSheet({
@@ -22,6 +24,7 @@ export function ConfirmSheet({
   confirmLabel = "확인",
   confirmVariant = "primary",
   isLoading = false,
+  hideCancel = false,
 }: ConfirmSheetProps) {
   return (
     <BottomSheet isOpen={isOpen} onClose={onClose} closeOnOverlay={!isLoading}>
@@ -88,27 +91,29 @@ export function ConfirmSheet({
             {isLoading ? "처리 중..." : confirmLabel}
           </button>
 
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isLoading}
-            className="pressable"
-            style={{
-              width: "100%",
-              minHeight: 50,
-              padding: "var(--space-3) var(--space-4)",
-              borderRadius: "var(--radius-md)",
-              border: "none",
-              backgroundColor: "var(--fill-2)",
-              color: "var(--fg)",
-              fontFamily: "var(--font-sans)",
-              fontSize: "var(--text-md)",
-              fontWeight: 600,
-              cursor: isLoading ? "default" : "pointer",
-            }}
-          >
-            취소
-          </button>
+          {!hideCancel && (
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isLoading}
+              className="pressable"
+              style={{
+                width: "100%",
+                minHeight: 50,
+                padding: "var(--space-3) var(--space-4)",
+                borderRadius: "var(--radius-md)",
+                border: "none",
+                backgroundColor: "var(--fill-2)",
+                color: "var(--fg)",
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-md)",
+                fontWeight: 600,
+                cursor: isLoading ? "default" : "pointer",
+              }}
+            >
+              취소
+            </button>
+          )}
         </div>
       </div>
     </BottomSheet>

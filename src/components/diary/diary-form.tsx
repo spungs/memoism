@@ -24,6 +24,7 @@ import {
 import { DiaryDatePicker } from "./date-picker";
 import { DEFAULT_MOOD, MoodPicker, type MoodKey } from "./mood-picker";
 import { AiBusyOverlay, Spinner } from "@/components/ui/ai-busy-overlay";
+import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 // DRAFT_KEY_NEW: create 모드에서 작성 중 내용을 자동저장하는 키. 새로고침·세션만료로 인한 유실 방지.
 import { DRAFT_KEY_NEW, PENDING_DRAFT_KEY } from "./draft-keys";
@@ -550,18 +551,21 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     });
   };
 
-  const handleAiGenerate = async () => {
+  // 이틀 이상 사진이 섞여 있으면 하나의 일기로 묶기 전에 한 번 묻는다. 예전엔 작성 화면의
+  // 빨간 경고 → 브라우저 confirm → 검토 화면 경고로 같은 말을 세 번 했다(점검 L17).
+  const [confirmMultiDate, setConfirmMultiDate] = useState(false);
+
+  const handleAiGenerate = () => {
     if (aiPending || pending) return;
-
-    // 이틀 이상 사진이 섞여 있으면 하나의 일기로 묶기 전 명시적 확인.
     if (isMultiDate) {
-      const dates = dateKeys.map(shortDateLabel).join("·");
-      const proceed = window.confirm(
-        `이틀(${dates}) 사진이 섞여 있어요. 이대로 하나의 일기로 정리할까요?`,
-      );
-      if (!proceed) return;
+      setConfirmMultiDate(true);
+      return;
     }
+    void runAiGenerate();
+  };
 
+  const runAiGenerate = async () => {
+    setConfirmMultiDate(false);
     setAiPending(true);
     setAiError(null);
     const ac = new AbortController();
@@ -981,26 +985,6 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
               ))}
             </div>
           )}
-          {isMultiDate && (
-            <p
-              role="alert"
-              style={{
-                fontFamily: "var(--font-sans)",
-                fontSize: "var(--text-sm)",
-                lineHeight: "var(--leading-relaxed)",
-                color: "var(--danger)",
-                backgroundColor:
-                  "color-mix(in srgb, var(--danger) 10%, transparent)",
-                padding: "var(--space-2) var(--space-3)",
-                borderRadius: "var(--radius-md)",
-                margin: 0,
-              }}
-            >
-              📷 {dateKeys.map(shortDateLabel).join("·")}{" "}
-              {dateKeys.length}일 사진이 섞여 있어요. 일기는 하루 단위라 한
-              날 사진만 두길 권해요.
-            </p>
-          )}
           {photoNotice && (
             <p
               role="status"
@@ -1140,6 +1124,15 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
           onCancel={handleCancelAi}
         />
       )}
+
+      <ConfirmSheet
+        isOpen={confirmMultiDate}
+        onClose={() => setConfirmMultiDate(false)}
+        onConfirm={() => void runAiGenerate()}
+        title="날짜가 다른 사진이 섞여 있어요"
+        description={`${dateKeys.map(shortDateLabel).join("·")} 사진이 섞여 있어요. 이대로 하나의 일기로 정리할까요?`}
+        confirmLabel="정리하기"
+      />
     </div>
   );
 }
