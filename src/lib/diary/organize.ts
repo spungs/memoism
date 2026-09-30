@@ -238,8 +238,10 @@ export async function organizeDiaryFromFragments(
         aiGenerationVersion: true,
       },
     }),
+    // 지금 이 일기에 있는 조각만 표시한다. 정리(AI)를 기다리는 사이 다른 날로 옮긴 조각에
+    // 찍으면, 옮겨 간 날 본문엔 없는데 그 날 정리에서 계속 빠진다(점검 M4 재발).
     prisma.diaryFragment.updateMany({
-      where: { id: { in: selectedIds } },
+      where: { id: { in: selectedIds }, diaryId: diary.id },
       data: { foldedAt },
     }),
   ]);
