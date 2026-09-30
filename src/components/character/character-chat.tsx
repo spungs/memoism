@@ -426,7 +426,7 @@ export function CharacterChat({
               role: "assistant",
               content:
                 data?.error ??
-                "오늘 기억을 꺼내보는 건 여기까지예요. 기록은 계속 남길 수 있으니 편하게 얘기해주세요.",
+                "오늘 기억을 꺼내보는 건 여기까지야. 기록은 계속 남길 수 있으니까 편하게 얘기해줘.",
               createdAt: new Date().toISOString(),
             },
           ]);
@@ -586,7 +586,8 @@ export function CharacterChat({
       >
         {currentEmpty && (
           <Greeting
-            text={`안녕하세요, 저는 ${characterName}예요.\n일기에 대해 뭐든 편하게 물어보세요.`}
+            // 메이는 반말로 말한다 — 인사·한도 안내만 존댓말이라 한 사람이 두 말투를 썼다(점검 L16).
+            text={`안녕, 나는 ${characterName}야.\n일기에 대해 뭐든 편하게 물어봐.`}
             sending={sending}
             capExhausted={capExhausted}
             onPick={(q) => void send(q)}
@@ -715,7 +716,7 @@ export function CharacterChat({
           messages.length > 0 &&
           messages[messages.length - 1].createdAt < boundaryAt && (
             <Greeting
-              text={"다시 만나서 반가워요.\n무엇이든 편하게 물어보세요."}
+              text={"다시 만나서 반가워.\n뭐든 편하게 물어봐."}
               sending={sending}
               capExhausted={capExhausted}
               onPick={(q) => void send(q)}

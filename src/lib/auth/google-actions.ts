@@ -21,7 +21,7 @@ export async function completeGoogleSignupAction(
   const consentRaw = formData.get("consent");
   const consent = consentRaw === "on" || consentRaw === "true";
   if (!consent) {
-    return { error: "사진·텍스트의 AI 분석 동의가 필요해요" };
+    return { error: "사진·텍스트를 Google Gemini로 보내는 것에 동의해야 가입할 수 있어요" };
   }
 
   const jar = await cookies();

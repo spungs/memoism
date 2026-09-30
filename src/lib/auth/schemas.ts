@@ -15,7 +15,7 @@ export const signupSchema = z.object({
     .max(72, "비밀번호는 72자를 초과할 수 없습니다"),
   consent: checkboxBoolean.refine(
     (v) => v === true,
-    "사진·텍스트의 AI 분석 동의가 필요합니다",
+    "사진·텍스트를 Google Gemini로 보내는 것에 동의해야 가입할 수 있어요",
   ),
 });
 

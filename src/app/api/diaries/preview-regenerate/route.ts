@@ -10,7 +10,7 @@ import { unauthorized } from "@/lib/auth/unauthorized";
 import { aiFailureStatus } from "@/lib/http/ai-status";
 import { withJsonErrors } from "@/lib/http/with-json-errors";
 
-// 저장 전 검토 게이트의 "다시 생성" 엔드포인트.
+// 저장 전 검토 게이트의 "다시 정리하기" 엔드포인트.
 // auto-generate와 달리 사진은 이미 업로드돼 있으므로 storagePath만 받는다 (재업로드 X).
 // 일기 row를 만들지 않는다 (DB 저장은 사용자가 "저장"을 눌렀을 때 createDiary).
 //
@@ -45,7 +45,7 @@ async function handlePOST(req: NextRequest) {
       {
         ok: false,
         error: tooLong
-          ? `${MAX_AI_INPUT_CONTENT_LENGTH.toLocaleString("ko-KR")}자가 넘어 '다시 생성'을 쓸 수 없어요. 줄이면 다시 쓸 수 있어요.`
+          ? `${MAX_AI_INPUT_CONTENT_LENGTH.toLocaleString("ko-KR")}자가 넘어 '다시 정리하기'를 쓸 수 없어요. 줄이면 다시 쓸 수 있어요.`
           : "잘못된 요청 형식이에요",
       },
       { status: 400 },

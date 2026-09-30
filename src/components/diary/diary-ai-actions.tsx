@@ -104,7 +104,7 @@ export function DiaryAiActions({
       });
       const data = await readJson(res);
       if (!res.ok || !data) {
-        setError(responseErrorMessage(res, data, "재생성에 실패했어요"));
+        setError(responseErrorMessage(res, data, "다시 정리하지 못했어요"));
         return;
       }
       const d = data.diary;

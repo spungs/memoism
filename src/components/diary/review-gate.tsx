@@ -309,7 +309,7 @@ export function ReviewGate() {
         if (data?.capExhausted) {
           setRegenError("오늘 사용 횟수를 모두 사용했어요.");
         } else {
-          setRegenError(responseErrorMessage(res, data, "다시 생성에 실패했어요"));
+          setRegenError(responseErrorMessage(res, data, "다시 정리하지 못했어요"));
         }
         return;
       }
@@ -756,7 +756,8 @@ export function ReviewGate() {
                 regenerating || pending || overAiLimit ? "default" : "pointer",
             }}
           >
-            {regenerating ? "생성 중..." : "✨ 다시 생성"}
+            {/* 수정 화면과 같은 이름 — 같은 동작을 화면마다 다르게 불렀다(점검 L16). */}
+            {regenerating ? "정리 중..." : "✨ 다시 정리하기"}
           </button>
 
           <AiUsageCounter refreshSignal={usageSignal} />
