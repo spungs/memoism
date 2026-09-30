@@ -690,6 +690,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
             fontWeight: 400,
             padding: "4px 0",
             minWidth: 44,
+            minHeight: 44, // 누를 영역 44px(점검 L19)
             display: "flex",
             alignItems: "center",
             gap: 2,
@@ -726,6 +727,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
             fontWeight: 600,
             padding: "4px 0",
             minWidth: 44,
+            minHeight: 44, // 누를 영역 44px(점검 L19)
             textAlign: "right",
           }}
         >

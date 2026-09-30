@@ -140,7 +140,7 @@ export function DiarySearchView({ onActiveChange }: Props) {
             outline: "none",
             backgroundColor: "transparent",
             fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-base)",
+            fontSize: "var(--text-input)",
             color: "var(--fg)",
             height: "100%",
           }}

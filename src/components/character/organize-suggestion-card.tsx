@@ -103,20 +103,32 @@ export function OrganizeSuggestionCard({
           className="pressable"
           onClick={onAccept}
           disabled={busy}
+          // 누를 영역은 높이 44px, 보이는 알약은 그대로(음수 여백으로 자리 유지) — 점검 L19.
           style={{
-            padding: "6px 12px",
-            borderRadius: "var(--radius-pill)",
+            display: "inline-flex",
+            alignItems: "center",
+            minHeight: 44,
+            margin: "-7px 0",
+            padding: 0,
             border: "none",
-            backgroundColor: "var(--fg)",
-            color: "var(--bg)",
-            fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-sm)",
-            fontWeight: 500,
+            background: "transparent",
             cursor: busy ? "not-allowed" : "pointer",
-            opacity: busy ? 0.6 : 1,
           }}
         >
-          {busy ? "정리하는 중" : "정리해줘"}
+          <span
+            style={{
+              padding: "6px 12px",
+              borderRadius: "var(--radius-pill)",
+              backgroundColor: "var(--fg)",
+              color: "var(--bg)",
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-sm)",
+              fontWeight: 500,
+              opacity: busy ? 0.6 : 1,
+            }}
+          >
+            {busy ? "정리하는 중" : "정리해줘"}
+          </span>
         </button>
         {/* 접기 — "나중에"라는 말 대신 동작을 그대로 보여준다. 지우는 게 아니라 접는 것이다. */}
         <button
@@ -130,8 +142,10 @@ export function OrganizeSuggestionCard({
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 28,
-            height: 28,
+            // 누를 영역 44px, 자리는 예전 28px 그대로(음수 여백) — 점검 L19.
+            width: 44,
+            height: 44,
+            margin: -8,
             padding: 0,
             borderRadius: "var(--radius-pill)",
             border: "none",

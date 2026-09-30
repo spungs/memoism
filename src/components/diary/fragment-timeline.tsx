@@ -33,6 +33,10 @@ const ACTION_BUTTON: React.CSSProperties = {
   border: "none",
   background: "none",
   padding: "4px 8px",
+  // 누를 영역 높이 44px, 줄 높이는 그대로(음수 여백) — 점검 L19.
+  minHeight: 44,
+  minWidth: 44,
+  margin: "-11px 0",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-xs)",
   color: "var(--fg-muted)",
@@ -162,7 +166,7 @@ export function FragmentTimeline({
                     style={{
                       flex: 1,
                       fontFamily: "var(--font-sans)",
-                      fontSize: "var(--text-sm)",
+                      fontSize: "var(--text-input)",
                       color: "var(--fg)",
                       background: "var(--fill-2)",
                       border: "1px solid var(--border)",

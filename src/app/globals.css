@@ -178,6 +178,9 @@
   --text-base:    15px;
   --text-md:      17px;
   --text-lg:      20px;
+  /* 입력칸 최소 글자 크기. 16px 미만이면 iOS가 포커스 때 화면을 확대한다 — 확대를 막는
+     대신 입력칸을 16px로 둔다(점검 L19). */
+  --text-input:   16px;
   --text-xl:      22px;
   --text-2xl:     28px;
   --text-3xl:     34px;

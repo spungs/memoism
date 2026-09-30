@@ -53,7 +53,7 @@ function FieldInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
         height: 50,
         padding: "0 var(--space-4)",
         fontFamily: "var(--font-sans)",
-        fontSize: "var(--text-base)",
+        fontSize: "var(--text-input)",
         color: "var(--fg)",
         backgroundColor: focused ? "var(--fill-1)" : "var(--fill-2)",
         border: invalid ? "1.5px solid var(--danger)" : "none",

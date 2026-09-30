@@ -15,8 +15,10 @@ export function SettingsLink() {
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        width: 34,
-        height: 34,
+        // 누를 영역 44px, 자리는 예전 34px 그대로(음수 여백) — 점검 L19.
+        width: 44,
+        height: 44,
+        margin: -5,
         borderRadius: "var(--radius-pill)",
         color: "var(--fg-muted)",
         flexShrink: 0,

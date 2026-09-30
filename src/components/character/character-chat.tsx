@@ -90,6 +90,27 @@ const EXAMPLE_QUESTIONS = [
 ];
 
 const INPUT_MIN_H = 38;
+
+// 입력줄 아이콘 버튼: 누를 영역 44px(투명) 안에 보이는 원 34px.
+const HIT_44: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 44,
+  height: 44,
+  padding: 0,
+  border: "none",
+  background: "transparent",
+  flexShrink: 0,
+};
+const CIRCLE_34: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 34,
+  height: 34,
+  borderRadius: "var(--radius-pill)",
+};
 const INPUT_MAX_H = 160;
 
 interface Props {
@@ -817,22 +838,18 @@ export function CharacterChat({
               if (visionOptIn === null) setConsentOpen(true);
               else fileRef.current?.click();
             }}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 34,
-              height: 34,
-              padding: 0,
-              borderRadius: "var(--radius-pill)",
-              border: "none",
-              backgroundColor: "var(--fill-2)",
-              color: "var(--fg-muted)",
-              cursor: sending ? "not-allowed" : "pointer",
-              flexShrink: 0,
-            }}
+            // 누를 영역은 44px, 보이는 원은 34px 그대로 — 음수 여백으로 자리도 34px를 유지한다(점검 L19).
+            style={{ ...HIT_44, margin: -5, cursor: sending ? "not-allowed" : "pointer" }}
           >
-            <ImagePlus size={18} aria-hidden />
+            <span
+              style={{
+                ...CIRCLE_34,
+                backgroundColor: "var(--fill-2)",
+                color: "var(--fg-muted)",
+              }}
+            >
+              <ImagePlus size={18} aria-hidden />
+            </span>
           </button>
           <input
             ref={fileRef}
@@ -875,22 +892,18 @@ export function CharacterChat({
             type="submit"
             disabled={!canSend}
             aria-label="전송"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 34,
-              height: 34,
-              borderRadius: "var(--radius-pill)",
-              border: "none",
-              backgroundColor: canSend ? "var(--tint)" : "var(--fill-1)",
-              color: canSend ? "var(--on-tint)" : "var(--fg-placeholder)",
-              cursor: canSend ? "pointer" : "not-allowed",
-              flexShrink: 0,
-              transition: "background-color var(--duration-fast), color var(--duration-fast)",
-            }}
+            style={{ ...HIT_44, margin: -5, cursor: canSend ? "pointer" : "not-allowed" }}
           >
-            <ArrowUp size={16} aria-hidden strokeWidth={2.5} />
+            <span
+              style={{
+                ...CIRCLE_34,
+                backgroundColor: canSend ? "var(--tint)" : "var(--fill-1)",
+                color: canSend ? "var(--on-tint)" : "var(--fg-placeholder)",
+                transition: "background-color var(--duration-fast), color var(--duration-fast)",
+              }}
+            >
+              <ArrowUp size={16} aria-hidden strokeWidth={2.5} />
+            </span>
           </button>
         </div>
       </form>

@@ -112,6 +112,9 @@ export function DiaryDatePicker({ value, max, onChange, defaultOpen = false }: D
           border: "none",
           cursor: "pointer",
           padding: 0,
+          // 누를 영역 높이 44px, 줄 간격은 그대로(음수 여백) — 점검 L19.
+          minHeight: 44,
+          margin: "-13px 0",
           display: "flex",
           alignItems: "center",
           gap: 4,
@@ -267,8 +270,10 @@ export function DiaryDatePicker({ value, max, onChange, defaultOpen = false }: D
 }
 
 const navBtnStyle: React.CSSProperties = {
-  width: 28,
-  height: 28,
+  // 누를 영역 44px, 자리는 예전 28px 그대로(음수 여백) — 점검 L19.
+  width: 44,
+  height: 44,
+  margin: -8,
   display: "flex",
   alignItems: "center",
   justifyContent: "center",

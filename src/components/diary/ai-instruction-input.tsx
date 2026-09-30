@@ -107,7 +107,7 @@ export function AiInstructionInput({
           border: "none",
           backgroundColor: "var(--fill-2)",
           fontFamily: "var(--font-sans)",
-          fontSize: "var(--text-base)",
+          fontSize: "var(--text-input)",
           color: "var(--fg)",
           outline: "none",
         }}

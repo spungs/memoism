@@ -31,8 +31,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // 확대를 막지 않는다 — 글자를 키워 보는 사용자를 막는 접근성 미달이었다(점검 L19).
+  // 입력칸 포커스 확대는 입력칸을 16px(--text-input)로 두어 막는다.
   viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#F4F3F1" },

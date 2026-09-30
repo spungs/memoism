@@ -834,7 +834,7 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
                   color: "var(--fg)",
                   fontFamily: "var(--font-sans)",
                   // 16px 미만이면 iOS Safari가 포커스 때 화면을 확대한다.
-                  fontSize: 16,
+                  fontSize: "var(--text-input)",
                   lineHeight: 1.5,
                   opacity: picked.has(g.dateKey!) ? 1 : 0.5,
                 }}
