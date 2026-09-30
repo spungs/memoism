@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { todayKeyInZone } from "@/lib/tz";
 import { getSignedUrlsByPath } from "@/lib/storage";
 import { fragmentPreview } from "./fragment-preview";
+import { NOT_EMPTY_DIARY } from "./not-empty";
 import {
   dateKeyLabel,
   diaryCreatedAtForDateKey,
@@ -45,25 +46,6 @@ export type DiaryListItem = Awaited<
  * Cursor-paginated list of a user's diaries, newest first.
  * Pass `cursor` = the last item's id from the previous page.
  */
-/**
- * 아무것도 없는 일기(제목·본문·사진·조각 전부 없음)를 목록·개수에서 제외한다.
- *
- * 왜 생기나: 채팅 캡처가 그날 컨테이너를 자동 생성하는데(`getOrCreateDiaryForDate`),
- * 마지막 조각을 다른 날로 옮기거나 지우면 껍데기만 남는다. 그대로 두면 캘린더·목록에
- * 날짜만 있는 빈 카드가 뜬다.
- *
- * **삭제하지 않고 숨기는 이유**: 채팅 칩(`ChatMessage.captureRef.diaryId`)이 그 일기를
- * 가리키고 있다. 지우면 칩 링크가 깨진다. 껍데기는 남겨도 손해가 없다.
- */
-const NOT_EMPTY_DIARY = {
-  OR: [
-    { title: { not: "" } },
-    { content: { not: "" } },
-    { images: { some: {} } },
-    { fragments: { some: {} } },
-  ],
-};
-
 export async function getDiaries(
   userId: string,
   opts: { cursor?: string; take?: number } = {},

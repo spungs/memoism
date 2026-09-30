@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractKeywords } from "./rag";
+import { composeRecallContent, extractKeywords } from "./rag";
 
 /**
  * 키워드 추출 회귀 방지.
@@ -35,5 +35,27 @@ describe("extractKeywords", () => {
     // 과잉 차단 방지: 일상 명사까지 막으면 키워드 검색이 죽는다.
     expect(extractKeywords("요가 수련")).toContain("요가");
     expect(extractKeywords("피자 먹은 날")).toContain("피자");
+  });
+});
+
+describe("composeRecallContent — 정리 안 한 조각을 회상 본문에 붙인다 (점검 M1)", () => {
+  it("본문이 빈 날은 조각만으로 본문을 만든다", () => {
+    expect(composeRecallContent("", ["성수동 카페 갔어"])).toBe("[아직 일기로 정리 안 한 메모] 성수동 카페 갔어");
+  });
+  it("본문이 있으면 뒤에 붙인다", () => {
+    expect(composeRecallContent("아침 산책", ["점심은 국수", " "])).toBe(
+      "아침 산책\n[아직 일기로 정리 안 한 메모] 점심은 국수",
+    );
+  });
+  it("조각이 없으면 본문 그대로", () => {
+    expect(composeRecallContent("아침 산책", [])).toBe("아침 산책");
+  });
+});
+
+describe("composeRecallContent — 메모 상한", () => {
+  it("하루치 메모가 길면 2,000자에서 자른다", () => {
+    const out = composeRecallContent("", ["가".repeat(3000)]);
+    expect(out.length).toBeLessThan(2100);
+    expect(out.endsWith("…")).toBe(true);
   });
 });

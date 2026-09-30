@@ -3,7 +3,8 @@ import { z } from "zod";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { chat } from "@/lib/ai/gemini";
-import { findRelevantDiaries, type RelevantDiary } from "@/lib/ai/rag";
+import { findRelevantDiaries, withUnfoldedFragments, type RelevantDiary } from "@/lib/ai/rag";
+import { NOT_EMPTY_DIARY } from "@/lib/diary/not-empty";
 import { checkAndIncrement, releaseIncrement } from "@/lib/ai/usage";
 import { screenUserText, CRISIS_REPLY } from "@/lib/ai/safety";
 import { enforceVerifiedHotline } from "@/lib/ai/hotline-guard";
@@ -478,9 +479,10 @@ async function handlePOST(req: NextRequest) {
     });
   }
 
-  const [recentDiaries, persona, relevant, scopeAgg, oldestDiary] = await Promise.all([
+  const [recentRows, persona, relevant, scopeAgg, oldestDiary] = await Promise.all([
+    // 빈 일기(채팅 캡처가 만든 컨테이너만 남은 것)는 최근 5칸을 차지하지 않게 뺀다(점검 M1).
     prisma.diary.findMany({
-      where: { userId: session.userId },
+      where: { userId: session.userId, ...NOT_EMPTY_DIARY },
       orderBy: { createdAt: "desc" },
       take: 5,
       select: {
@@ -508,19 +510,22 @@ async function handlePOST(req: NextRequest) {
       return [] as RelevantDiary[];
     }),
     // 목록(최근 5 + 검색 5)은 부분집합이다. 개수·기간 질문에 답하려면 전체 집계가 필요하다.
+    // 집계도 빈 일기를 뺀다 — 최근 목록·기록 화면 개수와 기준을 맞춘다.
     prisma.diary.aggregate({
-      where: { userId: session.userId },
+      where: { userId: session.userId, ...NOT_EMPTY_DIARY },
       _count: { _all: true },
       _min: { createdAt: true },
       _max: { createdAt: true },
     }),
     // 최초 일기의 제목. 최근 것은 recentDiaries[0]이 이미 같은 행이라 다시 묻지 않는다.
     prisma.diary.findFirst({
-      where: { userId: session.userId },
+      where: { userId: session.userId, ...NOT_EMPTY_DIARY },
       orderBy: { createdAt: "asc" },
       select: { title: true },
     }),
   ]);
+  // 채팅으로만 기록한 날은 본문이 비어 있다 — 아직 정리 안 한 조각을 붙여 넘긴다(점검 M1).
+  const recentDiaries = await withUnfoldedFragments(recentRows);
   const scope: DiaryScope = {
     total: scopeAgg._count._all,
     oldestAt: scopeAgg._min.createdAt,

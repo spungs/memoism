@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { embedText } from "@/lib/ai/gemini";
 import { kstDayRangeUtc } from "@/lib/diary/kst";
+import { NOT_EMPTY_DIARY } from "@/lib/diary/not-empty";
 import { shiftDateKey, todayKeyInZone, weekdayOfDateKey } from "@/lib/tz";
 
 
@@ -124,6 +125,51 @@ const diarySelect = {
 } as const;
 
 type DateRange = { startUtc: Date; endUtc: Date; label: string };
+
+/**
+ * 회상 프롬프트에 넣을 본문 = 일기 본문 + 아직 일기로 정리하지 않은 글 조각. 순수 함수.
+ *
+ * 채팅으로만 기록한 날은 본문이 비어 있다. 벡터 검색은 조각까지 임베딩해 그날을 찾아
+ * 오는데 프롬프트엔 본문만 넣어서, 메이에게는 빈 날로 보였다 — "성수동 언제 갔지?"에
+ * 기록이 없다고 하거나 지어냈다(점검 M1). 정리된 조각은 이미 본문에 들어 있어 뺀다.
+ */
+// 하루치 메모 상한 — 정리 입력 상한과 같다. 조각이 많은 날 프롬프트가 끝없이 불지 않게.
+const MAX_RECALL_MEMO_CHARS = 2000;
+
+export function composeRecallContent(content: string, unfoldedTexts: string[]): string {
+  const notes = unfoldedTexts.map((s) => s.trim()).filter((s) => s.length > 0);
+  if (notes.length === 0) return content;
+  let joined = notes.join(" / ");
+  if (joined.length > MAX_RECALL_MEMO_CHARS) joined = `${joined.slice(0, MAX_RECALL_MEMO_CHARS)}…`;
+  const memo = `[아직 일기로 정리 안 한 메모] ${joined}`;
+  return content.trim() ? `${content}\n${memo}` : memo;
+}
+
+/** 일기별로 아직 정리하지 않은 글 조각을 시간순으로 모은다. */
+async function unfoldedTextsByDiary(diaryIds: string[]): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  if (diaryIds.length === 0) return out;
+  const frags = await prisma.diaryFragment.findMany({
+    where: { diaryId: { in: [...new Set(diaryIds)] }, kind: "text", foldedAt: null },
+    select: { diaryId: true, content: true },
+    orderBy: { createdAt: "asc" },
+  });
+  for (const f of frags) {
+    if (!f.content) continue;
+    const arr = out.get(f.diaryId);
+    if (arr) arr.push(f.content);
+    else out.set(f.diaryId, [f.content]);
+  }
+  return out;
+}
+
+/** 일기 목록의 본문에 아직 정리하지 않은 글 조각을 붙인다(회상 프롬프트용). */
+export async function withUnfoldedFragments<T extends { id: string; content: string }>(
+  rows: T[],
+): Promise<T[]> {
+  const notes = await unfoldedTextsByDiary(rows.map((r) => r.id));
+  return rows.map((r) => ({ ...r, content: composeRecallContent(r.content, notes.get(r.id) ?? []) }));
+}
 
 function ymd(dateKey: string): { y: number; m: number; day: number } {
   const [y, m, day] = dateKey.split("-").map(Number);
@@ -269,9 +315,15 @@ export async function findRelevantDiaries(
       ? prisma.diary.findMany({
           where: {
             userId,
-            OR: dateRanges.map((r) => ({
-              createdAt: { gte: r.startUtc, lt: r.endUtc },
-            })),
+            // 내용이 전혀 없는 빈 일기는 뺀다(점검 M1). OR 키가 겹쳐 AND로 묶는다.
+            AND: [
+              {
+                OR: dateRanges.map((r) => ({
+                  createdAt: { gte: r.startUtc, lt: r.endUtc },
+                })),
+              },
+              NOT_EMPTY_DIARY,
+            ],
           },
           select: diarySelect,
           orderBy: { createdAt: "desc" },
@@ -284,6 +336,12 @@ export async function findRelevantDiaries(
             OR: keywords.flatMap((k) => [
               { title: { contains: k, mode: "insensitive" as const } },
               { content: { contains: k, mode: "insensitive" as const } },
+              // 채팅으로만 남긴 말도 찾는다(점검 M1).
+              {
+                fragments: {
+                  some: { kind: "text", content: { contains: k, mode: "insensitive" as const } },
+                },
+              },
             ]),
           },
           select: diarySelect,
@@ -292,6 +350,11 @@ export async function findRelevantDiaries(
         })
       : Promise.resolve([]),
   ]);
+
+  // 본문에 아직 정리하지 않은 조각을 붙여 둔다 — 프롬프트와 키워드 일치 판정 모두 이걸 본다.
+  const notes = await unfoldedTextsByDiary(
+    [...vectorHits, ...dateRows, ...keywordRows].map((d) => d.id),
+  );
 
   const byId = new Map<string, RelevantDiary>();
   const base = (d: {
@@ -303,7 +366,13 @@ export async function findRelevantDiaries(
   }): RelevantDiary => {
     let r = byId.get(d.id);
     if (!r) {
-      r = { ...d, similarity: 0, matchedByDate: null, matchedByKeyword: null };
+      r = {
+        ...d,
+        content: composeRecallContent(d.content, notes.get(d.id) ?? []),
+        similarity: 0,
+        matchedByDate: null,
+        matchedByKeyword: null,
+      };
       byId.set(d.id, r);
     }
     return r;
@@ -323,7 +392,7 @@ export async function findRelevantDiaries(
   for (const d of keywordRows) {
     const r = base(d);
     r.matchedByKeyword =
-      keywords.find((k) => d.title.includes(k) || d.content.includes(k)) ??
+      keywords.find((k) => r.title.includes(k) || r.content.includes(k)) ??
       r.matchedByKeyword ??
       keywords[0] ??
       null;
