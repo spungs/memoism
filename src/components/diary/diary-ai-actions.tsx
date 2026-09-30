@@ -10,6 +10,7 @@ import { MAX_AI_INPUT_CONTENT_LENGTH } from "@/lib/diary/schemas";
 import { buildInstruction } from "@/lib/diary/ai-instruction";
 import { AiBusyOverlay, Spinner } from "@/components/ui/ai-busy-overlay";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
+import { NETWORK_ERROR_MESSAGE, readJson, responseErrorMessage } from "@/lib/http/client";
 
 export interface DiaryAiUpdate {
   title: string;
@@ -101,9 +102,9 @@ export function DiaryAiActions({
         ),
         signal: ac.signal,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data?.error ?? "재생성에 실패했어요");
+      const data = await readJson(res);
+      if (!res.ok || !data) {
+        setError(responseErrorMessage(res, data, "재생성에 실패했어요"));
         return;
       }
       const d = data.diary;
@@ -120,7 +121,7 @@ export function DiaryAiActions({
     } catch (e) {
       // 사용자가 취소한 경우는 에러로 표시하지 않는다.
       if (e instanceof DOMException && e.name === "AbortError") return;
-      setError(e instanceof Error ? e.message : "재생성에 실패했어요");
+      setError(NETWORK_ERROR_MESSAGE);
     } finally {
       setAiPending(false);
       setUsageSignal((n) => n + 1);

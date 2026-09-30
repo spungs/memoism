@@ -5,6 +5,8 @@ import { getRequestTimeZone } from "@/lib/tz-server";
 import { organizeBackfillDay } from "@/lib/diary/backfill";
 import { unauthorized } from "@/lib/auth/unauthorized";
 import { dateKeySchema } from "@/lib/diary/schemas";
+import { aiFailureStatus } from "@/lib/http/ai-status";
+import { withJsonErrors } from "@/lib/http/with-json-errors";
 
 /**
  * AI 재시도까지 끝낼 시간을 함수에 준다.
@@ -26,7 +28,7 @@ const bodySchema = z.object({
  * 묶이고 진행 상황도 알 수 없다. 쪼개면 클라이언트가 진행률을 보여주고 중단할 수
  * 있으며, 한 날이 실패해도 나머지가 이어진다.
  */
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const session = await getSession();
   if (!session) {
     return unauthorized();
@@ -43,15 +45,18 @@ export async function POST(req: NextRequest) {
     await getRequestTimeZone(),
   );
   if (!r.ok) {
-    // 캡 소진은 429 — 클라이언트가 이걸 보고 남은 날짜 순회를 멈춘다.
-    // 나머지 이유는 그 날만 건너뛰고 계속 간다.
-    //
-    // AI 실패("error")만 503이다. 재료 없음·펜스 차단은 다시 불러도 같은 결과라
-    // 400이 맞지만, 업스트림 지연까지 400으로 나가면 "클라이언트가 잘못 보냈다"로
-    // 읽혀 로그에서 구분되지 않는다. 클라이언트는 res.ok와 reason만 보므로
-    // (backfill-client.tsx) 이 숫자 변경은 순회 동작에 영향이 없다.
-    const status = r.reason === "cap" ? 429 : r.reason === "error" ? 503 : 400;
+    // 캡 소진이면 클라이언트가 reason을 보고 남은 날짜 순회를 멈춘다. 나머지 이유는
+    // 그 날만 건너뛰고 계속 간다. 클라이언트는 res.ok와 reason만 보므로
+    // (backfill-client.tsx) 상태 숫자는 로그용이다 — 기준은 AI 라우트 공통(ai-status.ts).
+    const status = aiFailureStatus({
+      capExhausted: r.reason === "cap",
+      safetyBlocked: r.reason === "safety",
+      invalidInput: r.reason === "empty",
+    });
     return NextResponse.json({ error: r.error, reason: r.reason }, { status });
   }
   return NextResponse.json({ diaryId: r.diaryId, title: r.title });
 }
+
+// 처리 못 한 예외도 JSON으로 — 화면이 res.json()에서 터지지 않게(점검 M8).
+export const POST = withJsonErrors(handlePOST);

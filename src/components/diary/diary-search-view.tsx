@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { MoodBadge } from "./mood-badge";
 import { KNOWN_MOOD_KEYS, type MoodKey } from "./mood-data";
+import { NETWORK_ERROR_MESSAGE, readJson, responseErrorMessage } from "@/lib/http/client";
 
 export interface SearchResultItem {
   id: string;
@@ -82,17 +83,17 @@ export function DiarySearchView({ onActiveChange }: Props) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ q: trimmed }),
         });
-        const data = await res.json();
+        const data = await readJson(res);
         if (isStale()) return;
-        if (!res.ok) {
-          setError(data?.error ?? "검색에 실패했어요");
+        if (!res.ok || !data) {
+          setError(responseErrorMessage(res, data, "검색에 실패했어요"));
           setItems([]);
         } else {
           setItems(data.items ?? []);
         }
-      } catch (e) {
+      } catch {
         if (isStale()) return;
-        setError(e instanceof Error ? e.message : "검색에 실패했어요");
+        setError(NETWORK_ERROR_MESSAGE);
         setItems([]);
       } finally {
         if (latestQueryRef.current === trimmed) setLoading(false);

@@ -7,6 +7,7 @@ import { saveBackfillPhotos } from "@/lib/diary/backfill";
 import type { ClientExif } from "@/lib/diary/auto-generate";
 import { MAX_AI_INPUT_CONTENT_LENGTH, dateKeySchema, clientExifSchema } from "@/lib/diary/schemas";
 import { unauthorized } from "@/lib/auth/unauthorized";
+import { withJsonErrors } from "@/lib/http/with-json-errors";
 
 
 /**
@@ -16,7 +17,7 @@ import { unauthorized } from "@/lib/auth/unauthorized";
  * 본문 생성은 여기서 하지 않는다. 저장이 끝나면 사용자가 앱을 닫아도 사진은
  * 남고, 정리는 나중에 이어서 할 수 있다(스펙 §3 D-6).
  */
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const session = await getSession();
   if (!session) {
     return unauthorized();

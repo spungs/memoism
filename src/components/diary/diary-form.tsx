@@ -28,6 +28,7 @@ import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 // DRAFT_KEY_NEW: create 모드에서 작성 중 내용을 자동저장하는 키. 새로고침·세션만료로 인한 유실 방지.
 import { DRAFT_KEY_NEW, PENDING_DRAFT_KEY } from "./draft-keys";
 import { useDeviceTimeZone } from "@/lib/tz-client";
+import { NETWORK_ERROR_MESSAGE, readJson, responseErrorMessage } from "@/lib/http/client";
 
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000; // 24시간 후 만료
 
@@ -575,10 +576,10 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
         body: fd,
         signal: ac.signal,
       });
-      const data = await res.json();
+      const data = await readJson(res);
 
-      if (!res.ok) {
-        setAiError(data?.error ?? "정리에 실패했어요");
+      if (!res.ok || !data) {
+        setAiError(responseErrorMessage(res, data, "정리에 실패했어요"));
         return;
       }
 
@@ -608,7 +609,7 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     } catch (e) {
       // 사용자가 취소한 경우는 에러로 표시하지 않는다.
       if (e instanceof DOMException && e.name === "AbortError") return;
-      setAiError(e instanceof Error ? e.message : "정리 실패");
+      setAiError(NETWORK_ERROR_MESSAGE);
     } finally {
       setAiPending(false);
       setUsageSignal((n) => n + 1);

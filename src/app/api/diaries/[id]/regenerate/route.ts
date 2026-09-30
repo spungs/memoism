@@ -10,6 +10,8 @@ import {
 } from "@/lib/diary/schemas";
 import { MAX_AI_INSTRUCTION_LENGTH } from "@/lib/diary/ai-instruction";
 import { unauthorized } from "@/lib/auth/unauthorized";
+import { aiFailureStatus } from "@/lib/http/ai-status";
+import { withJsonErrors } from "@/lib/http/with-json-errors";
 
 /**
  * AI 재시도까지 끝낼 시간을 함수에 준다.
@@ -29,7 +31,7 @@ const bodySchema = z.object({
   instruction: z.string().max(MAX_AI_INSTRUCTION_LENGTH).optional(),
 });
 
-export async function POST(
+async function handlePOST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -76,10 +78,9 @@ export async function POST(
   );
 
   if (!result.ok) {
-    // 502가 아니라 503이다. 502는 "게이트웨이가 죽었다"는 뜻이라 Vercel 대시보드에서
-    // 플랫폼 장애로 읽힌다 — 실제로는 업스트림(Gemini) 지연·거부다.
-    // (2026-09-22에 이 오분류로 함수 크래시를 의심하며 한참 헤맸다.)
-    const status = result.capExhausted ? 429 : result.invalidInput ? 400 : 503;
+    // 상태 기준은 모든 AI 라우트 공통(ai-status.ts). 모델 실패는 502가 아니라 503이다 —
+    // 502는 Vercel 대시보드에서 플랫폼 장애로 읽힌다(2026-09-22에 이 오분류로 한참 헤맸다).
+    const status = aiFailureStatus(result);
     return NextResponse.json(
       {
         error: result.error,
@@ -92,3 +93,6 @@ export async function POST(
   await captureServer("ai_regenerated", session.userId, { diary_id: id });
   return NextResponse.json({ diary: result.diary });
 }
+
+// 처리 못 한 예외도 JSON으로 — 화면이 res.json()에서 터지지 않게(점검 M8).
+export const POST = withJsonErrors(handlePOST);

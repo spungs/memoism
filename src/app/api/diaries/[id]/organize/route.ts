@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db";
 import { organizeDiaryFromFragments } from "@/lib/diary/organize";
 import { MAX_AI_INSTRUCTION_LENGTH } from "@/lib/diary/ai-instruction";
 import { unauthorized } from "@/lib/auth/unauthorized";
+import { aiFailureStatus } from "@/lib/http/ai-status";
+import { withJsonErrors } from "@/lib/http/with-json-errors";
 
 /**
  * AI 재시도까지 끝낼 시간을 함수에 준다.
@@ -20,7 +22,7 @@ const bodySchema = z.object({
   instruction: z.string().max(MAX_AI_INSTRUCTION_LENGTH).optional(),
 });
 
-export async function POST(
+async function handlePOST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -58,14 +60,14 @@ export async function POST(
   );
 
   if (!result.ok) {
-    // 남은 실패는 대부분 업스트림(Gemini) 지연·거부다. 500은 "이 서버가 깨졌다"는
-    // 뜻이라 regenerate와 같은 오분류를 만든다 — 503으로 보낸다.
-    const status = result.capExhausted ? 429 : result.nothingToFold ? 400 : 503;
+    // 상태 기준은 모든 AI 라우트 공통(ai-status.ts).
+    const status = aiFailureStatus(result);
     return NextResponse.json(
       {
         error: result.error,
-        capExhausted: result.capExhausted,
-        nothingToFold: result.nothingToFold,
+        // 플래그가 없을 때 undefined로 빠지면 화면의 분기가 흔들린다 — 항상 불리언으로.
+        capExhausted: result.capExhausted ?? false,
+        nothingToFold: result.nothingToFold ?? false,
       },
       { status },
     );
@@ -169,3 +171,6 @@ export async function POST(
     chatMessage,
   });
 }
+
+// 처리 못 한 예외도 JSON으로 — 화면이 res.json()에서 터지지 않게(점검 M8).
+export const POST = withJsonErrors(handlePOST);

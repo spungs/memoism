@@ -7,6 +7,8 @@ import { MAX_AI_INPUT_CONTENT_LENGTH, clientExifSchema } from "@/lib/diary/schem
 import { MAX_AI_INSTRUCTION_LENGTH } from "@/lib/diary/ai-instruction";
 import { MAX_IMAGES_PER_REQUEST } from "@/lib/diary/limits";
 import { unauthorized } from "@/lib/auth/unauthorized";
+import { aiFailureStatus } from "@/lib/http/ai-status";
+import { withJsonErrors } from "@/lib/http/with-json-errors";
 
 // 저장 전 검토 게이트의 "다시 생성" 엔드포인트.
 // auto-generate와 달리 사진은 이미 업로드돼 있으므로 storagePath만 받는다 (재업로드 X).
@@ -26,7 +28,7 @@ const bodySchema = z.object({
   instruction: z.string().max(MAX_AI_INSTRUCTION_LENGTH).optional(),
 });
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const session = await getSession();
   if (!session) {
     return unauthorized();
@@ -85,8 +87,8 @@ export async function POST(req: NextRequest) {
   });
 
   if (!result.ok) {
-    // regenerate와 같은 이유로 503이다 — 502는 플랫폼 장애로 읽힌다.
-    const status = result.capExhausted ? 429 : result.invalidInput ? 400 : 503;
+    // 상태 기준은 모든 AI 라우트 공통(ai-status.ts).
+    const status = aiFailureStatus(result);
     return NextResponse.json(
       {
         ok: false,
@@ -99,3 +101,6 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, data: result.data });
 }
+
+// 처리 못 한 예외도 JSON으로 — 화면이 res.json()에서 터지지 않게(점검 M8).
+export const POST = withJsonErrors(handlePOST);

@@ -15,6 +15,7 @@ import { kstDateKey } from "@/lib/diary/kst";
 import { getRequestTimeZone } from "@/lib/tz-server";
 import type { ClientExif } from "@/lib/diary/auto-generate";
 import { unauthorized } from "@/lib/auth/unauthorized";
+import { withJsonErrors } from "@/lib/http/with-json-errors";
 
 // JSON·multipart 두 경로가 같은 상한을 쓰게 한 곳에 둔다.
 // (한쪽만 걸면 multipart로 상한을 우회할 수 있다.)
@@ -261,7 +262,7 @@ ${
   return { prompt, sources };
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const session = await getSession();
   if (!session) {
     return unauthorized();
@@ -572,7 +573,8 @@ export async function POST(req: NextRequest) {
     await releaseIncrement(session.userId, cap.chargedDate);
     return NextResponse.json(
       { error: "메이가 잠시 응답하지 못했어요. 잠시 후 다시 시도해주세요." },
-      { status: 502 },
+      // 업스트림 실패는 503 — AI 라우트 공통 기준(ai-status.ts, 점검 L1).
+      { status: 503 },
     );
   }
 
@@ -662,3 +664,6 @@ export async function POST(req: NextRequest) {
     relatedDiaries,
   });
 }
+
+// 처리 못 한 예외도 JSON으로 — 화면이 res.json()에서 터지지 않게(점검 M8).
+export const POST = withJsonErrors(handlePOST);

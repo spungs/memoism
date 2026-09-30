@@ -15,6 +15,7 @@ import { useDeviceTodayKey } from "@/lib/tz-client";
 import { AiUsageCounter } from "@/components/ai/ai-usage-counter";
 import { AiBusyOverlay } from "@/components/ui/ai-busy-overlay";
 import { DRAFT_KEY_NEW, PENDING_DRAFT_KEY } from "./draft-keys";
+import { NETWORK_ERROR_MESSAGE, readJson, responseErrorMessage } from "@/lib/http/client";
 
 const DRAFT_TTL_MS = 5 * 60 * 1000; // 5분 만료 — 사용자가 너무 오래 자리비울 때 보호
 
@@ -301,13 +302,13 @@ export function ReviewGate() {
         }),
         signal: ac.signal,
       });
-      const data = await res.json();
+      const data = await readJson(res);
 
       if (!res.ok || !data?.ok) {
         if (data?.capExhausted) {
           setRegenError("오늘 사용 횟수를 모두 사용했어요.");
         } else {
-          setRegenError(data?.error ?? "다시 생성에 실패했어요");
+          setRegenError(responseErrorMessage(res, data, "다시 생성에 실패했어요"));
         }
         return;
       }
@@ -339,7 +340,7 @@ export function ReviewGate() {
     } catch (e) {
       // 사용자가 취소한 경우는 에러로 표시하지 않는다.
       if (e instanceof DOMException && e.name === "AbortError") return;
-      setRegenError(e instanceof Error ? e.message : "다시 생성 실패");
+      setRegenError(NETWORK_ERROR_MESSAGE);
     } finally {
       setRegenerating(false);
       setUsageSignal((n) => n + 1);

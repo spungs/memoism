@@ -19,6 +19,7 @@ import { MAX_IMAGES_PER_REQUEST } from "@/lib/diary/limits";
 import { dateKeyLabel } from "@/lib/diary/kst";
 import { dateKeyInZone, shiftDateKey, todayKeyInZone } from "@/lib/tz";
 import { useDeviceTimeZone } from "@/lib/tz-client";
+import { readJson, responseErrorMessage } from "@/lib/http/client";
 
 type Role = "user" | "assistant";
 type RelatedDiary = { id: string; title: string; createdAt: string };
@@ -201,12 +202,14 @@ export function CharacterChat({
       const res = await fetch(`/api/diaries/${suggestion.diaryId}/organize`, {
         method: "POST",
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "정리하다가 문제가 생겼어. 조금 뒤에 다시 해볼래?");
+      const data = await readJson(res);
+      if (!res.ok || !data) {
+        setError(
+          responseErrorMessage(res, data, "정리하다가 문제가 생겼어. 조금 뒤에 다시 해볼래?"),
+        );
         // 캡 소진·조각 없음은 다시 눌러도 같은 결과다 — 제안을 내린다.
-        if (data.capExhausted || data.nothingToFold) setSuggestion(null);
-        if (data.capExhausted) setCapExhausted(true);
+        if (data?.capExhausted || data?.nothingToFold) setSuggestion(null);
+        if (data?.capExhausted) setCapExhausted(true);
         return;
       }
       // 서버가 ChatMessage로 저장했으면 그 행을 그대로 붙인다(새로고침 후에도 남는다).
@@ -389,8 +392,8 @@ export function CharacterChat({
           body: JSON.stringify({ message: text }),
         });
       }
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await readJson(res);
+      if (!res.ok || !data) {
         // 한도 소진은 **에러가 아니라 대화**로 알린다. 빨간 배너로 띄우면 사용자가
         // 뭘 잘못한 것처럼 읽히고, "기록은 계속된다"는 사실도 전달되지 않는다.
         if (data?.capExhausted) {
@@ -408,7 +411,9 @@ export function CharacterChat({
           ]);
           return;
         }
-        setError(data?.error ?? "메이가 잠시 응답하지 못했어요. 잠시 후 다시 시도해주세요.");
+        setError(
+          responseErrorMessage(res, data, "메이가 잠시 응답하지 못했어요. 잠시 후 다시 시도해주세요."),
+        );
         rollback();
         return;
       }

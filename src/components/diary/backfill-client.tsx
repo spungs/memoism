@@ -22,6 +22,7 @@ import { useDeviceTimeZone, useDeviceTodayKey } from "@/lib/tz-client";
 import { MAX_AI_INPUT_CONTENT_LENGTH } from "@/lib/diary/schemas";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { DiaryDatePicker } from "./date-picker";
+import { readJson, responseErrorMessage } from "@/lib/http/client";
 
 type Wire = { takenAt: string | null; lat: number | null; lng: number | null };
 /** `diaryId`가 있으면 결과 행을 누를 때 그날 일기 상세로 간다. */
@@ -51,16 +52,8 @@ const rowStyle = {
  * (2026-09-22 운영에서 실제로 413 이 이렇게 가려졌다.)
  */
 async function readError(res: Response): Promise<string> {
-  try {
-    const data = await res.json();
-    if (typeof data?.error === "string") return data.error;
-  } catch {
-    // 아래 상태 코드 분기로 넘어간다.
-  }
-  if (res.status === 413) {
-    return "사진 용량이 한 번에 보내기엔 커요. 장수를 줄여서 다시 해주세요.";
-  }
-  return `사진을 저장하지 못했어요 (오류 ${res.status})`;
+  // 공용 규칙(lib/http/client.ts)으로 옮겼다 — 다른 화면도 같은 방식으로 읽는다(점검 M8).
+  return responseErrorMessage(res, await readJson(res), `사진을 저장하지 못했어요 (오류 ${res.status})`);
 }
 
 
@@ -595,15 +588,15 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ dateKey: dk }),
         });
-        const data = await res.json();
-        if (res.ok) {
+        const data = await readJson(res);
+        if (res.ok && data) {
           out.push({
             dateKey: dk,
             ok: true,
             note: data.title,
             diaryId: data.diaryId ?? savedId,
           });
-        } else if (data.reason === "cap") {
+        } else if (data?.reason === "cap") {
           // 캡이 끝났다. 남은 날은 사진만 저장된 채로 둔다 — 내일 이어서 하면 된다.
           out.push({
             dateKey: dk,
@@ -623,7 +616,7 @@ export function BackfillClient({ limits }: { limits: BackfillLimits }) {
         } else {
           // 펜스에 걸리면 서버가 상담 안내를 돌려준다. 메모가 생기면서 이 경로에
           // 사용자가 쓴 글이 들어가므로 삼키지 않고 보여준다.
-          if (data.reason === "safety" && typeof data.error === "string") {
+          if (data?.reason === "safety" && typeof data?.error === "string") {
             setSafetyReply(data.error);
           }
           out.push({ dateKey: dk, ok: false, note: savedOnly(dk), diaryId: savedId });
