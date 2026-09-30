@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { deleteImage, saveImage } from "@/lib/storage";
+import { deleteImage, ImageRejectedError, saveImage } from "@/lib/storage";
 import { assertStorageQuota, STORAGE_FULL_MSG } from "@/lib/storage/quota";
 import { getOrCreateDiaryForDate } from "./queries";
 // EXIF 입력 타입은 auto-generate가 단일 출처다(preview-generate도 같은 걸 쓴다).
@@ -62,6 +62,8 @@ export async function savePhotosByDate(
     await Promise.all(uploaded.map((path) => deleteImage(path)));
     // 원문(스토리지 오류)은 로그에만 — 메이 채팅에 그대로 남았다(점검 M3).
     console.error("[capture-photos] upload failed:", e instanceof Error ? e.message : e);
+    // 파일 자체 문제(형식·크기·손상)는 다시 보내도 같다 — "잠시 후 다시"가 아니라 원인을 알린다.
+    if (e instanceof ImageRejectedError) return { ok: false, error: e.message };
     return { ok: false, error: PHOTO_SAVE_FAILED_MSG };
   }
 

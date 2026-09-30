@@ -59,6 +59,12 @@ function extensionFor(file: File): string {
 
 export class StorageError extends Error {}
 
+/**
+ * 파일 자체가 받아들일 수 없는 경우(형식·크기·손상). 다시 보내도 같은 결과라 원인 문구를
+ * 사용자에게 그대로 보여준다 — 업로드 실패(네트워크·스토리지)와 구분한다.
+ */
+export class ImageRejectedError extends StorageError {}
+
 // 파일의 첫 12바이트를 직접 확인해 클라이언트가 보낸 MIME과 실제 내용이
 // 일치하는지 검증한다 (QA H-6). 폴리글롯/위장 업로드 차단.
 // file-type 패키지를 쓰지 않은 이유: HEIC/HEIF·WebP·PNG·JPEG 네 가지만 다루므로
@@ -115,17 +121,17 @@ export async function saveImage(file: File, ownerId: string): Promise<string> {
       file.type as (typeof ALLOWED_IMAGE_TYPES)[number],
     )
   ) {
-    throw new StorageError(`지원하지 않는 이미지 형식입니다: ${file.type}`);
+    throw new ImageRejectedError(`지원하지 않는 이미지 형식입니다: ${file.type}`);
   }
   if (file.size > MAX_IMAGE_BYTES) {
-    throw new StorageError("이미지는 10MB 이하만 업로드할 수 있습니다.");
+    throw new ImageRejectedError("이미지는 10MB 이하만 업로드할 수 있습니다.");
   }
 
   const storagePath = `${ownerId}/${randomUUID()}${extensionFor(file)}`;
   const buf = Buffer.from(await file.arrayBuffer());
 
   if (!validateMagicBytes(buf, file.type)) {
-    throw new StorageError(
+    throw new ImageRejectedError(
       "이미지 파일이 손상되었거나 형식이 일치하지 않아요.",
     );
   }
