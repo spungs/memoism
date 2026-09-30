@@ -11,9 +11,10 @@ export {
   type MoodKey,
 } from './mood-data'
 import { MOODS, type MoodKey } from './mood-data'
+import { DEFAULT_MOOD as SHARED_DEFAULT_MOOD } from '@/lib/diary/schemas'
 
 /** 감정을 고르지 않은 채 저장되지 않게 하는 기본값. 호출자가 초기값으로 쓴다. */
-export const DEFAULT_MOOD: MoodKey = 'calm'
+export const DEFAULT_MOOD: MoodKey = SHARED_DEFAULT_MOOD
 
 interface MoodPickerProps {
   value: MoodKey

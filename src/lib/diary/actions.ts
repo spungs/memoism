@@ -7,10 +7,10 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { deleteImage, getObjectSize, saveImage } from "@/lib/storage";
 import { assertStorageQuota, STORAGE_FULL_MSG } from "@/lib/storage/quota";
-import { upsertDiaryEmbedding } from "./embedding";
 import { reembedDiaryWithFragments } from "./fragment-embed";
 import { deleteUnreferencedImages } from "./image-cleanup";
-import { diaryCreatedAtForDateKey } from "./kst";
+import { diaryCreatedAtForDateKey, kstDateKey } from "./kst";
+import { findDiaryForDate, lockUserDiaries } from "./queries";
 import { isValidDateKey, todayKeyInZone } from "@/lib/tz";
 import { getRequestTimeZone } from "@/lib/tz-server";
 import { MAX_IMAGES_PER_REQUEST } from "./limits";
@@ -30,7 +30,8 @@ import {
 //   - 백업 스왑 로직은 NEW-7 재생성 API에서 본격.
 
 export type DiaryActionResult =
-  | { ok: true; data: { id: string } }
+  // merged: 그날 이미 있던 일기에 이어 넣었다(하루에 일기 하나, 점검 M5).
+  | { ok: true; data: { id: string; merged?: boolean } }
   | {
       ok: false;
       error?: string;
@@ -267,7 +268,7 @@ export async function createDiaryAction(
 
   const totalNewBytes = imagesCreate.reduce((sum, img) => sum + img.sizeBytes, 0);
 
-  let diary: { id: string };
+  let diary: { id: string; merged: boolean };
   try {
     // 일기·이미지 insert와 사용량 카운터를 한 트랜잭션으로 — 한쪽만 반영되면
     // storageUsedBytes 캐시가 드리프트한다(coinBalance와 같은 규약).
@@ -291,6 +292,66 @@ export async function createDiaryAction(
           throw new AlreadySavedError(sameDraft ? [...ids][0] : null);
         }
       }
+      if (totalNewBytes > 0) {
+        await tx.character.update({
+          where: { userId: session.userId },
+          data: { storageUsedBytes: { increment: BigInt(totalNewBytes) } },
+        });
+      }
+
+      // 하루에 일기는 하나다(점검 M5). 그날 일기가 이미 있으면(메이와 나눈 조각이 모인
+      // 일기 포함) 새로 만들지 않고 이어 넣는다 — 그래야 정리할 때 직접 쓴 글과 그날
+      // 조각이 한 일기에서 함께 엮인다. 찾고-만들기가 겹치지 않게 사용자 단위로 줄 세운다.
+      await lockUserDiaries(tx, session.userId);
+      const sameDay = await findDiaryForDate(session.userId, kstDateKey(diaryDate), tx);
+      if (sameDay) {
+        const current = await tx.diary.findUniqueOrThrow({
+          where: { id: sameDay.id },
+          select: { title: true, content: true, mood: true },
+        });
+        const agg = await tx.diaryImage.aggregate({
+          where: { diaryId: sameDay.id },
+          _max: { orderIndex: true },
+        });
+        const nextOrder = (agg._max.orderIndex ?? -1) + 1;
+        const keptTitle = current.title.trim();
+        const newTitle = parsed.data.title.trim();
+        // 제목이 이미 있으면 유지하고, 새 제목은 이어 쓰는 글의 첫 줄로 남긴다 —
+        // 사용자가 쓴 말을 버리지 않는다.
+        const addition = [
+          keptTitle && newTitle && newTitle !== keptTitle ? newTitle : "",
+          parsed.data.content.trim(),
+        ]
+          .filter(Boolean)
+          .join("\n");
+        await tx.diary.update({
+          where: { id: sameDay.id },
+          data: {
+            title: keptTitle || newTitle,
+            content: [current.content.trim(), addition].filter(Boolean).join("\n\n"),
+            // 아직 글이 없는 일기(채팅이 만든 빈 일기)의 감정은 기본값(평온)일 뿐이다 —
+            // 처음 직접 쓴 글의 감정을 쓴다. 이미 글이 있으면 그 감정을 유지한다.
+            mood:
+              !current.title.trim() && !current.content.trim()
+                ? (parsed.data.mood ?? current.mood)
+                : (current.mood ?? parsed.data.mood ?? null),
+            contentEditedAt: new Date(),
+            images:
+              imagesCreate.length > 0
+                ? {
+                    create: imagesCreate.map((img) => ({
+                      ...img,
+                      orderIndex: nextOrder + img.orderIndex,
+                    })),
+                  }
+                : undefined,
+          },
+        });
+        // 목록에 안 보이던 빈 일기에 채운 거면 사용자 눈엔 새 일기다 — "이어서 넣었어요"
+        // 안내를 띄우지 않는다.
+        return { id: sameDay.id, merged: !sameDay.empty };
+      }
+
       const created = await tx.diary.create({
         data: {
           userId: session.userId,
@@ -304,13 +365,7 @@ export async function createDiaryAction(
         },
         select: { id: true },
       });
-      if (totalNewBytes > 0) {
-        await tx.character.update({
-          where: { userId: session.userId },
-          data: { storageUsedBytes: { increment: BigInt(totalNewBytes) } },
-        });
-      }
-      return created;
+      return { id: created.id, merged: false };
     });
   } catch (e) {
     if (e instanceof AlreadySavedError) {
@@ -334,7 +389,8 @@ export async function createDiaryAction(
 
   // 여기부터는 커밋 이후다. 예전엔 아래까지 위 try 안에 있어, 여기서 예외가 나면 보상
   // 정리가 **이미 저장된** 사진 파일을 지울 수 있었다(점검 H8). 아래는 모두 best-effort다.
-  await upsertDiaryEmbedding(diary.id, parsed.data.title, parsed.data.content);
+  // 이어 넣은 경우 본문이 합쳐졌고 조각도 있을 수 있다 — DB 기준으로 다시 임베딩한다.
+  await reembedDiaryWithFragments(diary.id);
 
   revalidatePath("/diary");
   revalidatePath("/");
@@ -342,6 +398,7 @@ export async function createDiaryAction(
     source,
     image_count: storagePaths.length,
     has_mood: parsed.data.mood != null,
+    merged: diary.merged,
   });
   return { ok: true, data: diary };
 }
@@ -356,7 +413,7 @@ export async function updateDiaryAction(
 
   const existing = await prisma.diary.findFirst({
     where: { id, userId: session.userId },
-    select: { id: true },
+    select: { id: true, createdAt: true },
   });
   if (!existing) return { ok: false, error: "일기를 찾을 수 없습니다" };
 
@@ -369,16 +426,32 @@ export async function updateDiaryAction(
 
   const diaryDate = parseDiaryDate(formData.get("date"), await getRequestTimeZone());
 
-  await prisma.diary.update({
-    where: { id },
-    data: {
-      title: parsed.data.title,
-      content: parsed.data.content,
-      mood: parsed.data.mood ?? null,
-      createdAt: diaryDate,
-      contentEditedAt: new Date(),
-    },
+  // 다른 날로 옮길 때 그날에 이미 일기가 있으면 막는다 — 하루에 일기는 하나다(점검 M5).
+  // 확인과 옮기기를 사용자 단위 잠금 안에서 한다 — 밖에서 확인하면 그 사이 같은 날
+  // 새 일기 저장이 끼어들어 두 편이 됐다. 목록에 안 보이는 빈 일기만 있는 날은 사용자
+  // 눈엔 빈 날이라 막지 않는다(그날 일기로는 이 일기가 먼저 골라진다 — findDiaryForDate).
+  const newKey = kstDateKey(diaryDate);
+  const moved = await prisma.$transaction(async (tx) => {
+    if (newKey !== kstDateKey(existing.createdAt)) {
+      await lockUserDiaries(tx, session.userId);
+      const other = await findDiaryForDate(session.userId, newKey, tx);
+      if (other && !other.empty) return false;
+    }
+    await tx.diary.update({
+      where: { id },
+      data: {
+        title: parsed.data.title,
+        content: parsed.data.content,
+        mood: parsed.data.mood ?? null,
+        createdAt: diaryDate,
+        contentEditedAt: new Date(),
+      },
+    });
+    return true;
   });
+  if (!moved) {
+    return { ok: false, error: "그 날에는 이미 일기가 있어요. 한 날에는 일기 하나만 둘 수 있어요." };
+  }
 
   // 선택된 기존 사진 제거 — 이 일기(소유 확인 완료)에 속한 DiaryImage만 대상.
   // 매칭 안 되는 id는 무시. DB row 삭제 후 Storage 정리(DB→Storage 순서, lifecycle invariant).

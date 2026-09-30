@@ -106,7 +106,7 @@ export async function saveBackfillPhotos(
  * 메모가 오고, 업로드가 끊겨 처음부터 다시 누를 때도 같은 메모가 다시 온다.
  * 그날 일기에 이미 쓴 글이 있으면 덮지 않고 뒤에 잇는다. 본문을 바꿨으면 true.
  */
-async function appendNoteToDiary(diaryId: string, note: string): Promise<boolean> {
+export async function appendNoteToDiary(diaryId: string, note: string): Promise<boolean> {
   const diary = await prisma.diary.findUnique({
     where: { id: diaryId },
     select: { content: true },
@@ -148,6 +148,7 @@ export async function organizeBackfillDay(
     orderBy: { createdAt: "asc" },
     select: {
       id: true,
+      content: true,
       _count: { select: { images: true } },
       fragments: {
         where: { kind: "text", foldedAt: null },
@@ -156,7 +157,8 @@ export async function organizeBackfillDay(
     },
   });
   if (!diary) return { ok: false, reason: "empty", error: "그 날 일기가 없어요" };
-  if (diary._count.images === 0 && diary.fragments.length === 0) {
+  // 본문도 재료다 — 새 일기 화면에서 글만 그날 일기에 합친 경우(day-merge.ts).
+  if (diary._count.images === 0 && diary.fragments.length === 0 && !diary.content.trim()) {
     return { ok: false, reason: "empty", error: "정리할 재료가 없어요" };
   }
 

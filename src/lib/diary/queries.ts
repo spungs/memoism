@@ -1,5 +1,7 @@
 import "server-only";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { DEFAULT_MOOD } from "./schemas";
 import { todayKeyInZone } from "@/lib/tz";
 import { getSignedUrlsByPath } from "@/lib/storage";
 import { fragmentPreview } from "./fragment-preview";
@@ -253,9 +255,56 @@ export async function getDiariesForMonth(
 }
 
 /**
- * 대화형 캡처 라우팅용 — 해당 KST 날짜의 "그날 일기"를 결정적으로 확보.
- *   - 있으면 가장 이른 일기(그날의 주 컨테이너)를 반환.
- *   - 없으면 빈 일기(source:"chat") 생성. title/content는 조각이 채움.
+ * 그 날짜의 "그날 일기" — 하루에 일기는 하나다(점검 M5). 예전 데이터엔 한 날에 여럿이
+ * 있을 수 있어 가장 이른 것을 주 일기로 본다. `tx`를 주면 그 트랜잭션 안에서 찾는다.
+ *
+ * 목록에 안 보이는 빈 일기(`NOT_EMPTY_DIARY` 반대)보다 보이는 일기를 먼저 고른다 — 빈
+ * 일기가 더 이르면 새 기록이 숨은 빈 일기로 들어가 같은 날 두 번째 카드로 드러났다.
+ * `empty`면 사용자 눈엔 그날 일기가 없는 것이다(안내·날짜 이동 판단에 쓴다).
+ */
+export async function findDiaryForDate(
+  userId: string,
+  dateKey: string,
+  tx: Prisma.TransactionClient = prisma,
+): Promise<{ id: string; empty: boolean } | null> {
+  const { startUtc, endUtc } = kstDayRangeFromKey(dateKey);
+  const rows = await tx.diary.findMany({
+    where: { userId, createdAt: { gte: startUtc, lt: endUtc } },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      title: true,
+      content: true,
+      _count: { select: { images: true, fragments: true } },
+    },
+  });
+  const days = rows.map((r) => ({
+    id: r.id,
+    empty:
+      r.title === "" &&
+      r.content === "" &&
+      r._count.images === 0 &&
+      r._count.fragments === 0,
+  }));
+  return days.find((d) => !d.empty) ?? days[0] ?? null;
+}
+
+/**
+ * 같은 사용자의 "그날 일기 확보·생성"을 한 줄로 세운다. 트랜잭션 안에서 부르면 끝날 때 풀린다.
+ * 찾고-없으면-만들기가 동시에 두 번 돌면 한 날에 일기가 둘 생겼다(그날 첫 채팅을 연달아
+ * 보낼 때, 점검 M5).
+ */
+export async function lockUserDiaries(
+  tx: Prisma.TransactionClient,
+  userId: string,
+): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${"diary-day:" + userId}))`;
+}
+
+/**
+ * 대화형 캡처 라우팅용 — 해당 날짜의 "그날 일기"를 결정적으로 확보.
+ *   - 있으면 그날 일기(가장 이른 것)를 반환.
+ *   - 없으면 빈 일기(source:"chat") 생성. title/content는 조각이 채움. 감정은 평온(점검 M23).
  */
 export async function getOrCreateDiaryForDate(
   userId: string,
@@ -268,25 +317,22 @@ export async function getOrCreateDiaryForDate(
   if (dateKey > latestPossibleTodayKey(new Date())) {
     throw new Error(`미래 날짜로는 일기를 만들 수 없어요: ${dateKey}`);
   }
-  const { startUtc, endUtc } = kstDayRangeFromKey(dateKey);
-  const existing = await prisma.diary.findFirst({
-    where: { userId, createdAt: { gte: startUtc, lt: endUtc } },
-    orderBy: { createdAt: "asc" },
-    select: { id: true },
+  return prisma.$transaction(async (tx) => {
+    await lockUserDiaries(tx, userId);
+    const existing = await findDiaryForDate(userId, dateKey, tx);
+    if (existing) return { id: existing.id };
+    return tx.diary.create({
+      data: {
+        userId,
+        title: "",
+        content: "",
+        source: "chat",
+        mood: DEFAULT_MOOD,
+        createdAt: diaryCreatedAtForDateKey(dateKey, new Date()),
+      },
+      select: { id: true },
+    });
   });
-  if (existing) return existing;
-
-  const created = await prisma.diary.create({
-    data: {
-      userId,
-      title: "",
-      content: "",
-      source: "chat",
-      createdAt: diaryCreatedAtForDateKey(dateKey, new Date()),
-    },
-    select: { id: true },
-  });
-  return created;
 }
 
 /** 이 일기의 아직 정리에 안 들어간 텍스트 조각 수. 넛지·제안 문구의 N. */

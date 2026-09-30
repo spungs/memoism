@@ -10,6 +10,7 @@ import { MoodBadge } from "@/components/diary/mood-badge";
 import { getSession } from "@/lib/auth/session";
 import { getDiary } from "@/lib/diary/queries";
 import { getSignedUrlsForOwner } from "@/lib/storage";
+import { CRISIS_REPLY } from "@/lib/ai/safety";
 
 const dateFmt = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
@@ -24,7 +25,22 @@ const weekdayFmt = new Intl.DateTimeFormat("ko-KR", {
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ notice?: string }>;
 }
+
+// 새 일기 화면에서 쓴 글이 그날 일기로 합쳐졌을 때(하루에 일기 하나, 점검 M5) 한 줄로 알린다.
+// 경고 상자가 아니라 사실 통지다 — 흐린 글자 한 줄로 둔다.
+const MERGED = "쓴 내용은 이 날 일기에 이어서 넣었어요.";
+const NOTICES: Record<string, string> = {
+  merged: MERGED,
+  organized: "쓴 내용을 이 날 일기에 합쳐서 정리했어요. 되돌리기로 합친 글을 되찾을 수 있어요.",
+  cap: `${MERGED} 오늘 사용 횟수를 다 써서 정리는 못 했어요.`,
+  empty: MERGED,
+  error: `${MERGED} 정리는 못 했어요. 수정에서 다시 정리할 수 있어요.`,
+  failed: `${MERGED} 정리는 못 했어요. 수정에서 다시 정리할 수 있어요.`,
+  // 펜스에 걸리면 상담 안내를 그대로 보여준다 — 삼키면 안 되는 말이다.
+  safety: `${MERGED}\n\n${CRISIS_REPLY}`,
+};
 
 export async function generateMetadata({ params }: PageProps) {
   const { id } = await params;
@@ -34,11 +50,12 @@ export async function generateMetadata({ params }: PageProps) {
   return { title: diary?.title || "일기" };
 }
 
-export default async function DiaryDetailPage({ params }: PageProps) {
+export default async function DiaryDetailPage({ params, searchParams }: PageProps) {
   const session = await getSession();
   if (!session) redirect("/login");
 
   const { id } = await params;
+  const notice = NOTICES[(await searchParams)?.notice ?? ""] ?? null;
   const diary = await getDiary(id, session.userId);
   if (!diary) notFound();
 
@@ -107,6 +124,21 @@ export default async function DiaryDetailPage({ params }: PageProps) {
           margin: "0 auto",
         }}
       >
+        {notice && (
+          <p
+            role="status"
+            style={{
+              margin: "0 0 var(--space-4)",
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-sm)",
+              lineHeight: "var(--leading-relaxed)",
+              color: "var(--fg-muted)",
+              whiteSpace: "pre-line",
+            }}
+          >
+            {notice}
+          </p>
+        )}
         {/* 날짜·요일 메타 — 13px tertiary */}
         <div
           style={{

@@ -534,7 +534,10 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
         if (mode === "create") {
           try { localStorage.removeItem(DRAFT_KEY_NEW); } catch { /* 무시 */ }
         }
-        router.push(`/diary/${result.data.id}`);
+        // 그날 일기에 이어 넣었으면(하루에 일기 하나, 점검 M5) 상세 화면이 그 사실을 알린다.
+        router.push(
+          `/diary/${result.data.id}${mode === "create" && result.data.merged ? "?notice=merged" : ""}`,
+        );
         router.refresh();
       } catch {
         // Server Action이 예외를 던지면(배포 스큐로 액션 ID 소멸·네트워크 단절 등)
@@ -566,10 +569,18 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
     try {
       const { compressed, exifs } = await buildExifsAndCompress();
 
+      // 일기 날짜 기본값: 사용자가 폼에서 날짜를 바꾸지 않았다면(=오늘) 사진의
+      // 가장 이른 촬영일을 쓴다. 검토 화면에서 다시 변경할 수 있다.
+      const draftDate =
+        date === today && dateKeys.length > 0 ? [...dateKeys].sort()[0] : date;
+
       const fd = new FormData();
       for (const f of compressed) fd.append("photo", f);
       fd.set("exifs", JSON.stringify(exifs.map(exifToWire)));
       if (content.trim()) fd.set("text", content.trim());
+      // 서버가 그날 일기가 이미 있는지 본다 — 있으면 합쳐서 제자리에서 정리한다(점검 M5).
+      fd.set("date", draftDate);
+      fd.set("mood", mood);
 
       const res = await fetch("/api/diaries/auto-generate", {
         method: "POST",
@@ -583,10 +594,15 @@ export function DiaryForm({ mode, diaryId, initial }: DiaryFormProps) {
         return;
       }
 
-      // 일기 날짜 기본값: 사용자가 폼에서 날짜를 바꾸지 않았다면(=오늘) 사진의
-      // 가장 이른 촬영일(KST)을 쓴다. 검토 화면에서 다시 변경할 수 있다.
-      const draftDate =
-        date === today && dateKeys.length > 0 ? [...dateKeys].sort()[0] : date;
+      // 그날 일기에 합쳐 제자리에서 정리했다 — 검토 화면 없이 그 일기로 간다. 정리가
+      // 막혔어도 쓴 글·사진은 이미 들어갔으니 초안을 지우고, 상세 화면이 이유를 알린다.
+      if (data.merged) {
+        try { localStorage.removeItem(DRAFT_KEY_NEW); } catch { /* 무시 */ }
+        const notice = data.organized ? "organized" : (data.reason ?? "failed");
+        router.push(`/diary/${data.diaryId}?notice=${notice}`);
+        router.refresh();
+        return;
+      }
 
       // sessionStorage에 draft + 입력 컨텍스트 저장 → /diary/review가 읽음
       sessionStorage.setItem(

@@ -34,6 +34,13 @@ export const moodKeySchema = z.enum([
   "tired",
 ]);
 
+/**
+ * 감정 기본값(평온). 작성·검토 화면의 초기값이자, 메이·밀린 날 채우기가 만드는 일기의
+ * 기본값이다 — 어느 경로로 생겨도 "미설정"이 남지 않게(점검 M23). 서버도 쓰므로 "use client"
+ * 모듈(mood-picker)이 아니라 여기 둔다.
+ */
+export const DEFAULT_MOOD = "calm" satisfies z.infer<typeof moodKeySchema>;
+
 export const diaryInputSchema = z.object({
   // 제목은 필수 (DB 컬럼 not null) — UI도 "(선택)" 표기 없이 필수로 안내한다.
   title: z
