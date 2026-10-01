@@ -1,14 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { DiaryContent } from "@/components/diary/diary-content";
 import { FragmentTimeline } from "@/components/diary/fragment-timeline";
-import { kstDateKey } from "@/lib/diary/kst";
+import { dateKeyLabel, kstDateKey } from "@/lib/diary/kst";
 import { DiaryDetailActions } from "@/components/diary/diary-detail-actions";
 import { MoodBadge } from "@/components/diary/mood-badge";
 import { getSession } from "@/lib/auth/session";
-import { getDiary } from "@/lib/diary/queries";
+import { getAdjacentDiaries, getDiary } from "@/lib/diary/queries";
 import { getSignedUrlsForOwner } from "@/lib/storage";
 import { CRISIS_REPLY } from "@/lib/ai/safety";
 
@@ -22,6 +22,18 @@ const weekdayFmt = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
   weekday: "long",
 });
+
+const ADJACENT_LINK: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 2,
+  minHeight: 44,
+  color: "var(--tint)",
+  textDecoration: "none",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  fontWeight: 600,
+};
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -70,10 +82,18 @@ export default async function DiaryDetailPage({ params, searchParams }: PageProp
 
   // DiaryImage signed URL 일괄 발급 (1h TTL). 실패한 항목은 null.
   const imagePaths = diary.images.map((img) => img.storagePath);
-  const imageUrls =
+  const [imageUrls, adjacent] = await Promise.all([
     imagePaths.length > 0
-      ? await getSignedUrlsForOwner(imagePaths, session.userId)
-      : [];
+      ? getSignedUrlsForOwner(imagePaths, session.userId)
+      : Promise.resolve([]),
+    getAdjacentDiaries(session.userId, diary),
+  ]);
+  // 이전·다음 버튼 날짜. 해가 다르면 연도까지 — "12월 31일"만으로는 어느 해인지 모른다.
+  const adjacentLabel = (d: { createdAt: Date }) => {
+    const key = kstDateKey(d.createdAt);
+    const sameYear = key.slice(0, 4) === kstDateKey(date).slice(0, 4);
+    return sameYear ? dateKeyLabel(key) : `${key.slice(0, 4)}년 ${dateKeyLabel(key)}`;
+  };
 
   // 레이아웃이 이미 <main>이다 — 중첩하면 랜드마크가 둘이 된다(점검 L20).
   return (
@@ -253,6 +273,46 @@ export default async function DiaryDetailPage({ params, searchParams }: PageProp
           fragments={diary.fragments}
           diaryDateKey={kstDateKey(diary.createdAt)}
         />
+
+        {/* 이전·다음 일기 — 다 읽은 자리에서 넘긴다. 헤더는 뒤로·수정·삭제로 차 있고,
+            가로 스와이프는 사진 캐러셀과 겹친다. 네비게이션이라 틴트 글자만(DESIGN.md Plain). */}
+        {(adjacent.prev || adjacent.next) && (
+          <nav
+            aria-label="이전·다음 일기"
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginTop: "var(--space-8)",
+              paddingTop: "var(--space-3)",
+              borderTop: "1px solid var(--separator)",
+            }}
+          >
+            {adjacent.prev ? (
+              <Link
+                href={`/diary/${adjacent.prev.id}`}
+                aria-label={`이전 일기, ${adjacentLabel(adjacent.prev)}`}
+                style={ADJACENT_LINK}
+              >
+                <ChevronLeft size={18} aria-hidden />
+                {adjacentLabel(adjacent.prev)}
+              </Link>
+            ) : (
+              <span />
+            )}
+            {adjacent.next ? (
+              <Link
+                href={`/diary/${adjacent.next.id}`}
+                aria-label={`다음 일기, ${adjacentLabel(adjacent.next)}`}
+                style={ADJACENT_LINK}
+              >
+                {adjacentLabel(adjacent.next)}
+                <ChevronRight size={18} aria-hidden />
+              </Link>
+            ) : (
+              <span />
+            )}
+          </nav>
+        )}
       </article>
     </div>
   );

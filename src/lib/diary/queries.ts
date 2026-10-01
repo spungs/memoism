@@ -87,6 +87,53 @@ export async function getDiary(id: string, userId: string) {
 }
 
 /**
+ * 일기 상세의 이전·다음 — 일기 날짜 기준으로 바로 앞(더 오래된)·뒤(더 최근) 일기.
+ * 목록에 안 보이는 빈 일기는 건너뛴다. 같은 시각이면 id로 순서를 정해 서로 맞물리게 한다.
+ */
+export async function getAdjacentDiaries(
+  userId: string,
+  diary: { id: string; createdAt: Date },
+) {
+  const select = { id: true, createdAt: true } as const;
+  const [prev, next] = await Promise.all([
+    prisma.diary.findFirst({
+      where: {
+        userId,
+        // NOT_EMPTY_DIARY가 OR를 쓰므로 펼치지 않고 AND로 묶는다.
+        AND: [
+          NOT_EMPTY_DIARY,
+          {
+            OR: [
+              { createdAt: { lt: diary.createdAt } },
+              { createdAt: diary.createdAt, id: { lt: diary.id } },
+            ],
+          },
+        ],
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select,
+    }),
+    prisma.diary.findFirst({
+      where: {
+        userId,
+        AND: [
+          NOT_EMPTY_DIARY,
+          {
+            OR: [
+              { createdAt: { gt: diary.createdAt } },
+              { createdAt: diary.createdAt, id: { gt: diary.id } },
+            ],
+          },
+        ],
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select,
+    }),
+  ]);
+  return { prev, next };
+}
+
+/**
  * 홈 "이번 달" 요약용 카운트.
  *   - total: 유저 전체 일기 수
  *   - thisMonth: 이번 달(KST 1일 자정 기준) 작성 일기 수
