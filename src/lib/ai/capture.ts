@@ -3,6 +3,7 @@ import { chat, CAPTURE_MODEL, type ChatTurn } from "./gemini";
 import { CRISIS_REPLY } from "./safety";
 import { enforceVerifiedHotline } from "./hotline-guard";
 import { classifyIntent } from "./intent";
+import { splitMessageByDate } from "./capture-split";
 import { resolveCaptureDate, resolvePhotoDates } from "@/lib/diary/capture-date";
 import { createFragment } from "@/lib/diary/fragments";
 import { dateKeyLabel } from "@/lib/diary/kst";
@@ -200,9 +201,21 @@ export async function handleCaptureMessage(
   const withPhotoNotice = (reply: string) =>
     photoFailNotice ? `${photoFailNotice}\n\n${reply}` : reply;
 
-  if (date.kind === "ambiguous") {
-    // 사진은 (저장에 성공했다면) 이미 제 날짜로 갔다. 되묻는 대상은 텍스트뿐 — 사용자가 날짜를
-    // 확정해 다시 보내면 그때 조각으로 저장된다. 칩은 사진이 어디 갔는지 알린다.
+  // 글을 둘 날(들). 날짜가 하나면 그 날에 통째로, 여럿이면("화요일에 토마토파스타, 수요일에
+  // 크림파스타…") 날짜별로 나눠 본다(2026-10-01). 예전엔 여럿이면 무조건 되물었고, 요일만 쓴
+  // 표현은 날짜로 못 읽어 과거 이야기가 오늘 조각으로 들어갔다.
+  let textTargets: { dateKey: string; text: string }[] = [];
+  if (message && textIsRecord) {
+    if (date.kind === "resolved") {
+      textTargets = [{ dateKey: date.dateKey, text: message }];
+    } else {
+      textTargets = (await splitMessageByDate(message, date.candidates)) ?? [];
+    }
+  }
+
+  if (date.kind === "ambiguous" && textTargets.length === 0) {
+    // 나누지 못했다. 사진은 (저장에 성공했다면) 이미 제 날짜로 갔다. 되묻는 대상은 텍스트뿐 —
+    // 사용자가 날짜를 확정해 다시 보내면 그때 조각으로 저장된다. 칩은 사진이 어디 갔는지 알린다.
     return {
       handled: true,
       reply: withPhotoNotice(date.question),
@@ -219,27 +232,27 @@ export async function handleCaptureMessage(
     };
   }
 
-  // 텍스트 조각은 메시지 날짜로. 조각은 하나뿐이라 여러 날로 쪼갤 수 없다.
+  // 텍스트 조각을 날짜마다 하나씩. 날짜 교정(칩)은 한 날짜 기록만 옮기므로 첫 조각만 기억한다.
   let fragmentId: string | null = null;
-  let textDiaryId: string | null = null;
-  if (message && textIsRecord) {
+  const textDiaryIds = new Set<string>();
+  for (const target of textTargets) {
     const f = await createFragment({
       userId,
-      dateKey: date.dateKey,
+      dateKey: target.dateKey,
       kind: "text",
-      content: message,
+      content: target.text,
     });
-    fragmentId = f.fragmentId;
-    textDiaryId = f.diaryId;
-    if (!entries.some((e) => e.dateKey === date.dateKey)) {
-      entries.push({ dateKey: date.dateKey, diaryId: f.diaryId, imageIds: [] });
+    fragmentId ??= f.fragmentId;
+    textDiaryIds.add(f.diaryId);
+    if (!entries.some((e) => e.dateKey === target.dateKey)) {
+      entries.push({ dateKey: target.dateKey, diaryId: f.diaryId, imageIds: [] });
     }
   }
 
   if (entries.length === 0) return { handled: false };
 
   // 칩이 가리킬 대표 일기: 텍스트가 있으면 그쪽, 없으면 첫 사진의 날.
-  const primary = entries.find((e) => e.diaryId === textDiaryId) ?? entries[0];
+  const primary = entries.find((e) => textDiaryIds.has(e.diaryId)) ?? entries[0];
   // 사진이 있으면 텍스트가 같이 왔든 아니든 "못 본다"는 사실을 알린다.
   // 예전엔 사진만 온 경우에만 알려서, 사진+글을 보내면 메이가 사진을 아예
   // 없었던 것처럼 되물어 사용자가 무시당했다고 느꼈다.
@@ -317,7 +330,7 @@ export async function handleCaptureMessage(
       label: captureLabel(
         entries,
         primary,
-        primary.dateKey === date.dateKey ? date.label : null,
+        date.kind === "resolved" && primary.dateKey === date.dateKey ? date.label : null,
       ),
       entries,
       fragmentId,

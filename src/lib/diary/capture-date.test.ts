@@ -164,3 +164,20 @@ describe("resolvePhotoDates", () => {
     ).toEqual(["2026-07-22", "2026-07-22"]);
   });
 });
+
+describe("resolveCaptureDate — 날짜가 여럿이면 후보를 함께 돌려준다", () => {
+  it("요일 두 개 → ambiguous + 날짜 후보(나눠 저장용)", () => {
+    const r = resolveCaptureDate(
+      "화요일에 토마토파스타, 수요일에 크림파스타 만들어서 먹었어",
+      new Date("2026-10-01T13:42:00Z"),
+      SEOUL,
+    );
+    expect(r.kind).toBe("ambiguous");
+    if (r.kind === "ambiguous") {
+      expect(r.candidates).toEqual([
+        { dateKey: "2026-09-29", label: "화요일" },
+        { dateKey: "2026-09-30", label: "수요일" },
+      ]);
+    }
+  });
+});

@@ -11,12 +11,18 @@ export type CaptureDate =
       /** 메시지에 명시적 날짜 표현이 있었나. true면 사진 EXIF보다 우선한다. */
       fromExplicit: boolean;
     }
-  | { kind: "ambiguous"; question: string };
+  | {
+      kind: "ambiguous";
+      question: string;
+      /** 메시지가 가리킨 날짜들(시간순). 글을 날짜별로 나눠 저장할 때 쓴다(capture-split). */
+      candidates: { dateKey: string; label: string }[];
+    };
 
 /**
  * record 메시지가 어느 날 일기로 갈지 결정한다 (스펙 §4).
  *   1. 명시적 시간표현이 정확히 하나 → 그 날짜
- *   2. 여러 개 → 되묻기 (범위가 넓어 잘못 넣으면 교정 비용이 크다)
+ *   2. 여러 개 → ambiguous. 호출부가 글을 날짜별로 나눠 보고, 못 나누면 되묻는다
+ *      (범위가 넓어 잘못 넣으면 교정 비용이 크다)
  *   3. 표현 없음 + 자정 넘은 새벽(0~4시) → **직전 하루** (자기 전 몰아 기록이 자정을 넘겨도 "오늘")
  *      스펙 원문은 "심야 21~4시"지만 21~23시는 이미 오늘이라 따로 옮길 필요가 없다.
  *   4. 표현 없음 + 그 외 → 오늘
@@ -52,6 +58,9 @@ export function resolveCaptureDate(
     return {
       kind: "ambiguous",
       question: `${labels} 중에 언제 얘기예요? 🙂`,
+      candidates: refs
+        .map((r) => ({ dateKey: kstDateKey(r.startUtc), label: r.label }))
+        .sort((a, b) => a.dateKey.localeCompare(b.dateKey)),
     };
   }
 
