@@ -20,6 +20,8 @@ export const maxDuration = 90;
 
 const bodySchema = z.object({
   instruction: z.string().max(MAX_AI_INSTRUCTION_LENGTH).optional(),
+  /** 한번에 정리하기는 날마다 이 경로를 부르고, 결과 말풍선은 끝에 한 쌍으로 묶어 남긴다. */
+  skipChat: z.boolean().optional(),
 });
 
 async function handlePOST(
@@ -52,11 +54,12 @@ async function handlePOST(
   }
 
   const { id } = await params;
+  const { skipChat, ...organizeOptions } = options;
   const result = await organizeDiaryFromFragments(
     id,
     session.userId,
     await getRequestTimeZone(),
-    options,
+    organizeOptions,
   );
 
   if (!result.ok) {
@@ -93,10 +96,12 @@ async function handlePOST(
   } | null = null;
 
   try {
-    const character = await prisma.character.findUnique({
-      where: { userId: session.userId },
-      select: { id: true },
-    });
+    const character = skipChat
+      ? null
+      : await prisma.character.findUnique({
+          where: { userId: session.userId },
+          select: { id: true },
+        });
     if (character) {
       // 날짜 키 원문(2026-09-21) 대신 사람이 읽는 라벨을 쓴다 — 답장 말풍선과 같게(점검 L16).
       const userContent = `${result.label} 조각 정리해줘`;

@@ -31,12 +31,20 @@ export function OrganizeSuggestionCard({
   collapsed,
   onAccept,
   onToggle,
+  allDays,
+  progress,
+  onAcceptAll,
 }: {
   suggestion: OrganizeSuggestion;
   busy: boolean;
   collapsed: boolean;
   onAccept: () => void;
   onToggle: () => void;
+  /** 정리 안 된 지난 날 수. 2일 이상이면 "모두 정리"를 보인다. */
+  allDays: number;
+  /** 한번에 정리하는 중이면 진행 상황. */
+  progress: { done: number; total: number } | null;
+  onAcceptAll: () => void;
 }) {
   if (collapsed) {
     return (
@@ -86,17 +94,43 @@ export function OrganizeSuggestionCard({
         aria-hidden
         style={{ color: "var(--fg-muted)", flexShrink: 0 }}
       />
-      <p
-        style={{
-          flex: 1,
-          margin: 0,
-          fontSize: "var(--text-sm)",
-          color: "var(--fg)",
-          lineHeight: 1.45,
-        }}
-      >
-        {suggestion.label}에 {suggestion.count}개 모였어. 일기로 정리해줄까?
-      </p>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p
+          style={{
+            margin: 0,
+            fontSize: "var(--text-sm)",
+            color: "var(--fg)",
+            lineHeight: 1.45,
+          }}
+        >
+          {suggestion.label}에 {suggestion.count}개 모였어. 일기로 정리해줄까?
+        </p>
+        {/* 보조 액션이라 틴트 글자만(DESIGN.md Plain). 정리는 하루당 사용 횟수 1회라 미리 적는다. */}
+        {allDays >= 2 && !busy && (
+          <button
+            type="button"
+            className="pressable"
+            onClick={onAcceptAll}
+            // 누를 영역 44px, 줄 간격은 그대로(음수 여백) — 점검 L19.
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              minHeight: 44,
+              margin: "-12px 0 -14px",
+              padding: 0,
+              border: "none",
+              background: "transparent",
+              color: "var(--tint)",
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-xs)",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            {allDays}일 모두 정리 · AI {allDays}회
+          </button>
+        )}
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexShrink: 0 }}>
         <button
           type="button"
@@ -127,7 +161,11 @@ export function OrganizeSuggestionCard({
               opacity: busy ? 0.6 : 1,
             }}
           >
-            {busy ? "정리하는 중" : "정리해줘"}
+            {busy
+              ? progress
+                ? `정리하는 중 ${progress.done}/${progress.total}`
+                : "정리하는 중"
+              : "정리해줘"}
           </span>
         </button>
         {/* 접기 — "나중에"라는 말 대신 동작을 그대로 보여준다. 지우는 게 아니라 접는 것이다. */}

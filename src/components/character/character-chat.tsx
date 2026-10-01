@@ -20,6 +20,7 @@ import { dateKeyLabel } from "@/lib/diary/kst";
 import { dateKeyInZone, shiftDateKey, todayKeyInZone } from "@/lib/tz";
 import { useDeviceTimeZone } from "@/lib/tz-client";
 import { readJson, responseErrorMessage } from "@/lib/http/client";
+import { organizeAllReply } from "@/lib/diary/organize-all";
 
 type Role = "user" | "assistant";
 type RelatedDiary = { id: string; title: string; createdAt: string };
@@ -150,7 +151,12 @@ export function CharacterChat({
   const [consentSaving, setConsentSaving] = useState(false);
   // 지난 날의 미반영 조각 제안. 파생 상태라 진입할 때마다 서버에 새로 묻는다.
   const [suggestion, setSuggestion] = useState<OrganizeSuggestion | null>(null);
+  // 한번에 정리할 지난 날들(최근 날짜순). 제안과 같이 매번 서버에 새로 묻는다.
+  const [organizeDays, setOrganizeDays] = useState<{ diaryId: string }[]>([]);
   const [organizing, setOrganizing] = useState(false);
+  const [organizeProgress, setOrganizeProgress] = useState<{ done: number; total: number } | null>(
+    null,
+  );
   /** 제안을 접어뒀는가. 지우는 게 아니라 접는 것이라 재조회는 계속 돌고 개수도 갱신된다. */
   const [suggestionCollapsed, setSuggestionCollapsed] = useState(false);
   // 저장 칩을 탭해서 연 교정 대상(메시지 id + 그 메시지가 기록한 날들).
@@ -206,6 +212,7 @@ export function CharacterChat({
       if (!res.ok) return;
       const data = await res.json();
       setSuggestion(data?.suggestion ?? null);
+      setOrganizeDays(Array.isArray(data?.days) ? data.days : []);
     } catch {
       // 제안은 부가 기능이다 — 실패해도 대화를 막지 않는다.
     }
@@ -268,6 +275,112 @@ export function CharacterChat({
       setError("정리하다가 연결이 끊겼어. 조금 뒤에 다시 해볼래?");
     } finally {
       setOrganizing(false);
+    }
+  }
+
+  // 한번에 정리 — 하루 정리 경로를 최근 날짜부터 차례로 부른다. 서버 한 번에 몰면 함수 시간
+  // 제한(90초)에 걸리고 진행 상황도 못 보여준다. 결과 말풍선은 끝에 한 쌍으로 묶어 남긴다.
+  // 도중에 화면을 떠나면 끝난 날까지는 정리되고 묶음 말풍선만 남지 않는다.
+  async function handleOrganizeAll() {
+    if (organizing || organizeDays.length < 2) return;
+    const targets = organizeDays;
+    setOrganizing(true);
+    setError(null);
+    setOrganizeProgress({ done: 0, total: targets.length });
+    const doneIds: string[] = [];
+    let failed = 0;
+    let capStopped = 0;
+    let lastError = "정리하다가 문제가 생겼어. 조금 뒤에 다시 해볼래?";
+    // 안전 펜스 차단(422)의 안내문. 하루 정리는 이걸 배너로 보여준다 — 한번에 정리에서도
+    // 삼키지 않는다(위기 안내가 사라지면 안 된다). 다시 해도 같은 결과라 실패로 세지 않는다.
+    let safetyReply: string | null = null;
+    try {
+      for (const [i, t] of targets.entries()) {
+        try {
+          const res = await fetch(`/api/diaries/${t.diaryId}/organize`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ skipChat: true }),
+          });
+          const data = await readJson(res);
+          if (res.ok && data) {
+            doneIds.push(t.diaryId);
+          } else {
+            lastError = responseErrorMessage(res, data, lastError);
+            if (data?.capExhausted) {
+              // 남은 날은 시도해도 같은 결과다 — 여기서 멈춘다.
+              capStopped = targets.length - i;
+              setCapExhausted(true);
+              break;
+            }
+            if (res.status === 422) {
+              safetyReply ??= lastError;
+            } else if (!data?.nothingToFold) {
+              // 그새 다른 곳에서 정리된 날은 실패가 아니다.
+              failed++;
+            }
+          }
+        } catch {
+          failed++;
+        }
+        setOrganizeProgress({ done: i + 1, total: targets.length });
+      }
+
+      if (doneIds.length === 0) {
+        setError(safetyReply ?? lastError);
+        return;
+      }
+      if (safetyReply) setError(safetyReply);
+      // 서버가 말풍선을 저장했으면 그 행을 붙인다. 실패하면 이번 화면에만 보이는 낙관적 메시지.
+      let pair: Message[] | null = null;
+      try {
+        const res = await fetch("/api/chat/organize-summary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            diaryIds: doneIds,
+            failedCount: failed,
+            capStoppedCount: capStopped,
+          }),
+        });
+        const data = await readJson(res);
+        if (res.ok && data?.userChatMessage && data?.chatMessage) {
+          pair = [data.userChatMessage, data.chatMessage];
+        }
+      } catch {
+        // 말풍선은 부가 기능이다 — 정리는 이미 끝났다.
+      }
+      const now = Date.now();
+      setMessages((prev) => [
+        ...prev,
+        ...(pair ?? [
+          {
+            id: `organize-all-user-${now}`,
+            role: "user" as const,
+            content: "조각 한번에 정리해줘",
+            createdAt: new Date(now).toISOString(),
+          },
+          {
+            id: `organize-all-${now}`,
+            role: "assistant" as const,
+            content: organizeAllReply(doneIds.length, failed, capStopped),
+            createdAt: new Date(now + 1).toISOString(),
+          },
+        ]),
+      ]);
+      setUsageSignal((n) => n + 1);
+      router.refresh();
+    } finally {
+      setOrganizing(false);
+      setOrganizeProgress(null);
+      setSuggestionCollapsed(false);
+      // 횟수가 떨어졌으면 제안을 내린다(하루 정리와 같다). 아니면 남은 날이 있는지 다시 묻는다.
+      if (capStopped > 0) {
+        setSuggestion(null);
+        setOrganizeDays([]);
+      } else {
+        void refreshSuggestion();
+      }
     }
   }
 
@@ -567,6 +680,9 @@ export function CharacterChat({
             // 접기/펼치기만 한다. 서버에 스누즈를 기록하지 않으므로 새로고침하면
             // 다시 펼친 상태로 돌아온다(스펙 §3.2).
             onToggle={() => setSuggestionCollapsed((v) => !v)}
+            allDays={organizeDays.length}
+            progress={organizeProgress}
+            onAcceptAll={() => void handleOrganizeAll()}
           />
           </div>
         </div>

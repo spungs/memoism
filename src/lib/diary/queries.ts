@@ -6,6 +6,7 @@ import { todayKeyInZone } from "@/lib/tz";
 import { getSignedUrlsByPath } from "@/lib/storage";
 import { fragmentPreview } from "./fragment-preview";
 import { NOT_EMPTY_DIARY } from "./not-empty";
+import { MAX_ORGANIZE_ALL_DAYS } from "./organize-all";
 import {
   dateKeyLabel,
   diaryCreatedAtForDateKey,
@@ -380,4 +381,29 @@ export async function findUnfoldedDiary(
 
   const dateKey = kstDateKey(diary.createdAt);
   return { diaryId: diary.id, dateKey, label: dateKeyLabel(dateKey), count };
+}
+
+/**
+ * 한번에 정리 대상 — 미반영 텍스트 조각이 있는 지난 날 전부(최근 날짜순, 최대 31일).
+ * 오늘을 빼는 이유는 findUnfoldedDiary와 같다.
+ */
+export async function listUnfoldedDiaries(
+  userId: string,
+  timeZone: string,
+): Promise<{ diaryId: string; dateKey: string; label: string }[]> {
+  const { startUtc: todayStartUtc } = kstDayRangeFromKey(todayKeyInZone(timeZone));
+  const diaries = await prisma.diary.findMany({
+    where: {
+      userId,
+      createdAt: { lt: todayStartUtc },
+      fragments: { some: { kind: "text", foldedAt: null } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: MAX_ORGANIZE_ALL_DAYS,
+    select: { id: true, createdAt: true },
+  });
+  return diaries.map((d) => {
+    const dateKey = kstDateKey(d.createdAt);
+    return { diaryId: d.id, dateKey, label: dateKeyLabel(dateKey) };
+  });
 }
