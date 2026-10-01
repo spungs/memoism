@@ -237,10 +237,10 @@ export function parseDateRefs(message: string, now: Date, tz: string): DateRange
   const todayDow = weekdayOfDateKey(todayKey);
   // 이번 주 월요일까지의 일 수(음수 또는 0). 월=0, 화=-1(이번주 화요일은 어제), ...
   const daysToThisMonday = -((todayDow + 6) % 7);
-  for (const [prefix, weekDelta] of [
-    ["이번주", 0], ["지난주", -7], ["저번주", -7],
-  ] as [string, number][]) {
-    const re = new RegExp(`${prefix}\\s*([월화수목금토일])요일`, "g");
+  for (const [prefix, pattern, weekDelta] of [
+    ["이번주", "이번\\s*주", 0], ["지난주", "지난\\s*주", -7], ["저번주", "저번\\s*주", -7],
+  ] as [string, string, number][]) {
+    const re = new RegExp(`${pattern}\\s*([월화수목금토일])요일`, "g");
     for (const mt of message.matchAll(re)) {
       const dow = DOW_MAP[mt[1]]; // JS dow
       // 이번 주 해당 요일까지의 거리: Mon(1)→0, Tue(2)→1, ..., Sun(0)→6
@@ -249,6 +249,19 @@ export function parseDateRefs(message: string, now: Date, tz: string): DateRange
       const t = shifted(delta);
       add(t.y, t.m, t.day, `${prefix} ${mt[1]}요일`);
     }
+  }
+
+  // 요일만 쓴 경우("화요일에 파스타 먹었어") → 오늘 포함 지난 7일 중 가장 가까운 그 요일.
+  // 일기는 대부분 지난 일이라 과거 쪽으로 찾는다(2026-10-01 결정). 예전엔 앞말이 없으면
+  // 날짜로 안 봐서, 과거 이야기가 오늘 조각으로 들어가고 사진만 촬영일로 갔다.
+  // 앞말이 붙은 건 위에서 셌고, "다음주 ○요일"(미래)·"매주 ○요일"·"○요일마다"(반복)는
+  // 날짜가 아니라 건너뛴다.
+  const BARE_DOW_RE = /(이번\s*주|지난\s*주|저번\s*주|다음\s*주|담주|매주)?\s*([월화수목금토일])요일(마다)?/g;
+  for (const mt of message.matchAll(BARE_DOW_RE)) {
+    if (mt[1] || mt[3]) continue;
+    const daysBack = (todayDow - DOW_MAP[mt[2]] + 7) % 7;
+    const t = shifted(-daysBack);
+    add(t.y, t.m, t.day, `${mt[2]}요일`);
   }
 
   return ranges;
