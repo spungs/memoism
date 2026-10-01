@@ -4,6 +4,7 @@ import { CRISIS_REPLY } from "./safety";
 import { enforceVerifiedHotline } from "./hotline-guard";
 import { classifyIntent } from "./intent";
 import { splitMessageByDate } from "./capture-split";
+import { fixTypos } from "./capture-typo";
 import { resolveCaptureDate, resolvePhotoDates } from "@/lib/diary/capture-date";
 import { createFragment } from "@/lib/diary/fragments";
 import { dateKeyLabel } from "@/lib/diary/kst";
@@ -232,15 +233,20 @@ export async function handleCaptureMessage(
     };
   }
 
+  // 저장 직전에 오타·맞춤법·띄어쓰기만 고친다(2026-10-02). 날짜 판단·나누기는 원문으로
+  // 끝났다 — 나누기 검증이 원문을 그대로 자른 조각만 받기 때문이다. 채팅 말풍선과 메이
+  // 답장은 원문 그대로다.
+  const contents = await Promise.all(textTargets.map((t) => fixTypos(t.text)));
+
   // 텍스트 조각을 날짜마다 하나씩. 날짜 교정(칩)은 한 날짜 기록만 옮기므로 첫 조각만 기억한다.
   let fragmentId: string | null = null;
   const textDiaryIds = new Set<string>();
-  for (const target of textTargets) {
+  for (const [i, target] of textTargets.entries()) {
     const f = await createFragment({
       userId,
       dateKey: target.dateKey,
       kind: "text",
-      content: target.text,
+      content: contents[i],
     });
     fragmentId ??= f.fragmentId;
     textDiaryIds.add(f.diaryId);
