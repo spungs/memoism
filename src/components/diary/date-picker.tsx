@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { popoverShiftX } from "@/lib/popover-position";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -22,6 +23,7 @@ interface DatePickerProps {
 
 /** 달력 팝오버의 대략 높이(px). 열 때 위/아래 방향을 고르는 기준. */
 const CALENDAR_HEIGHT = 340;
+const CALENDAR_WIDTH = 288;
 
 export function DiaryDatePicker({ value, max, onChange, defaultOpen = false }: DatePickerProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -32,17 +34,24 @@ export function DiaryDatePicker({ value, max, onChange, defaultOpen = false }: D
   // 화면 맨 아래에 있어서, 아래로 펴면 달력이 화면 밖으로 내려가고 그 아래 버튼
   // ("날짜 바꾸기")까지 덮어버린다.
   const [dropUp, setDropUp] = useState(false);
+  // 버튼이 오른쪽에 있으면(조각의 "날짜 옮기기") 버튼 왼쪽 끝에서 펼친 달력이 화면 오른쪽
+  // 밖으로 나간다 — 폭 430 화면에서 90px이 잘렸다. 화면 안으로 당길 가로 이동량.
+  const [shiftX, setShiftX] = useState(0);
 
   const maxYear = Number(max.slice(0, 4));
   const maxMonth = Number(max.slice(5, 7)) - 1;
 
-  // 열리는 순간 한 번만 방향을 정한다. 열려 있는 동안 바꾸면 달력이 튄다.
-  useEffect(() => {
+  // 열리는 순간 한 번만 방향·위치를 정한다. 열려 있는 동안 바꾸면 달력이 튄다.
+  // 그리기 전에 재야 왼쪽 끝에 한 번 그려졌다가 옮겨지는 깜빡임이 없다.
+  useLayoutEffect(() => {
     if (!open) return;
     const el = containerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
     setDropUp(window.innerHeight - rect.bottom < CALENDAR_HEIGHT + 16);
+    setShiftX(
+      popoverShiftX(rect.left, CALENDAR_WIDTH, document.documentElement.clientWidth),
+    );
   }, [open]);
 
   useEffect(() => {
@@ -136,9 +145,9 @@ export function DiaryDatePicker({ value, max, onChange, defaultOpen = false }: D
             ...(dropUp
               ? { bottom: "calc(100% + 8px)" }
               : { top: "calc(100% + 8px)" }),
-            left: 0,
+            left: shiftX,
             zIndex: 100,
-            width: 288,
+            width: CALENDAR_WIDTH,
             backgroundColor: "var(--surface-raised)",
             border: "1px solid var(--border)",
             borderRadius: "var(--radius-xl)",
